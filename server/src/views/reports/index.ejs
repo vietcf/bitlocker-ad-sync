@@ -1,0 +1,190 @@
+<%- include('../partials/head') %>
+<%
+  const t = report.totals;
+  const pct = (v) => (v === null || v === undefined ? '—' : `${h.number(Math.round(v * 1000) / 10)}%`);
+  const vn = (iso) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
+  const qs = h.query({}, report.period.all
+    ? { period: 'all', branchId: report.branchId }
+    : { from: report.period.from, to: report.period.to, branchId: report.branchId });
+  const label = (b) => b.branch_code ?? 'N/A';
+  const reasonLabel = (r) => ({ user_locked_out: 'Bị khóa máy', hardware_change: 'Đổi phần cứng', bios_update: 'Cập nhật BIOS', disk_recovery: 'Khôi phục ổ', other: 'Khác' })[r] ?? r ?? '—';
+  const USER_LIMIT = 100;
+  const NO_KEY_LIMIT = 200;
+%>
+<div class="title-row">
+  <h1>Báo cáo</h1>
+  <a class="button small" href="/reports/export.xlsx<%= qs %>" title="Tải file Excel gồm tổng quan, chi tiết từng chi nhánh, xem key theo chi nhánh, người xem key và máy chưa có key (được ghi nhật ký)">Xuất Excel</a>
+</div>
+
+<form method="get" action="/reports" class="filter-bar">
+  <div class="filter-fields">
+    <fieldset class="date-range">
+      <legend>Kỳ báo cáo</legend>
+      <input type="date" name="from" value="<%= report.period.from %>" aria-label="Từ ngày" title="Từ ngày">
+      <span class="muted">–</span>
+      <input type="date" name="to" value="<%= report.period.to %>" aria-label="Đến ngày" title="Đến ngày">
+      <label class="check" title="Từ ngày đầu tiên có dữ liệu đến hôm nay; bỏ qua ô ngày">
+        <input type="checkbox" name="period" value="all" <%= report.period.all ? 'checked' : '' %>> Toàn bộ thời gian
+      </label>
+    </fieldset>
+    <% if (report.branchOptions.length > 1) { %>
+    <label>Chi nhánh
+      <select name="branchId">
+        <option value="">Tất cả</option>
+        <% report.branchOptions.forEach((b) => { %><option value="<%= b.id %>" <%= report.branchId === b.id ? 'selected' : '' %>><%= b.code %> · <%= b.name %></option><% }) %>
+      </select>
+    </label>
+    <% } %>
+  </div>
+  <div class="filter-actions">
+    <span class="muted small">Nhanh:
+      <% [7, 30, 90].forEach((n, i) => { %><%= i ? ' · ' : '' %><a href="/reports<%= h.query(query, { from: h.daysAgo(n - 1), to: undefined, period: undefined }) %>"><%= n %> ngày</a><% }) %>
+      · <a href="/reports<%= h.query(query, { period: 'all', from: undefined, to: undefined }) %>">Toàn bộ</a>
+    </span>
+    <span class="spacer"></span>
+    <a href="/reports" class="small">Mặc định (30 ngày)</a>
+    <button type="submit" class="small">Xem</button>
+  </div>
+</form>
+
+<p class="muted small">Kỳ báo cáo <% if (report.period.all) { %><strong>toàn bộ thời gian</strong>, <% } %><strong><%= vn(report.period.from) %> – <%= vn(report.period.to) %></strong> (<%= report.period.days %> ngày).
+  Số máy, số key là hiện tại; "mới", "rời AD" và lượt hiện key tính trong kỳ.</p>
+
+<h2 class="section-title">Tổng quan</h2>
+<section class="tiles">
+  <div class="tile"><div class="tile-label">Chi nhánh</div><div class="tile-value"><%= h.number(t.branches) %></div></div>
+  <div class="tile"><div class="tile-label">Máy trong AD</div><div class="tile-value"><%= h.number(t.computers) %></div>
+    <div class="tile-sub">+<%= h.number(t.newComputers) %> mới · <%= h.number(t.leftAd) %> rời AD trong kỳ</div></div>
+  <div class="tile"><div class="tile-label">Máy có key</div><div class="tile-value"><%= pct(t.coverage) %></div>
+    <div class="tile-sub"><%= h.number(t.withKey) %> có key · <%= h.number(t.noKey) %> chưa có</div></div>
+  <div class="tile"><div class="tile-label">Số key</div><div class="tile-value"><%= h.number(t.keys) %></div>
+    <div class="tile-sub">+<%= h.number(t.newKeys) %> mới trong kỳ</div></div>
+  <div class="tile"><div class="tile-label">Lượt hiện key</div><div class="tile-value"><%= h.number(t.reveals) %></div>
+    <div class="tile-sub"><%= h.number(t.revealUsers) %> người · <%= h.number(t.revealComputers) %> máy<% if (t.outOfHours !== null) { %> · <%= h.number(t.outOfHours) %> ngoài giờ<% } %></div></div>
+</section>
+
+<section class="card">
+  <h2>Chi tiết theo chi nhánh</h2>
+  <div class="table-scroll">
+  <table class="dense report">
+    <thead>
+      <tr><th>Chi nhánh</th><th class="num">Máy</th><th class="num">Có key</th><th class="num">Chưa có key</th><th class="num">% có key</th>
+        <th class="num">Số key</th><th class="num">Máy mới</th><th class="num">Key mới</th><th class="num">Rời AD</th></tr>
+    </thead>
+    <tbody>
+    <% report.branches.forEach((b) => { %>
+      <tr>
+        <td><strong><%= label(b) %></strong><% if (b.branch_name) { %> <span class="muted">· <%= b.branch_name %></span><% } %></td>
+        <td class="num"><%= h.number(b.computers) %></td>
+        <td class="num"><%= h.number(b.with_key) %></td>
+        <td class="num"><% if (b.no_key) { %><a href="/?branchId=<%= b.branch_id ?? 'na' %>&status=no_key"><%= h.number(b.no_key) %></a><% } else { %>—<% } %></td>
+        <td class="num"><span class="<%= b.coverage !== null && b.coverage < 0.9 ? 'low' : '' %>"><%= pct(b.coverage) %></span></td>
+        <td class="num"><%= h.number(b.keys) %></td>
+        <td class="num"><%= b.new_computers ? `+${h.number(b.new_computers)}` : '—' %></td>
+        <td class="num"><%= b.new_keys ? `+${h.number(b.new_keys)}` : '—' %></td>
+        <td class="num"><%= b.left_ad ? h.number(b.left_ad) : '—' %></td>
+      </tr>
+    <% }) %>
+    <% if (!report.branches.length) { %><tr><td colspan="9" class="muted">Không có dữ liệu trong phạm vi của bạn.</td></tr><% } %>
+    </tbody>
+    <% if (report.branches.length > 1) { %>
+    <tfoot><tr><th>Tổng</th><th class="num"><%= h.number(t.computers) %></th><th class="num"><%= h.number(t.withKey) %></th><th class="num"><%= h.number(t.noKey) %></th>
+      <th class="num"><%= pct(t.coverage) %></th><th class="num"><%= h.number(t.keys) %></th><th class="num">+<%= h.number(t.newComputers) %></th>
+      <th class="num">+<%= h.number(t.newKeys) %></th><th class="num"><%= h.number(t.leftAd) %></th></tr></tfoot>
+    <% } %>
+  </table>
+  </div>
+  <p class="muted small">% có key dưới 90% được tô màu. Bấm số "Chưa có key" để mở danh sách máy ở trang Tìm máy.</p>
+</section>
+
+<section class="card">
+  <h2>Xem key theo chi nhánh</h2>
+  <div class="table-scroll">
+  <table class="dense report">
+    <thead>
+      <tr><th>Chi nhánh</th><th class="num">Lượt hiện key</th><th class="num">Người xem</th><th class="num">Máy được xem</th>
+        <th class="num">Ngoài giờ</th><th class="num">Xuất file</th><th>Lý do nhiều nhất</th></tr>
+    </thead>
+    <tbody>
+    <% const viewed = report.branches.filter((b) => b.reveals > 0).sort((a, b) => b.reveals - a.reveals); %>
+    <% viewed.forEach((b) => { %>
+      <tr>
+        <td><strong><%= label(b) %></strong><% if (b.branch_name) { %> <span class="muted">· <%= b.branch_name %></span><% } %></td>
+        <td class="num"><%= h.number(b.reveals) %></td>
+        <td class="num"><%= h.number(b.reveal_users) %></td>
+        <td class="num"><%= h.number(b.reveal_computers) %></td>
+        <td class="num"><%= b.out_of_hours === null ? '—' : (b.out_of_hours ? h.number(b.out_of_hours) : '—') %></td>
+        <td class="num"><%= b.exported ? h.number(b.exported) : '—' %></td>
+        <td><%= reasonLabel(b.top_reason) %><% if (b.top_reason) { %> <span class="muted">(<%= b.reasons[b.top_reason] %>)</span><% } %></td>
+      </tr>
+    <% }) %>
+    <% if (!viewed.length) { %><tr><td colspan="7" class="muted">Không có lượt hiện key nào trong kỳ.</td></tr><% } %>
+    </tbody>
+  </table>
+  </div>
+  <% if (t.outOfHours === null) { %><p class="muted small">"Ngoài giờ" chỉ tính khi đã cấu hình giờ làm việc (cảnh báo xem key ngoài giờ).</p><% } %>
+
+  <h3>Người xem key</h3>
+  <div class="table-scroll">
+  <table class="dense">
+    <thead><tr><th>Chi nhánh</th><th>Người dùng</th><th class="num">Lượt</th><th class="num">Số máy</th><th>Lần gần nhất</th></tr></thead>
+    <tbody>
+    <% report.revealUsers.slice(0, USER_LIMIT).forEach((u) => { %>
+      <tr><td><%= u.branch_code ?? 'N/A' %></td><td><%= u.user_upn %></td><td class="num"><%= h.number(u.reveals) %></td>
+        <td class="num"><%= h.number(u.computers) %></td><td><%= h.dateTime(u.last_at) %></td></tr>
+    <% }) %>
+    <% if (!report.revealUsers.length) { %><tr><td colspan="5" class="muted">Không có.</td></tr><% } %>
+    </tbody>
+  </table>
+  </div>
+  <% if (report.revealUsers.length > USER_LIMIT) { %><p class="muted small">Hiện <%= USER_LIMIT %> / <%= report.revealUsers.length %> dòng; file Excel có đủ.</p><% } %>
+  <% if (can('logs')) { %><p><a href="/audit?action=reveal">Xem nhật ký hiện key →</a></p><% } %>
+</section>
+
+<section class="card">
+  <div class="title-row">
+    <h2>Máy chưa có key trên AD (<%= h.number(report.noKey.length) %>)</h2>
+  </div>
+  <p class="muted small">Máy còn trong AD nhưng chưa lưu recovery key: BitLocker chưa bật, hoặc GPO lưu key lên AD chưa áp dụng.
+    Máy mới ghi nhận trong <%= report.noKeyNewDays %> ngày có thể vẫn đang chờ GPO; máy lâu hơn là phần cần xử lý.</p>
+  <% if (!report.noKey.length) { %>
+    <p class="muted">Không có máy nào chưa có key.</p>
+  <% } else if (!report.noKeyDetail) { %>
+    <%# Tat ca chi nhanh: chi tong quan theo chi nhanh, danh sach may o trang Tim may %>
+    <table class="dense">
+      <thead><tr><th>Chi nhánh</th><th class="num">Chưa có key</th><th class="num">Lâu hơn <%= report.noKeyNewDays %> ngày</th>
+        <th class="num">Mới (≤ <%= report.noKeyNewDays %> ngày)</th><th></th></tr></thead>
+      <tbody>
+      <% report.noKeyByBranch.forEach((b) => { %>
+        <tr><td title="<%= b.branch_name ?? 'Máy chưa thuộc chi nhánh nào' %>"><strong><%= h.branchCode(b.branch_code) %></strong><% if (b.branch_name) { %> <span class="muted">· <%= b.branch_name %></span><% } %></td>
+          <td class="num"><%= h.number(b.total) %></td>
+          <td class="num"><% if (b.older) { %><strong><%= h.number(b.older) %></strong><% } else { %>—<% } %></td>
+          <td class="num"><%= b.recent ? h.number(b.recent) : '—' %></td>
+          <td><a href="/?branchId=<%= b.branch_id ?? 'na' %>&status=no_key">Xem danh sách →</a></td></tr>
+      <% }) %>
+      </tbody>
+      <% if (report.noKeyByBranch.length > 1) { %>
+      <tfoot><tr><th>Tổng</th><th class="num"><%= h.number(report.noKey.length) %></th>
+        <th class="num"><%= h.number(report.noKeyByBranch.reduce((n, b) => n + b.older, 0)) %></th>
+        <th class="num"><%= h.number(report.noKeyByBranch.reduce((n, b) => n + b.recent, 0)) %></th><th></th></tr></tfoot>
+      <% } %>
+    </table>
+    <p class="muted small">Chọn một chi nhánh ở bộ lọc phía trên để xem và xuất Excel danh sách máy; báo cáo tất cả chi nhánh (cả file Excel) chỉ có tổng hợp này.</p>
+  <% } else { %>
+    <div class="table-scroll">
+    <table class="dense">
+      <thead><tr><th>Máy</th><th>Chi nhánh</th><th>Hệ điều hành</th><th>Tạo trên AD</th><th>Ghi nhận</th><th class="num">Số ngày chưa có key</th></tr></thead>
+      <tbody>
+      <% report.noKey.slice(0, NO_KEY_LIMIT).forEach((c) => { %>
+        <tr><td><a href="/computers/<%= c.id %>"><%= c.name %></a><% if (c.is_new) { %> <span class="badge badge-muted">mới</span><% } %></td>
+          <td><%= h.branchCode(c.branch_code) %></td><td><%= c.os ?? '—' %></td>
+          <td><%= h.date(c.ad_created_at) %></td><td><%= h.date(c.first_seen_at) %></td>
+          <td class="num"><%= h.number(c.days_without_key) %></td></tr>
+      <% }) %>
+      </tbody>
+    </table>
+    </div>
+    <% if (report.noKey.length > NO_KEY_LIMIT) { %><p class="muted small">Hiện <%= NO_KEY_LIMIT %> / <%= report.noKey.length %> máy; file Excel có đủ.</p><% } %>
+  <% } %>
+</section>
+<%- include('../partials/foot') %>

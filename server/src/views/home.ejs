@@ -1,0 +1,136 @@
+<%- include('partials/head') %>
+<section class="search-hero">
+  <h1>Tìm máy</h1>
+  <form method="get" action="/" class="search" role="search">
+    <input name="q" value="<%= q %>" placeholder="Key ID, tên máy, serial, email hoặc GUID máy" aria-label="Key ID, tên máy, serial, email hoặc GUID máy" autofocus autocomplete="off" spellcheck="false">
+    <button type="submit">Tìm</button>
+  </form>
+  <p class="muted small search-help">
+    <strong>Key ID:</strong> từ 4 ký tự đầu trên màn hình BitLocker, ví dụ <code>1A2B</code>, có hay không có dấu gạch đều được.
+    <strong>Tên máy, serial, email:</strong> một phần bất kỳ từ 3 ký tự, không cần đúng dấu gạch, ví dụ <code>0231</code> hoặc <code>lt0231</code> tìm ra <code>HN-LT-0231</code>.
+  </p>
+</section>
+
+<% if (result) { %>
+<section class="card">
+  <% if (result.rows.length === 0) { %>
+    <p>Không tìm thấy <%= result.kind === 'key' ? 'key' : 'máy' %> nào khớp với <strong><%= result.query %></strong> trong phạm vi của bạn.</p>
+    <% if (result.kind === 'key') { %>
+      <p class="muted">Kiểm tra lại các ký tự đầu của Key ID. Nếu máy mới được mã hóa, key có thể chưa được sync (tối đa 15 phút).</p>
+    <% } %>
+  <% } else if (result.kind === 'key') { %>
+    <h2>Key khớp với <code><%= result.query.toUpperCase() %></code></h2>
+    <table>
+      <thead><tr><th>Máy</th><th>Chi nhánh</th><th>Key ID</th><th>Tạo trên AD</th><th>Ghi nhận</th><th>Trạng thái</th><th></th></tr></thead>
+      <tbody>
+      <% result.rows.forEach((r) => { const st = h.keyStatus(r.key_status); %>
+        <tr>
+          <td><a href="/computers/<%= r.id %>?key=<%= r.key_id %>"><%= r.name %></a>
+            <span class="guid" title="objectGUID trên AD"><%= r.object_guid %></span>
+            <% if (r.deleted_in_ad_at) { %><span class="badge badge-muted">Không còn trong AD</span><% } %></td>
+          <td><%= h.branchCode(r.branch_code) %></td>
+          <td><code><%= r.key_id.toUpperCase() %></code></td>
+          <td><%= h.date(r.key_created_at) %></td>
+          <td><%= h.date(r.key_first_synced_at) %></td>
+          <td><span class="badge badge-<%= st.tone %>"><%= st.label %></span></td>
+          <td><a class="button small" href="/computers/<%= r.id %>/keys/<%= r.key_id %>/reveal">Hiện key</a></td>
+        </tr>
+      <% }) %>
+      </tbody>
+    </table>
+    <% if (result.computers && result.computers.rows.length) { %>
+      <h2>Máy có tên, serial hoặc email chứa “<%= result.query %>”</h2>
+      <%- include('partials/computer-results', { rows: result.computers.rows }) %>
+      <% if (result.computers.total > result.computers.rows.length) { %><p class="muted small">Còn <%= h.number(result.computers.total - result.computers.rows.length) %> máy nữa: gõ thêm ký tự để thu hẹp.</p><% } %>
+    <% } %>
+  <% } else { %>
+    <h2><%= h.number(result.total) %> máy có tên, serial hoặc email chứa “<%= result.query %>”</h2>
+    <%- include('partials/computer-results', { rows: result.rows }) %>
+    <%- include('partials/pager', { page: result.page, pages: result.pages, query: { q }, total: result.total, pageSize: result.pageSize, unit: 'máy' }) %>
+  <% } %>
+  <p><a href="/">← Xem tất cả máy</a></p>
+</section>
+<% } %>
+
+<% if (list) { %>
+<section class="card">
+  <div class="title-row">
+    <h2>Máy trong phạm vi của bạn</h2>
+    <% if (features['feature.computer_export'] || canExportKeys) { %>
+    <div class="button-group">
+      <% if (features['feature.computer_export']) { %>
+        <a class="button secondary small" href="/computers/export.csv<%= h.query(query, { page: undefined, q: undefined }) %>"
+           title="Xuất toàn bộ danh sách theo bộ lọc đang chọn (không có key)">Xuất CSV</a>
+      <% } %>
+      <% if (canExportKeys) { %>
+        <a class="button sensitive small" href="/computers/export-keys<%= h.query(query, { page: undefined, q: undefined }) %>"
+           title="Xuất danh sách kèm mật khẩu recovery (cần lý do, được ghi nhật ký)">🔑 Xuất kèm key</a>
+      <% } %>
+    </div>
+    <% } %>
+  </div>
+  <form method="get" action="/" class="filter-bar">
+    <div class="filter-fields">
+    <% if (list.branches.length > 1 || list.seesUnmapped) { %>
+    <label>Chi nhánh
+      <select name="branchId">
+        <option value="">Tất cả</option>
+        <% list.branches.forEach((b) => { %><option value="<%= b.id %>" <%= filters.branchId === b.id ? 'selected' : '' %>><%= b.code %> · <%= b.name %></option><% }) %>
+        <% if (list.seesUnmapped) { %><option value="na" <%= filters.branchId === 'na' ? 'selected' : '' %>>N/A · Chưa thuộc chi nhánh nào</option><% } %>
+      </select>
+    </label>
+    <% } %>
+    <label>Tình trạng
+      <select name="status">
+        <option value="all" <%= filters.status === 'all' ? 'selected' : '' %>>Tất cả</option>
+        <option value="no_key" <%= filters.status === 'no_key' ? 'selected' : '' %>>Chưa có key</option>
+      </select>
+    </label>
+    <fieldset class="date-range">
+      <legend>Ngày xuất hiện</legend>
+      <select name="dateField" aria-label="Lọc theo ngày">
+        <option value="seen" <%= filters.dateField === 'seen' ? 'selected' : '' %>>Ghi nhận trên hệ thống</option>
+        <option value="ad" <%= filters.dateField === 'ad' ? 'selected' : '' %>>Tạo trên AD</option>
+      </select>
+      <input type="date" name="from" value="<%= filters.from ?? '' %>" aria-label="Từ ngày" title="Từ ngày">
+      <span class="muted">–</span>
+      <input type="date" name="to" value="<%= filters.to ?? '' %>" aria-label="Đến ngày" title="Đến ngày">
+    </fieldset>
+    </div>
+    <div class="filter-actions">
+      <label class="check"><input type="checkbox" name="includeDeleted" <%= filters.includeDeleted ? 'checked' : '' %>> Hiện cả máy không còn trong AD</label>
+      <span class="spacer"></span>
+      <a href="/" class="small">Xóa lọc</a>
+      <button type="submit" class="small">Lọc</button>
+    </div>
+  </form>
+
+  <% if (list.rows.length === 0) { %>
+    <p class="muted">Không có máy nào khớp bộ lọc.</p>
+  <% } else { %>
+  <table>
+    <thead><tr><th>Máy</th><th>Chi nhánh</th><th>Hệ điều hành</th><th class="num">Số key</th><th>Key mới nhất</th><th>Tạo trên AD</th><th>Ghi nhận</th><th>Tình trạng</th></tr></thead>
+    <tbody>
+    <% list.rows.forEach((c) => { %>
+      <tr>
+        <td><a href="/computers/<%= c.id %>"><%= c.name %></a><span class="guid" title="objectGUID trên AD"><%= c.object_guid %></span></td>
+        <td title="<%= c.branch_name ?? 'Chưa thuộc chi nhánh nào' %>"><%= h.branchCode(c.branch_code) %></td>
+        <td><%= c.os ?? '—' %></td>
+        <td class="num"><%= c.key_count %></td>
+        <td><%= h.date(c.latest_key_at) %></td>
+        <td><%= h.date(c.ad_created_at) %></td>
+        <td title="Lần đầu hệ thống ghi nhận máy này (qua đồng bộ AD)"><%= h.date(c.first_seen_at) %></td>
+        <td>
+          <% if (c.deleted_in_ad_at) { %><span class="badge badge-muted">Không còn trong AD</span>
+          <% } else if (c.key_count === 0) { %><span class="badge badge-bad">Chưa có key</span>
+          <% } else { %><span class="badge badge-good">Có key</span><% } %>
+        </td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+  <% } %>
+  <%- include('partials/pager', { page: list.page, pages: list.pages, query, total: list.total, pageSize: list.pageSize, unit: 'máy' }) %>
+</section>
+<% } %>
+<%- include('partials/foot') %>

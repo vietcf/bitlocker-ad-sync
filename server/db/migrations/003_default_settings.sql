@@ -1,0 +1,22 @@
+-- Default values from the design doc; Admin HQ can change them later.
+INSERT INTO app_setting (key, value) VALUES
+  ('reveal.reasons',          '["user_locked_out", "hardware_change", "bios_update", "disk_recovery", "other"]'),
+  ('reveal.ticket_required',  'false'),
+  ('reveal.limit_per_hour',   '5'),
+  ('reveal.limit_per_day',    '20'),
+  ('reveal.working_hours',    '{"tz": "Asia/Ho_Chi_Minh", "days": [1,2,3,4,5], "start": "08:00", "end": "18:00"}'),
+  ('reveal.sensitive_ous',    '[]'),
+  ('anomaly.min_computer_ratio',     '0.95'),
+  ('anomaly.branch_drop_ratio',      '0.20'),
+  ('anomaly.branch_drop_min',        '10'),
+  ('anomaly.min_key_ratio',          '0.95'),
+  ('anomaly.escrow_ratio',           '0.50'),
+  ('anomaly.escrow_min_new',         '5'),
+  ('anomaly.no_key_pp_increase',     '5'),
+  ('anomaly.usn_stall_hours',        '6'),
+  ('anomaly.canary_max_age_minutes', '90'),
+  ('watchdog.heartbeat_max_minutes', '15'),
+  ('watchdog.delta_max_minutes',     '60'),
+  ('watchdog.full_max_hours',        '26'),
+  ('watchdog.running_max_hours',     '2'),
+  ('full_sync.max_delete_ratio',     '0.05');

@@ -1,0 +1,22 @@
+<%# Computers found by the search box. Locals: rows (with matched_on: name | serial | email). %>
+<% const MATCHED = { serial: 'khớp serial', email: 'khớp email' }; %>
+<table>
+  <thead><tr><th>Máy</th><th>Chi nhánh</th><th>Serial</th><th>Email người dùng</th><th>Hệ điều hành</th><th>Số key</th><th>Tạo trên AD</th><th>Ghi nhận</th><th>Trạng thái AD</th></tr></thead>
+  <tbody>
+  <% rows.forEach((c) => { %>
+    <tr>
+      <td><a href="/computers/<%= c.id %>"><%= c.name %></a>
+        <% if (MATCHED[c.matched_on]) { %><span class="badge badge-muted"><%= MATCHED[c.matched_on] %></span><% } %>
+        <span class="guid" title="objectGUID trên AD"><%= c.object_guid %></span></td>
+      <td><%= h.branchCode(c.branch_code) %></td>
+      <td><%= c.device_serial ?? '—' %></td>
+      <td><%= c.owner_email ?? '—' %></td>
+      <td><%= c.os ?? '—' %></td>
+      <td><%= c.key_count %></td>
+      <td><%= h.date(c.ad_created_at) %></td>
+      <td><%= h.date(c.first_seen_at) %></td>
+      <td><% if (c.deleted_in_ad_at) { %><span class="badge badge-muted">Không còn trong AD</span><% } else { %>Còn trong AD<% } %></td>
+    </tr>
+  <% }) %>
+  </tbody>
+</table>

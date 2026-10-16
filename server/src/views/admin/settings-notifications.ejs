@@ -1,0 +1,79 @@
+<%- include('../partials/head') %>
+<%- include('_tabs') %>
+<section class="card">
+  <h2>Thông báo qua email</h2>
+  <p class="muted">Email không bao giờ chứa recovery key. Chỉ người dùng có email
+    (<a href="/admin/users">Người dùng</a>) và đang hoạt động mới nhận được.</p>
+  <%- include('../partials/error-box', { error }) %>
+  <form method="post" action="/admin/settings/notifications" class="form">
+    <%- include('../partials/csrf') %>
+
+    <fieldset>
+      <legend>Cảnh báo hệ thống</legend>
+      <p class="muted small">Sync lỗi, sync bất thường bị giữ lại, worker không gửi heartbeat, chứng chỉ LDAPS sắp hết hạn,
+        chuỗi hash nhật ký bị gãy, xem key ngoài giờ...</p>
+      <label class="check"><input type="checkbox" name="alertsEnabled" <%= n.alerts.enabled ? 'checked' : '' %>>
+        <span><strong>Gửi email cảnh báo</strong></span></label>
+      <label class="check"><input type="checkbox" name="alertsAdmins" <%= n.alerts.admins ? 'checked' : '' %>>
+        <span>Gửi cho mọi Admin HQ</span></label>
+      <label>Gửi thêm cho các địa chỉ
+        <textarea name="alertsExtra" rows="3" placeholder="security@corp.local&#10;it-hq@corp.local"><%= n.alerts.extra.join('\n') %></textarea>
+        <span class="muted hint">Mỗi dòng một địa chỉ. Các địa chỉ trong <code>NOTIFY_TO</code> (file .env) luôn nhận.</span>
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Máy mới, key mới</legend>
+      <p class="muted small">Sau mỗi lượt sync, mỗi người nhận một email gom các máy/key mới trong phạm vi của họ.</p>
+      <label class="check"><input type="checkbox" name="newComputers" <%= n.newObjects.computers ? 'checked' : '' %>>
+        <span><strong>Khi có máy mới</strong> trong AD</span></label>
+      <label class="check"><input type="checkbox" name="newKeys" <%= n.newObjects.keys ? 'checked' : '' %>>
+        <span><strong>Khi có recovery key mới</strong> (email chỉ có Key ID, không có mật khẩu)</span></label>
+      <p><strong>Gửi cho</strong></p>
+      <label class="check"><input type="checkbox" name="newBranchUsers" <%= n.newObjects.branchUsers ? 'checked' : '' %>>
+        <span>Người dùng của chi nhánh (vai trò IT, Trưởng IT) có máy nằm trong OU của chi nhánh</span></label>
+      <label class="check"><input type="checkbox" name="newAdmins" <%= n.newObjects.admins ? 'checked' : '' %>>
+        <span>Mọi Admin HQ (nhận tất cả, kể cả máy N/A chưa thuộc chi nhánh nào)</span></label>
+      <label class="check"><input type="checkbox" name="skipFirstFull" <%= n.newObjects.skipFirstFull ? 'checked' : '' %>>
+        <span>Không gửi cho lượt full sync đầu tiên <span class="muted">(lượt này thấy mọi máy là "mới")</span></span></label>
+      <label>Số máy / key tối đa liệt kê trong một email
+        <input type="number" name="maxItems" value="<%= n.newObjects.maxItems %>" min="10" max="1000" style="max-width: 140px">
+        <span class="muted hint">Ví dụ đặt 100 mà lượt sync có 300 máy mới: email liệt kê 100 máy đầu, rồi ghi "... and 200 more". Danh sách đầy đủ xem trên web.</span>
+      </label>
+    </fieldset>
+    <fieldset>
+      <legend>Báo cáo hằng ngày</legend>
+      <p class="muted small">Mỗi ngày một email cho Admin HQ: trạng thái đồng bộ AD (worker, lượt sync, cảnh báo), số máy và key tăng / giảm trong ngày,
+        chi nhánh có thay đổi, biểu đồ số máy và số key 10 ngày gần nhất. Không có recovery key.</p>
+      <label class="check"><input type="checkbox" name="reportEnabled" <%= n.dailyReport.enabled ? 'checked' : '' %>>
+        <span><strong>Gửi báo cáo hằng ngày</strong></span></label>
+      <div class="inline-fields">
+        <label>Giờ gửi
+          <input type="time" name="reportTime" value="<%= n.dailyReport.time %>" required class="input-time">
+        </label>
+        <label>Số liệu của
+          <select name="reportPeriod">
+            <option value="yesterday" <%= n.dailyReport.period === 'yesterday' ? 'selected' : '' %>>Hôm qua (cả ngày), hợp với gửi buổi sáng</option>
+            <option value="today" <%= n.dailyReport.period === 'today' ? 'selected' : '' %>>Hôm nay, tính đến giờ gửi (hợp với gửi cuối ngày)</option>
+          </select>
+        </label>
+      </div>
+      <span class="muted hint">Giờ theo múi giờ của ứng dụng (APP_TZ). Bật sau giờ gửi của hôm nay thì báo cáo đầu tiên gửi vào ngày mai.
+        <% if (n.dailyReport.lastDay) { %>Lần gửi theo lịch gần nhất: <%= n.dailyReport.lastDay.split('-').reverse().join('/') %>.<% } %></span>
+      <p><strong>Gửi cho</strong></p>
+      <label class="check"><input type="checkbox" name="reportAdmins" <%= n.dailyReport.admins ? 'checked' : '' %>>
+        <span>Mọi Admin HQ có email</span></label>
+      <label>Gửi thêm cho các địa chỉ
+        <textarea name="reportExtra" rows="2" placeholder="it-manager@corp.local"><%= n.dailyReport.extra.join('\n') %></textarea>
+        <span class="muted hint">Mỗi dòng một địa chỉ.</span>
+      </label>
+    </fieldset>
+    <div class="actions"><button type="submit">Lưu</button></div>
+  </form>
+  <form method="post" action="/admin/settings/notifications/daily-report/send" class="inline-form">
+    <%- include('../partials/csrf') %>
+    <button type="submit" class="secondary small" title="Tạo báo cáo với cấu hình đã lưu và gửi ngay (không tính là báo cáo theo lịch của hôm nay)">Gửi thử báo cáo ngay</button>
+    <span class="muted small">Dùng cấu hình đã lưu; xem kết quả ở Log email (có nút xem bản HTML).</span>
+  </form>
+</section>
+<%- include('../partials/foot') %>

@@ -1,0 +1,1017 @@
+openapi: 3.1.0
+info:
+  title: BitLocker Key Management API
+  version: 1.0.0
+  description: |
+    JSON API of the app (same rules as the web pages: both call the same services).
+    The worker's ingest API is documented separately (port 8443, `/docs`).
+
+    **Sign-in.** `POST /api/auth/login` starts a session (cookie `blk.sid`, HttpOnly, SameSite=Strict)
+    and returns a `csrfToken`. Send it as header `X-CSRF-Token` on every POST / PUT / DELETE.
+    `GET /api/me` returns the current token again. Sessions end after 15 minutes idle, 8 hours max.
+
+    **Try it out here.** This page is only for signed-in users, so your session cookie is already
+    sent. GET calls work as they are. For POST / PUT / DELETE, run `GET /api/me`, copy `csrfToken`,
+    click **Authorize** and paste it into `csrfHeader`.
+
+    **Scope.** Every answer is limited to the caller's branches. Something outside the scope answers
+    404, exactly like something that does not exist.
+
+    **Errors.** `{ "error": "<code>", "message": "<English sentence>", ...details }`. Rely on `error`,
+    not on the wording. Validation errors (400 `invalid_request`) list `fields: [{ field, message }]`.
+
+    **Logging.** Searches, computer views, reveals, exports and every admin change are written to
+    the tamper-evident access log. Recovery passwords appear only in the reveal and key-export answers.
+servers:
+  - url: /
+security:
+  - sessionCookie: []
+    csrfHeader: []
+
+tags:
+  - name: Auth
+  - name: Dashboard
+  - name: Computers
+    description: Search, list, details, hand-entered info. Never returns key values.
+  - name: Keys
+    description: Reveal one key, export keys with passwords.
+  - name: Audit
+  - name: Reports
+  - name: Admin - branches
+  - name: Admin - users
+  - name: Admin - sync
+  - name: Admin - settings
+  - name: Admin - mail log
+
+paths:
+  # ------------------------------------------------------------------------------------- Auth
+  /api/auth/login:
+    post:
+      operationId: postAuthLogin
+      tags: [Auth]
+      summary: Sign in (AD password over LDAPS, or local password)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string, maxLength: 128, description: 'nguyenvana, CORP\nguyenvana or nguyenvana@corp.local for AD users', example: admin }
+                password: { type: string, maxLength: 256, format: password }
+      responses:
+        '200':
+          description: |
+            Signed in, the session cookie is set. With two-step sign-in on for the user, the response is
+            `{ secondFactor: 'code' | 'setup', csrfToken }` instead and the session is NOT signed in yet:
+            for 'setup' call GET /api/auth/2fa/setup, then (both cases) POST /api/auth/2fa with the code, within 5 minutes.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  secondFactor: { type: string, enum: [code, setup], description: 'Only when two-step sign-in is required.' }
+                  user:
+                    type: object
+                    properties:
+                      username: { type: string }
+                      displayName: { type: string }
+                  mustChangePassword: { type: boolean, description: 'Local accounts only: call change-password before anything else.' }
+                  csrfToken: { type: string }
+        '401': { $ref: '#/components/responses/Error', description: 'invalid_credentials' }
+        '403': { $ref: '#/components/responses/Error', description: 'ad_account_mismatch' }
+        '423': { $ref: '#/components/responses/Error', description: 'account_locked (after repeated failures, 15 minutes)' }
+        '503': { $ref: '#/components/responses/Error', description: 'directory_unavailable / directory_not_configured' }
+  /api/auth/2fa/setup:
+    get:
+      operationId: getAuth2faSetup
+      tags: [Auth]
+      summary: First setup of the authenticator app (after a login that answered secondFactor 'setup')
+      description: The secret (base32) and otpauth:// link to add to Microsoft / Google Authenticator. Confirmed by the first code sent to POST /api/auth/2fa.
+      security: []
+      responses:
+        '200':
+          description: The secret, kept (encrypted) until confirmed.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  secret: { type: string }
+                  otpauthUri: { type: string }
+        '400': { $ref: '#/components/responses/Error', description: 'totp_already_set_up / totp_not_required' }
+        '401': { $ref: '#/components/responses/Error', description: 'second_factor_expired (sign in with the password again)' }
+  /api/auth/2fa:
+    post:
+      operationId: postAuth2fa
+      tags: [Auth]
+      summary: Second sign-in step - the 6-digit code from the authenticator app
+      description: Completes the sign-in started by POST /api/auth/login. A code works once; a wrong code counts as a failed sign-in.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string, example: '123456' }
+      responses:
+        '200':
+          description: Signed in (same body as a login without two-step sign-in).
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '401': { $ref: '#/components/responses/Error', description: 'invalid_totp / second_factor_expired' }
+        '423': { $ref: '#/components/responses/Error', description: 'account_locked' }
+  /api/auth/logout:
+    post:
+      operationId: postAuthLogout
+      tags: [Auth]
+      summary: Sign out
+      responses:
+        '204': { description: Signed out. }
+  /api/auth/change-password:
+    post:
+      operationId: postAuthChangePassword
+      tags: [Auth]
+      summary: Change the password of a local account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword: { type: string, format: password }
+                newPassword: { type: string, format: password, minLength: 12, description: 'At least 12 characters, not containing the username, different from the current one.' }
+      responses:
+        '200':
+          description: Changed. The session is renewed with a new CSRF token.
+          content:
+            application/json:
+              schema: { type: object, properties: { csrfToken: { type: string } } }
+        '400': { $ref: '#/components/responses/Error', description: 'wrong_current_password, weak_password (reason too_short | too_long | contains_username | same_as_current), directory_user (AD accounts change it in Windows)' }
+  /api/me:
+    get:
+      operationId: getMe
+      tags: [Auth]
+      summary: The signed-in user, roles, branch scope and CSRF token
+      responses:
+        '200':
+          description: Current user.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    type: object
+                    properties:
+                      username: { type: string }
+                      displayName: { type: string }
+                      authMethod: { type: string, enum: [password] }
+                  mustChangePassword: { type: boolean }
+                  roles: { type: array, items: { $ref: '#/components/schemas/Role' } }
+                  branches:
+                    type: object
+                    description: Branch ids per capability, or "all".
+                    properties:
+                      keys: { $ref: '#/components/schemas/BranchSet' }
+                      logs: { $ref: '#/components/schemas/BranchSet' }
+                      reports: { $ref: '#/components/schemas/BranchSet' }
+                  can:
+                    type: object
+                    properties:
+                      keys: { type: boolean }
+                      logs: { type: boolean }
+                      reports: { type: boolean }
+                      admin: { type: boolean }
+                  csrfToken: { type: string }
+        '401': { $ref: '#/components/responses/Error' }
+
+  # -------------------------------------------------------------------------------- Dashboard
+  /api/dashboard:
+    get:
+      operationId: getDashboard
+      tags: [Dashboard]
+      summary: Quick statistics in the caller's scope
+      description: |
+        `inventory` for anyone with keys or reports; `activity` (reveals) only for roles that read
+        reports; `sync` health only for Admin HQ (null otherwise). `freshness` for everyone:
+        `{ lastSyncAt, ageMinutes, maxMinutes, stale }` (last successful sync; stale when older than
+        the watchdog delta threshold, or never synced).
+        `inventoryDaily` for everyone: `[{ day, computers, keys }]`, the last 30 days in APP_TZ (computers
+        from first recorded until no longer in AD; keys from first recorded).
+      responses:
+        '200': { description: Statistics., content: { application/json: { schema: { type: object, additionalProperties: true } } } }
+        '403': { $ref: '#/components/responses/Error' }
+
+  # -------------------------------------------------------------------------------- Computers
+  /api/computers:
+    get:
+      operationId: getComputers
+      tags: [Computers]
+      summary: Search, list or export computers
+      description: |
+        - With `q`: search, logged as `search`. A Key ID from its first 4 characters (the recovery
+          screen shows 8), or the full GUID (dashes optional), finds keys (`kind: key`); hex text that also matches
+          computers adds them in `computers`. Otherwise computers whose name, machine serial or user
+          e-mail contains the text (from 3 characters; 2 = start only), ignoring case and - _ . spaces;
+          exact matches first, then prefix, then contains; `matched_on`: name | serial | email.
+          A full computer objectGUID finds that computer.
+        - Without `q`: every computer in scope, filtered, 25 per page (not logged).
+        - `format=csv`: the whole filtered list as CSV, no keys (logged `export_computers`;
+          can be switched off under Admin > Features).
+      parameters:
+        - { name: q, in: query, schema: { type: string, maxLength: 100 }, example: HN-LT }
+        - { $ref: '#/components/parameters/Page' }
+        - { name: branchId, in: query, schema: { oneOf: [{ type: integer }, { type: string, enum: [na] }] }, description: 'A branch id, or "na" for computers in no branch (Admin HQ only).' }
+        - { name: status, in: query, schema: { type: string, enum: [all, no_key], default: all } }
+        - { name: includeDeleted, in: query, schema: { type: string, enum: ['on', 'true', '1'] }, description: 'Also list computers no longer in AD.' }
+        - { name: dateField, in: query, schema: { type: string, enum: [seen, ad], default: seen }, description: 'Which date from/to apply to: seen = first recorded in this system, ad = created in AD.' }
+        - { name: from, in: query, schema: { type: string, format: date }, description: 'Appeared on or after this day (YYYY-MM-DD, APP_TZ).' }
+        - { name: to, in: query, schema: { type: string, format: date }, description: 'Appeared on or before this day (YYYY-MM-DD, APP_TZ).' }
+        - { name: format, in: query, schema: { type: string, enum: [csv] } }
+      responses:
+        '200':
+          description: |
+            Search: `{ kind: "key" | "name", query, rows, total, page, pages }` (key rows carry the
+            Key ID and status). List: `{ rows, total, page, pageSize, pages, seesUnmapped }`.
+            CSV: columns name, dns_name, branch, distinguished_name, os, device_serial, owner_email,
+            keys, latest_key_utc, ad_created_utc, first_seen_utc, in_ad, not_in_ad_since_utc.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  kind: { type: string, enum: [key, name] }
+                  query: { type: string }
+                  rows: { type: array, items: { $ref: '#/components/schemas/ComputerRow' } }
+                  total: { type: integer }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+                  pages: { type: integer }
+                  seesUnmapped: { type: boolean }
+            text/csv: { schema: { type: string } }
+        '403': { $ref: '#/components/responses/Error', description: 'forbidden, or feature_disabled for format=csv' }
+  /api/computers/{id}:
+    get:
+      operationId: getComputersById
+      tags: [Computers]
+      summary: Computer details and key metadata (logged as view_computer)
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200':
+          description: The computer and its keys (Key ID, volume, status, dates; never the password).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  computer: { $ref: '#/components/schemas/ComputerRow' }
+                  keys: { type: array, items: { $ref: '#/components/schemas/KeyMeta' } }
+                  keyHistory:
+                    type: object
+                    description: |
+                      moves: keys moved to / from this computer after an unjoin + rejoin (key_id, at, reason
+                      rejoin_same_name | old_not_in_ad, from_/to_computer_id, name, guid; name null when out of scope).
+                      duplicates: open cases of its Key IDs also under another computer still in AD (key_id,
+                      owner_id/name/guid, other_id/name/guid, same_password, detected_at).
+                    properties:
+                      moves: { type: array, items: { type: object, additionalProperties: true } }
+                      duplicates: { type: array, items: { type: object, additionalProperties: true } }
+        '404': { $ref: '#/components/responses/Error' }
+  /api/computers/{id}/info:
+    put:
+      operationId: putComputersByIdInfo
+      tags: [Computers]
+      summary: Set the machine serial and user e-mail of a computer
+      description: Typed by IT, never from AD (sync does not overwrite them). Empty or null clears a value. Logged as computer_edit with before and after values.
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                deviceSerial: { type: [string, 'null'], maxLength: 64, example: 5CG1234XYZ }
+                ownerEmail: { type: [string, 'null'], format: email, maxLength: 254, example: nguyenvana@corp.local }
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  computerId: { type: integer }
+                  deviceSerial: { type: [string, 'null'] }
+                  ownerEmail: { type: [string, 'null'] }
+        '400': { $ref: '#/components/responses/Error', description: 'invalid_request (invalid_email)' }
+        '404': { $ref: '#/components/responses/Error' }
+  /api/keys/search:
+    get:
+      operationId: getKeysSearch
+      tags: [Computers]
+      summary: Find a key by Key ID (same as /api/computers?q=)
+      parameters:
+        - { name: keyId, in: query, required: true, schema: { type: string, minLength: 2, maxLength: 40 }, example: 1A2B3C4D }
+      responses:
+        '200': { description: 'Search result, kind "key".', content: { application/json: { schema: { type: object, additionalProperties: true } } } }
+
+  # ------------------------------------------------------------------------------------- Keys
+  /api/keys/reveal-options:
+    get:
+      operationId: getKeysRevealOptions
+      tags: [Keys]
+      summary: Reasons that may be chosen, and whether a ticket number is required
+      responses:
+        '200':
+          description: Options.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reasons:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        value: { $ref: '#/components/schemas/Reason' }
+                        label: { type: string, example: Khôi phục dữ liệu ổ cứng }
+                  ticketRequired: { type: boolean }
+  /api/keys/{keyId}/reveal:
+    post:
+      operationId: postKeysByKeyIdReveal
+      tags: [Keys]
+      summary: Reveal one recovery password
+      description: |
+        The log row, the read of the password and `last_revealed_at` happen in one transaction: a key
+        is never returned without its log row. Outside working hours Admin HQ is alerted (can be
+        switched off). The answer is `no-store`; show the key briefly and drop it.
+      parameters:
+        - { name: keyId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RevealReason' }
+      responses:
+        '200':
+          description: The recovery password.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  keyId: { type: string, format: uuid }
+                  computerId: { type: integer }
+                  computerName: { type: string }
+                  recoveryPassword: { type: string, example: 123456-234567-345678-456789-567890-678901-789012-890123 }
+                  expiresInSec: { type: integer, example: 60 }
+        '400': { $ref: '#/components/responses/Error', description: 'invalid_reason, ticket_required' }
+        '404': { $ref: '#/components/responses/Error' }
+  /api/keys/export:
+    post:
+      operationId: postKeysExport
+      tags: [Keys]
+      summary: Export keys WITH recovery passwords as CSV
+      description: |
+        Keys of the computers matching the list filters, in the caller's scope. Who may use it is set
+        under Admin > Features (off by default / Admin HQ only / IT, lead and Admin HQ). Every exported
+        key gets its own `reveal` log row plus one `export_keys` row, and Admin HQ is alerted.
+        CSV columns: computer, branch, distinguished_name, in_ad, key_id, volume_guid, device_serial,
+        owner_email, status, key_created_utc, key_recorded_utc, recovery_password.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/RevealReason'
+                - type: object
+                  properties:
+                    branchId: { oneOf: [{ type: integer }, { type: string, enum: [na] }] }
+                    status: { type: string, enum: [all, no_key] }
+                    includeDeleted: { type: boolean }
+                    dateField: { type: string, enum: [seen, ad] }
+                    from: { type: string, format: date }
+                    to: { type: string, format: date }
+      responses:
+        '200': { description: CSV file (no-store)., content: { text/csv: { schema: { type: string } } } }
+        '400': { $ref: '#/components/responses/Error', description: 'invalid_reason, ticket_required' }
+        '403': { $ref: '#/components/responses/Error', description: 'feature_disabled' }
+
+  # ------------------------------------------------------------------------------------ Audit
+  /api/audit:
+    get:
+      operationId: getAudit
+      tags: [Audit]
+      summary: "Search the access log (lead: own branches; admin and auditor: all)"
+      parameters:
+        - { name: branchId, in: query, schema: { type: integer } }
+        - { name: user, in: query, schema: { type: string }, description: 'Part of the account name.' }
+        - { name: action, in: query, schema: { $ref: '#/components/schemas/AuditAction' } }
+        - { name: computer, in: query, schema: { type: string }, description: 'Start of the computer name.' }
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date }, description: 'Exclusive.' }
+        - { $ref: '#/components/parameters/Page' }
+        - { name: format, in: query, schema: { type: string, enum: [csv] }, description: 'CSV of up to 50 000 rows (logged export_log; can be switched off).' }
+      responses:
+        '200':
+          description: '`{ rows, total, page, pageSize, pages }`, newest first; or CSV.'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rows:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        at: { type: string, format: date-time }
+                        user_upn: { type: string }
+                        action: { $ref: '#/components/schemas/AuditAction' }
+                        branch_code: { type: [string, 'null'] }
+                        computer_id: { type: [integer, 'null'] }
+                        computer_name: { type: [string, 'null'] }
+                        key_id: { type: [string, 'null'] }
+                        reason: { type: [string, 'null'] }
+                        reason_note: { type: [string, 'null'] }
+                        ticket_no: { type: [string, 'null'] }
+                        client_ip: { type: [string, 'null'] }
+                        detail: { type: [object, 'null'] }
+                  total: { type: integer }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+                  pages: { type: integer }
+            text/csv: { schema: { type: string } }
+
+  # ---------------------------------------------------------------------------------- Reports
+  /api/reports/summary:
+    get:
+      operationId: getReportsSummary
+      tags: [Reports]
+      summary: Report for a period, per branch (or the same as an Excel file)
+      description: |
+        Within the caller's reports scope. Inventory (computers, with / without key, keys) is the current state;
+        new computers / keys, computers that left AD and key reveals count within the period.
+        `{ period: { all, from, to, days }, branchId, workingHours, generatedAt, totals, branches: [ { branch_id, branch_code,
+        branch_name, computers, with_key, no_key, coverage, keys, new_computers, new_keys, left_ad, reveals, reveal_users,
+        reveal_computers, out_of_hours, exported, reasons, top_reason } ], revealUsers, noKey (each with days_without_key, is_new),
+        noKeyByBranch: [ { branch_id, branch_code, branch_name, total, recent, older } ], noKeyNewDays (7), noKeyDetail }`.
+        `noKeyDetail` is true when the report covers one branch (the page and the xlsx sheet "Máy chưa có key" then list the computers; otherwise only the per-branch summary).
+        `format=xlsx`: a workbook with the sheets Tổng quan, Theo chi nhánh, Xem key theo CN, Người xem key and
+        Máy chưa có key (never a key value), logged as `export_report`.
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date }, description: 'First day (APP_TZ); default 29 days before "to".' }
+        - { name: to, in: query, schema: { type: string, format: date }, description: 'Last day (APP_TZ); default today. At most 366 days.' }
+        - { name: branchId, in: query, schema: { type: integer }, description: 'One branch; outside the caller scope = an empty report.' }
+        - { name: period, in: query, schema: { type: string, enum: [all] }, description: 'all = all time, from the first day with data (computer or key first recorded) to today; from / to are ignored and the 366-day limit does not apply. The response has period.all = true.' }
+        - { name: format, in: query, schema: { type: string, enum: [xlsx] } }
+      responses:
+        '200':
+          description: The report, or the .xlsx file (no-store).
+          content:
+            application/json: { schema: { type: object, additionalProperties: true } }
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet: { schema: { type: string, format: binary } }
+        '400': { $ref: '#/components/responses/Error', description: 'invalid_request (dates)' }
+        '403': { $ref: '#/components/responses/Error' }
+  /api/reports/no-key:
+    get:
+      operationId: getReportsNoKey
+      tags: [Reports]
+      summary: Computers in AD without any recovery key
+      responses:
+        '200': { description: '`{ items: [...] }`', content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { type: object, additionalProperties: true } } } } } } }
+  /api/reports/reveals:
+    get:
+      operationId: getReportsReveals
+      tags: [Reports]
+      summary: Reveals per branch and per user over the last N days
+      parameters:
+        - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 365, default: 30 } }
+      responses:
+        '200': { description: '`{ byBranch, byUser }`', content: { application/json: { schema: { type: object, additionalProperties: true } } } }
+
+  # --------------------------------------------------------------------------- Admin: branches
+  /api/admin/branches:
+    get:
+      operationId: getAdminBranches
+      tags: [Admin - branches]
+      summary: Branches with their OUs, and how many computers are in no branch
+      responses:
+        '200': { description: '`{ branches, unmapped }`', content: { application/json: { schema: { type: object, additionalProperties: true } } } }
+    post:
+      operationId: postAdminBranches
+      tags: [Admin - branches]
+      summary: Create a branch
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/BranchInput' } } } }
+      responses:
+        '201': { description: '`{ id, moved, computers }`: every computer is re-mapped at once, so the new branch already holds the computers of its OUs.', content: { application/json: { schema: { type: object, additionalProperties: true } } } }
+        '409': { $ref: '#/components/responses/Error', description: 'code_taken, ou_taken (details: taken[{ ou, branch }])' }
+  /api/admin/branches/{id}:
+    get:
+      operationId: getAdminBranchesById
+      tags: [Admin - branches]
+      summary: One branch
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { description: The branch., content: { application/json: { schema: { type: object, additionalProperties: true } } } }
+        '404': { $ref: '#/components/responses/Error' }
+    put:
+      operationId: putAdminBranchesById
+      tags: [Admin - branches]
+      summary: Update a branch and its OUs
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/BranchInput' } } } }
+      responses:
+        '200': { description: '`{ id, moved, computers }`', content: { application/json: { schema: { type: object, additionalProperties: true } } } }
+        '409': { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: deleteAdminBranchesById
+      tags: [Admin - branches]
+      summary: Delete a branch (its computers go to N/A)
+      description: |
+        `confirmCode` must repeat the branch code (any case). The branch's computers go to no branch, then every
+        computer is re-mapped (one inside an OU of another branch moves there). Its OUs and the role grants on
+        it are removed; keys and the access log stay. Logged as `admin_change` op `delete_branch`.
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [confirmCode], properties: { confirmCode: { type: string, example: HN } } }
+      responses:
+        '200': { description: '`{ code, computers, toNa, toOther, grants }`', content: { application/json: { schema: { type: object, additionalProperties: true } } } }
+        '400': { $ref: '#/components/responses/Error', description: 'confirm_mismatch' }
+        '404': { $ref: '#/components/responses/Error' }
+  /api/admin/branches/{id}/delete-preview:
+    get:
+      operationId: getAdminBranchesDeletePreview
+      tags: [Admin - branches]
+      summary: What deleting a branch would touch
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { description: '`{ branch, impact: { computers, computers_gone, grants, users_left_without_role } }`', content: { application/json: { schema: { type: object, additionalProperties: true } } } }
+        '404': { $ref: '#/components/responses/Error' }
+  /api/admin/branches/preview:
+    post:
+      operationId: postAdminBranchesPreview
+      tags: [Admin - branches]
+      summary: How many computers a list of OUs would cover, by current branch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { ous: { type: array, items: { type: string }, example: ['OU=Computers,OU=HN,DC=corp,DC=local'] } } }
+      responses:
+        '200': { description: '`{ matches: [{ current_branch, computers }] }` ("N/A" = no branch).', content: { application/json: { schema: { type: object, additionalProperties: true } } } }
+
+  # ------------------------------------------------------------------------------ Admin: users
+  /api/admin/users:
+    get:
+      operationId: getAdminUsers
+      tags: [Admin - users]
+      summary: All users with their grants
+      responses:
+        '200': { description: '`{ items }`', content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { $ref: '#/components/schemas/User' } } } } } } }
+    post:
+      operationId: postAdminUsers
+      tags: [Admin - users]
+      summary: Create a user (AD or local)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, displayName, email]
+              properties:
+                username: { type: string, description: 'AD: sAMAccountName (max 20; "CORP\name" is accepted). Local: 2-64 letters, digits, . _ -' }
+                displayName: { type: string, maxLength: 256 }
+                email: { type: string, format: email }
+                authSource: { type: string, enum: [ldap, local], default: ldap }
+                grants: { $ref: '#/components/schemas/Grants' }
+      responses:
+        '201': { description: '`{ id, oneTimePassword }`; oneTimePassword is null for AD users and shown only once.', content: { application/json: { schema: { type: object, additionalProperties: true } } } }
+        '409': { $ref: '#/components/responses/Error', description: username_taken }
+  /api/admin/users/{id}:
+    get:
+      operationId: getAdminUsersById
+      tags: [Admin - users]
+      summary: One user
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { description: The user., content: { application/json: { schema: { $ref: '#/components/schemas/User' } } } }
+    put:
+      operationId: putAdminUsersById
+      tags: [Admin - users]
+      summary: Update name, e-mail, active flag, grants, and optionally how the user signs in
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [displayName, email]
+              properties:
+                displayName: { type: string }
+                email: { type: string, format: email }
+                isActive: { type: boolean }
+                authSource: { type: string, enum: [ldap, local], description: 'Omit to keep. Switching to local returns a one-time password.' }
+                grants: { $ref: '#/components/schemas/Grants' }
+                totpRequired: { type: boolean, description: 'Two-step sign-in (authenticator app). Omit to keep; false forgets the app set up.' }
+                mustChangePassword: { type: boolean, description: 'Local accounts: change the password at the next sign-in. Omit to keep.' }
+      responses:
+        '200': { description: '`{}` or `{ oneTimePassword }`', content: { application/json: { schema: { type: object, additionalProperties: true } } } }
+        '400': { $ref: '#/components/responses/Error', description: 'self_lockout, last_admin, invalid_username' }
+  /api/admin/users/{id}/reset-password:
+    post:
+      operationId: postAdminUsersByIdResetPassword
+      tags: [Admin - users]
+      summary: New one-time password for a local user
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { description: '`{ oneTimePassword }` (must be changed at the next sign-in).', content: { application/json: { schema: { type: object, additionalProperties: true } } } }
+        '400': { $ref: '#/components/responses/Error', description: directory_user }
+  /api/admin/users/{id}/unlink-ad:
+    post:
+      operationId: postAdminUsersByIdUnlinkAd
+      tags: [Admin - users]
+      summary: Forget the bound AD objectGUID (the next AD sign-in binds again)
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses: { '204': { description: Done. } }
+  /api/admin/users/{id}/reset-2fa:
+    post:
+      operationId: postAdminUsersByIdReset2fa
+      tags: [Admin - users]
+      summary: Forget the user's authenticator app (lost phone); they set it up again at the next sign-in
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses: { '204': { description: Done. } }
+  /api/admin/users/{id}/unlock:
+    post:
+      operationId: postAdminUsersByIdUnlock
+      tags: [Admin - users]
+      summary: Unlock a user locked after failed sign-ins
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses: { '204': { description: Done. } }
+
+  # ------------------------------------------------------------------------------- Admin: sync
+  /api/admin/sync:
+    get:
+      operationId: getAdminSync
+      tags: [Admin - sync]
+      summary: Sync health (runs, heartbeats, open alerts, pending request)
+      responses:
+        '200': { description: '`{ runs, heartbeats, openAlerts, requested, lastSuccess }`', content: { application/json: { schema: { type: object, additionalProperties: true } } } }
+  /api/admin/sync-runs:
+    get:
+      operationId: getAdminSyncRuns
+      tags: [Admin - sync]
+      summary: The last 30 sync runs
+      responses:
+        '200': { description: '`{ items }`', content: { application/json: { schema: { type: object, additionalProperties: true } } } }
+    post:
+      operationId: postAdminSyncRuns
+      tags: [Admin - sync]
+      summary: Ask the worker for a sync (picked up at its next heartbeat, within about 5 minutes)
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [mode], properties: { mode: { type: string, enum: [delta, full] } } } } }
+      responses:
+        '202': { description: '`{ mode }`', content: { application/json: { schema: { type: object, additionalProperties: true } } } }
+        '403': { $ref: '#/components/responses/Error', description: feature_disabled }
+  /api/admin/sync-runs/{id}/ack:
+    post:
+      operationId: postAdminSyncRunsByIdAck
+      tags: [Admin - sync]
+      summary: Accept or reject a quarantined run
+      description: Accept applies what was held back (computers not seen are flagged "not in AD", the USN mark moves). Reject applies nothing; the next full run reads again.
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [decision], properties: { decision: { type: string, enum: [accept, reject] } } } } }
+      responses:
+        '200': { description: '`{ decision, markedDeleted, remaining }`', content: { application/json: { schema: { type: object, additionalProperties: true } } } }
+        '400': { $ref: '#/components/responses/Error', description: not_quarantined }
+
+  # --------------------------------------------------------------------------- Admin: settings
+  /api/admin/settings:
+    get:
+      operationId: getAdminSettings
+      tags: [Admin - settings]
+      summary: Mail server (without its password), notifications and features
+      responses:
+        '200':
+          description: Settings.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  mailServer: { $ref: '#/components/schemas/MailServer' }
+                  notifications: { type: object, additionalProperties: true }
+                  features: { $ref: '#/components/schemas/Features' }
+  /api/admin/settings/mail-server:
+    put:
+      operationId: putAdminSettingsMailServer
+      tags: [Admin - settings]
+      summary: Save the SMTP server
+      description: The password is write-only, stored encrypted (AES-256-GCM). Leave it out or empty to keep the stored one; clearPassword removes it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/MailServer'
+                - type: object
+                  properties:
+                    password: { type: string, format: password }
+                    clearPassword: { type: boolean }
+      responses:
+        '200': { description: The saved settings (without the password)., content: { application/json: { schema: { $ref: '#/components/schemas/MailServer' } } } }
+        '400': { $ref: '#/components/responses/Error', description: 'invalid_request (host_required, invalid_email)' }
+  /api/admin/settings/mail-server/test:
+    post:
+      operationId: postAdminSettingsMailServerTest
+      tags: [Admin - settings]
+      summary: Send a test mail now with the saved SMTP settings
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [to], properties: { to: { type: string, format: email } } } } }
+      responses:
+        '200': { description: '`{ ok, error }`: error is the SMTP error text when ok is false.', content: { application/json: { schema: { type: object, properties: { ok: { type: boolean }, error: { type: [string, 'null'] } } } } } }
+        '400': { $ref: '#/components/responses/Error', description: smtp_not_configured }
+  /api/admin/settings/notifications:
+    put:
+      operationId: putAdminSettingsNotifications
+      tags: [Admin - settings]
+      summary: Who receives alerts and new computer / key mails
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                alertsEnabled: { type: boolean }
+                alertsAdmins: { type: boolean, description: Send alerts to every Admin HQ user with an e-mail. }
+                alertsExtra: { type: array, items: { type: string, format: email } }
+                newComputers: { type: boolean }
+                newKeys: { type: boolean }
+                newBranchUsers: { type: boolean, description: IT / lead users of the computer's branch. }
+                newAdmins: { type: boolean }
+                skipFirstFull: { type: boolean }
+                maxItems: { type: integer, minimum: 10, maximum: 1000, default: 100 }
+      responses:
+        '200': { description: The saved settings., content: { application/json: { schema: { type: object, additionalProperties: true } } } }
+  /api/admin/settings/features:
+    put:
+      operationId: putAdminSettingsFeatures
+      tags: [Admin - settings]
+      summary: Switch features on or off
+      description: A boolean feature left out is switched off.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/Features' } } } }
+      responses:
+        '200': { description: The saved features., content: { application/json: { schema: { $ref: '#/components/schemas/Features' } } } }
+  /api/admin/settings/thresholds:
+    get:
+      operationId: getAdminSettingsThresholds
+      tags: [Admin - settings]
+      summary: Anomaly and watchdog thresholds
+      description: |
+        `[{ key, group (run | watchdog), unit (percent | minutes | hours | count | points), label, min, max,
+        default, value, defaultValue }]` in `items`. `value`, `defaultValue`, `min` and `max` are in page units (percent as 0-100);
+        `default` is the stored value (percent as a ratio, 0.5 = 50%).
+      responses:
+        '200': { description: The thresholds., content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { type: object, additionalProperties: true } } } } } } }
+    put:
+      operationId: putAdminSettingsThresholds
+      tags: [Admin - settings]
+      summary: Save the thresholds
+      description: |
+        Body: `{ "<key>": value }`, the same units as the page (percent as 0-100). A key left out keeps its
+        value. Out of range -> 400 with field message `out_of_range:min-max`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: { type: number }
+              example: { 'anomaly.min_computer_ratio': 70, 'watchdog.delta_max_minutes': 60 }
+      responses:
+        '200': { description: The saved thresholds., content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { type: object, additionalProperties: true } } } } } } }
+        '400': { $ref: '#/components/responses/Error', description: invalid_request }
+  /api/admin/settings/retention:
+    get:
+      operationId: getAdminSettingsRetention
+      tags: [Admin - settings]
+      summary: How long the access log, sync history and mail are kept
+      responses:
+        '200': { description: '`{ mailDays, syncDays, accessLogDays (null = forever), lastPurge }`', content: { application/json: { schema: { type: object, additionalProperties: true } } } }
+    put:
+      operationId: putAdminSettingsRetention
+      tags: [Admin - settings]
+      summary: Save the retention periods
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mailDays, syncDays]
+              properties:
+                mailDays: { type: integer, minimum: 1, maximum: 3650 }
+                syncDays: { type: integer, minimum: 30, maximum: 3650 }
+                keepAccessLog: { type: boolean, description: 'true = never delete the access log (default).' }
+                accessLogDays: { type: integer, minimum: 365, description: 'Required when keepAccessLog is false.' }
+      responses:
+        '200': { description: The saved settings., content: { application/json: { schema: { type: object, additionalProperties: true } } } }
+        '400': { $ref: '#/components/responses/Error', description: 'invalid_request (access_log_days_required)' }
+  /api/admin/settings/retention/run:
+    post:
+      operationId: postAdminSettingsRetentionRun
+      tags: [Admin - settings]
+      summary: Run the clean-up now
+      responses:
+        '200': { description: '`{ mail, syncRuns, alerts, accessLog }`: rows deleted.', content: { application/json: { schema: { type: object, additionalProperties: true } } } }
+
+  # ---------------------------------------------------------------------------- Admin: mail log
+  /api/admin/mail:
+    get:
+      operationId: getAdminMail
+      tags: [Admin - mail log]
+      summary: Mail outbox (pending, sent, failed)
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [pending, sent, failed, no_recipient] }, description: "no_recipient: nobody had an e-mail address; stored with the reason in last_error." }
+        - { name: q, in: query, schema: { type: string }, description: Part of the subject or a recipient. }
+        - { $ref: '#/components/parameters/Page' }
+      responses:
+        '200': { description: '`{ rows, total, page, pageSize, pages, counts, retentionDays }`', content: { application/json: { schema: { type: object, additionalProperties: true } } } }
+  /api/admin/mail/{id}:
+    get:
+      operationId: getAdminMailById
+      tags: [Admin - mail log]
+      summary: One mail with its body
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { description: The mail., content: { application/json: { schema: { type: object, additionalProperties: true } } } }
+        '404': { $ref: '#/components/responses/Error' }
+  /api/admin/mail/{id}/retry:
+    post:
+      operationId: postAdminMailByIdRetry
+      tags: [Admin - mail log]
+      summary: Queue a failed mail again
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '204': { description: Queued. }
+        '400': { $ref: '#/components/responses/Error', description: not_failed }
+
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: blk.sid
+      description: Set by POST /api/auth/login.
+    csrfHeader:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
+      description: The csrfToken from login or GET /api/me. Required on POST / PUT / DELETE.
+
+  parameters:
+    Id: { name: id, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    Page: { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+
+  responses:
+    Error:
+      description: Error.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string, example: invalid_request }
+        message: { type: string, example: The request data is invalid. }
+        fields:
+          type: array
+          items: { type: object, properties: { field: { type: string }, message: { type: string } } }
+      additionalProperties: true
+    Role: { type: string, enum: [it, lead, admin, auditor] }
+    BranchSet:
+      oneOf:
+        - { type: string, enum: [all] }
+        - { type: array, items: { type: integer } }
+    Reason: { type: string, enum: [user_locked_out, hardware_change, bios_update, disk_recovery, other] }
+    RevealReason:
+      type: object
+      required: [reason]
+      properties:
+        reason: { $ref: '#/components/schemas/Reason' }
+        reasonNote: { type: string, maxLength: 500, description: Required when reason is "other". }
+        ticketNo: { type: string, maxLength: 64, description: Required when Admin > Features requires a ticket. }
+    AuditAction:
+      type: string
+      enum: [login, login_failed, password_change, search, view_computer, reveal, export_log, export_computers, export_keys, export_report,
+             log_purge, computer_edit, admin_change, computer_moved, sync_manual, sync_ack]
+    ComputerRow:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        dns_name: { type: [string, 'null'] }
+        distinguished_name: { type: string }
+        os: { type: [string, 'null'] }
+        branch_id: { type: [integer, 'null'], description: null = N/A (no branch) }
+        branch_code: { type: [string, 'null'] }
+        branch_name: { type: [string, 'null'] }
+        device_serial: { type: [string, 'null'] }
+        owner_email: { type: [string, 'null'] }
+        info_updated_at: { type: [string, 'null'], format: date-time }
+        info_updated_by: { type: [string, 'null'] }
+        ad_created_at: { type: [string, 'null'], format: date-time, description: Created in AD (whenCreated). }
+        first_seen_at: { type: string, format: date-time, description: First recorded in this system (by sync). }
+        deleted_in_ad_at: { type: [string, 'null'], format: date-time, description: 'Set = no longer in AD (nothing is deleted).' }
+        key_count: { type: integer }
+      additionalProperties: true
+    KeyMeta:
+      type: object
+      properties:
+        key_id: { type: string, format: uuid }
+        key_id_prefix: { type: string, example: 1A2B3C4D }
+        volume_guid: { type: [string, 'null'], format: uuid, description: The encrypted volume; "superseded" is per volume. }
+        status: { type: string, enum: [active, superseded] }
+        ad_created_at: { type: string, format: date-time }
+        first_synced_at: { type: string, format: date-time }
+        last_revealed_at: { type: [string, 'null'], format: date-time }
+    BranchInput:
+      type: object
+      required: [code, name]
+      properties:
+        code: { type: string, pattern: '^[A-Za-z0-9_-]{1,16}$', example: HN }
+        name: { type: string, maxLength: 128, example: Ha Noi }
+        isActive: { type: boolean }
+        ous:
+          type: array
+          maxItems: 20
+          items: { type: string }
+          example: ['OU=Computers,OU=HN,DC=corp,DC=local']
+    Grants:
+      type: array
+      description: '"role:branchId" or "role:all"; admin is always all branches.'
+      items: { type: string, pattern: '^(it|lead|admin|auditor):(all|\d+)$' }
+      example: ['it:1', 'lead:1']
+    User:
+      type: object
+      properties:
+        id: { type: integer }
+        username: { type: string }
+        display_name: { type: string }
+        email: { type: [string, 'null'] }
+        auth_source: { type: string, enum: [ldap, local] }
+        is_active: { type: boolean }
+        is_locked: { type: boolean }
+        must_change_password: { type: boolean }
+        last_login_at: { type: [string, 'null'], format: date-time }
+        ad_object_guid: { type: [string, 'null'] }
+        grants: { type: array, items: { type: object, additionalProperties: true } }
+      additionalProperties: true
+    MailServer:
+      type: object
+      properties:
+        enabled: { type: boolean }
+        host: { type: string, example: smtp.corp.local }
+        port: { type: integer, example: 587 }
+        security: { type: string, enum: [starttls, tls, none] }
+        username: { type: string }
+        from: { type: string, format: email }
+        rejectUnauthorized: { type: boolean, description: Check the server certificate. }
+        appUrl: { type: string, description: Base URL used for links in mails. }
+        passwordSet: { type: boolean, readOnly: true }
+    Features:
+      type: object
+      properties:
+        feature.manual_sync: { type: boolean }
+        feature.audit_export: { type: boolean }
+        feature.computer_export: { type: boolean }
+        feature.reveal_alerts: { type: boolean, description: Alert on reveals outside working hours. }
+        reveal.ticket_required: { type: boolean }
+        export.keys: { type: string, enum: ['off', admin, all], description: Who may export keys with passwords. }

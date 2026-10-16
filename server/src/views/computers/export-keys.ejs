@@ -1,0 +1,53 @@
+<%- include('../partials/head') %>
+<p class="crumbs"><a href="/<%= h.query(query, {}) %>">← Quay lại danh sách máy</a></p>
+<section class="card narrow wide-ish">
+  <h1>Xuất kèm recovery key</h1>
+  <div class="notice notice-warn">
+    File CSV sẽ chứa <strong>mật khẩu recovery</strong> của <strong><%= h.number(preview.keys) %> key</strong>
+    trên <strong><%= h.number(preview.computers) %> máy</strong> theo bộ lọc đang chọn, trong phạm vi chi nhánh của bạn.
+  </div>
+  <p class="muted">Mỗi key xuất ra được ghi vào nhật ký như một lần hiện key (người xuất, thời điểm, lý do), và Admin HQ
+    nhận cảnh báo. Lưu file ở nơi an toàn và xóa ngay khi dùng xong.</p>
+  <dl class="facts">
+    <dt>Chi nhánh</dt><dd><%= filters.branchId === 'na' ? 'N/A (chưa thuộc chi nhánh nào)' : filters.branchId ? (branchName ?? filters.branchId) : 'Tất cả trong phạm vi của bạn' %></dd>
+    <dt>Tình trạng</dt><dd><%= filters.status === 'no_key' ? 'Chưa có key' : 'Tất cả' %></dd>
+    <dt>Máy không còn trong AD</dt><dd><%= filters.includeDeleted ? 'Có' : 'Không' %></dd>
+    <% if (filters.from || filters.to) { %>
+      <dt><%= filters.dateField === 'ad' ? 'Tạo trên AD' : 'Ghi nhận trên hệ thống' %></dt>
+      <dd><%= filters.from ? `từ ${filters.from}` : '' %> <%= filters.to ? `đến ${filters.to}` : '' %></dd>
+    <% } %>
+  </dl>
+  <%- include('../partials/error-box', { error }) %>
+  <% if (preview.keys > 0) { %>
+  <form method="post" action="/computers/export-keys" class="form" style="margin-top: 16px">
+    <%- include('../partials/csrf') %>
+    <% if (filters.branchId) { %><input type="hidden" name="branchId" value="<%= filters.branchId %>"><% } %>
+    <input type="hidden" name="status" value="<%= filters.status %>">
+    <% if (filters.includeDeleted) { %><input type="hidden" name="includeDeleted" value="on"><% } %>
+    <input type="hidden" name="dateField" value="<%= filters.dateField %>">
+    <% if (filters.from) { %><input type="hidden" name="from" value="<%= filters.from %>"><% } %>
+    <% if (filters.to) { %><input type="hidden" name="to" value="<%= filters.to %>"><% } %>
+    <label>Lý do
+      <select name="reason" required>
+        <option value="">— Chọn lý do —</option>
+        <% reasons.forEach((r) => { %>
+          <option value="<%= r.value %>" <%= form.reason === r.value ? 'selected' : '' %>><%= r.label %></option>
+        <% }) %>
+      </select>
+    </label>
+    <label>Ghi chú <span class="muted">(bắt buộc nếu chọn “Lý do khác”)</span>
+      <textarea name="reasonNote" maxlength="500" rows="3"><%= form.reasonNote ?? '' %></textarea>
+    </label>
+    <label>Số ticket <% if (!ticketRequired) { %><span class="muted">(nếu có)</span><% } %>
+      <input name="ticketNo" maxlength="64" value="<%= form.ticketNo ?? '' %>" <%= ticketRequired ? 'required' : '' %>>
+    </label>
+    <div class="actions">
+      <button type="submit">Tải file CSV</button>
+      <a class="button secondary" href="/<%= h.query(query, {}) %>">Hủy</a>
+    </div>
+  </form>
+  <% } else { %>
+    <p>Không có key nào theo bộ lọc này.</p>
+  <% } %>
+</section>
+<%- include('../partials/foot') %>

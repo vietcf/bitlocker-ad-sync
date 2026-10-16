@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/BitlockerSync.Worker/BitlockerSync.Worker.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/BitlockerSync.Tests/BitlockerSync.Tests.csproj" />
+  </Folder>
+</Solution>

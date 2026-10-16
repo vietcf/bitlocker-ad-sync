@@ -1,0 +1,32 @@
+<%- include('../partials/head') %>
+<%- include('_tabs') %>
+<p class="crumbs"><a href="/admin/branches">← Chi nhánh</a></p>
+<section class="card narrow wide-ish">
+  <h2>Xóa chi nhánh <%= branch.code %> · <%= branch.name %></h2>
+  <%- include('../partials/error-box', { error }) %>
+  <div class="notice notice-error">
+    <strong>Thao tác này không hoàn tác được.</strong> Khi xóa chi nhánh:
+    <ul>
+      <li><strong><%= h.number(impact.computers) %></strong> máy đang trong AD<% if (impact.computers_gone) { %> (và <%= h.number(impact.computers_gone) %> máy đã không còn trong AD)<% } %>
+        chuyển về <strong>N/A</strong> (chỉ Admin HQ thấy). Máy nằm trong OU của chi nhánh khác sẽ chuyển sang chi nhánh đó.</li>
+      <li>Các OU gốc của chi nhánh bị gỡ:
+        <% if (branch.ous.length) { %><% branch.ous.forEach((ou) => { %><code class="wrap block"><%= ou %></code><% }) %><% } else { %><span class="muted">không có</span><% } %></li>
+      <li><strong><%= h.number(impact.grants) %></strong> quyền người dùng trên chi nhánh này bị gỡ.
+        <% if (impact.users_left_without_role.length) { %>
+          Những người sau sẽ không còn quyền nào: <strong><%= impact.users_left_without_role.join(', ') %></strong>.
+        <% } %></li>
+      <li>Key và nhật ký truy cập được giữ nguyên.</li>
+    </ul>
+  </div>
+  <form method="post" action="/admin/branches/<%= branch.id %>/delete" class="form" data-confirm="Xóa chi nhánh <%= branch.code %>? Thao tác này không hoàn tác được.">
+    <%- include('../partials/csrf') %>
+    <label>Gõ mã chi nhánh <code><%= branch.code %></code> để xác nhận
+      <input name="confirmCode" autocomplete="off" required maxlength="16" placeholder="<%= branch.code %>">
+    </label>
+    <div class="actions">
+      <button type="submit" class="danger">Xóa chi nhánh</button>
+      <a class="button secondary" href="/admin/branches">Hủy</a>
+    </div>
+  </form>
+</section>
+<%- include('../partials/foot') %>

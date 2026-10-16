@@ -1,0 +1,33 @@
+<%# Thanh ngang 100% moi chi nhanh: xanh = % may co key, do = % may chua co key.
+    Locals: rows (branch_id, branch_code, branch_name, computers, with_key, no_key), total (dong Tong hoac null). %>
+<%
+  const pct = (n, of) => (of ? (n * 100) / of : 0);
+  // Lam tron nhung khong de 0% / 100% khi con may o phan kia
+  const fmt = (p) => (p > 0 && p < 1 ? '<1%' : p > 99 && p < 100 ? '>99%' : `${Math.round(p)}%`);
+  const bar = (b, isTotal) => {
+    const ok = pct(b.with_key, b.computers);
+    const bad = pct(b.no_key, b.computers);
+    // Do rong theo % nguyen (CSP chan style inline nen dung class .pct-N); phan nho van >= 1%
+    let wBad = bad > 0 ? Math.max(1, Math.round(bad)) : 0;
+    if (ok > 0 && wBad === 100) wBad = 99;
+    return { ok, bad, isTotal, wOk: ok > 0 ? 100 - wBad : 0, wBad };
+  };
+%>
+<ul class="hbars" role="list">
+<% [...rows.map((b) => [b, bar(b, false)]), ...(total ? [[total, bar(total, true)]] : [])].forEach(([b, v]) => { %>
+  <li class="hbar-row<%= v.isTotal ? ' hbar-total' : '' %>">
+    <span class="hbar-label" title="<%= v.isTotal ? 'Tất cả chi nhánh' : (b.branch_name ?? 'Máy chưa thuộc chi nhánh nào') %>">
+      <strong><%= v.isTotal ? 'Tổng' : h.branchCode(b.branch_code) %></strong><% if (!v.isTotal && b.branch_name) { %> <span class="muted">· <%= b.branch_name %></span><% } %>
+    </span>
+    <span class="hbar" aria-label="<%= `${h.number(b.computers)} máy: ${fmt(v.ok)} có key, ${fmt(v.bad)} chưa có key` %>">
+      <% if (!b.computers) { %><span class="hbar-empty">Chưa có máy</span><% } %>
+      <% if (v.ok > 0) { %><span class="hbar-seg hbar-ok pct-<%= v.wOk %>"
+        title="Có key: <%= fmt(v.ok) %> (<%= h.number(b.with_key) %>/<%= h.number(b.computers) %> máy)"><% if (v.ok >= 12) { %><%= fmt(v.ok) %><% } %></span><% } %>
+      <% if (v.bad > 0) { %><a class="hbar-seg hbar-bad pct-<%= v.wBad %>"
+        href="/?<%= v.isTotal ? '' : `branchId=${b.branch_id ?? 'na'}&` %>status=no_key"
+        title="Chưa có key: <%= fmt(v.bad) %> (<%= h.number(b.no_key) %>/<%= h.number(b.computers) %> máy), bấm để xem danh sách"><% if (v.bad >= 12) { %><%= fmt(v.bad) %><% } %></a><% } %>
+    </span>
+    <span class="hbar-count"><%= h.number(b.computers) %> máy<% if (v.ok > 0 && v.ok < 12) { %><br><span class="muted small">có key <%= fmt(v.ok) %></span><% } %><% if (v.bad > 0 && v.bad < 12) { %><br><span class="muted small">chưa có key <%= fmt(v.bad) %></span><% } %></span>
+  </li>
+<% }) %>
+</ul>

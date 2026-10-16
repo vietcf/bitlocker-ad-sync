@@ -1,0 +1,429 @@
+# ============================================================================================
+# MAU EMAIL: noi dung moi email (va tin Teams) he thong gui di.
+#
+# Sua `subject` / `body` cua mot mau roi luu: lan gui ke tiep dung noi dung moi, khong can khoi
+# dong lai. Neu ban sua lam hong file (YAML sai, thieu mau), app giu ban tot truoc do va ghi loi
+# vao log; luc khoi dong, app khong chay neu file hong. Huong dan: README, muc "Mau email".
+#
+# Khong co bien nao chua recovery password, nen email khong bao gio co key.
+#
+# --------------------------------------------------------------------------------------------
+# CAC TRUONG CUA MOT MAU
+# --------------------------------------------------------------------------------------------
+# Ten mau (khoa, vi du `sync_failed`)
+#     Co dinh: code tim mau theo ten. Khong doi ten, khong xoa (app se khong chay neu thieu
+#     mau no can). Them ten moi khong co tac dung.
+#
+# kind        (app dung)  Cach tao tieu de.
+#     alert         Them alert_subject_prefix vao dau tieu de, vi du
+#                   "[BitLocker][HIGH] Sync AD loi: ldap_bind_failed".
+#                   Muc do do code quyet dinh theo tung canh bao, khong sua o day:
+#                   HIGH, MEDIUM, hoac INFO cho cac thong bao "da khoi phuc".
+#     notification  Giu nguyen tieu de, khong them tien to.
+#
+# used_by     (chi de tra cuu)  Chu tu do: tinh nang nao gui mau nay.
+# sent_when   (chi de tra cuu)  Chu tu do: gui khi nao, bao lau mot lan.
+# recipients  (chi de tra cuu)  Chu tu do: ai nhan. Nguoi nhan KHONG dat o day ma o
+#             Quan tri > Thong bao (Admin HQ, dia chi them, nguoi dung chi nhanh) va NOTIFY_TO
+#             trong .env.
+# variables   (chi de tra cuu)  Cac bien code dien cho mau nay. Ghi them ten vao day khong tao
+#             ra bien moi; chi cac bien trong bang duoi la co that.
+#
+# subject     (app dung)  Mot dong. Xuong dong va nhieu dau cach lien nhau bi gop thanh mot dau
+#             cach. Dat trong dau nhay ("...") neu co dau ':' hoac '#', hoac bat dau bang { hay [.
+# body        (app dung)  Van ban thuong (khong phai HTML). Viet dang khoi:
+#                 body: |
+#                   Dong thu nhat {{bien}}
+#                   Dong thu hai
+#             Giu nguyen thut le cua khoi; cac dong trong o cuoi bi bo.
+# parts       (app dung, chi new_objects)  Cac manh ghep thanh danh sach may / key moi.
+#
+# Bien: {{ten}}, co the co dau cach trong ngoac ({{ ten }}). Ten sai, hoac bien khong co trong
+# mau do, duoc giu nguyen trong email de de phat hien loi go.
+# Thoi diem co dang "2026-10-13 15:04" theo mui gio APP_TZ (mac dinh Asia/Ho_Chi_Minh).
+# Gia tri "—" nghia la khong co (vi du chua tung co heartbeat).
+#
+# --------------------------------------------------------------------------------------------
+# CAC BIEN VA GIA TRI
+# --------------------------------------------------------------------------------------------
+#   Bien            Gia tri (vi du)                                            Dung trong mau
+#   alertSubject    Tieu de canh bao dang duoc dong (khong co tien to)         *_recovered, recovered
+#   alertType       Ten canh bao dang duoc dong, vi du ldap_error              recovered
+#   ageMinutes      So phut, vi du 135                                         canary_stale
+#   anomalies       Danh sach bat thuong bang tieng Anh, moi dong bat dau "- "  sync_anomaly
+#   anomaliesVi     Nhu anomalies nhung tieng Viet (giong trang Quan tri > Sync AD), vi du
+#                   "- Luot full chi thay 2/27 may (7.4%, nguong 95.0%)."       sync_anomaly
+#   branch          Ma chi nhanh, vi du HN; "N/A" neu may chua thuoc chi nhanh  reveal_out_of_hours
+#   branches        "HN: 2.1% -> 8.4%; HCM: 0.5% -> 6.0%"                       no_key_rising
+#   computer        Ten may, vi du HN-LT-0231                                  reveal_out_of_hours
+#   computers       Phan "may moi" cua new_objects (tieu de + moi may mot dong + dong trong),
+#                   rong neu khong co may moi                                   new_objects
+#   computerCount   So may moi, vi du 3 (co the la 0)                          new_objects
+#   count           So key da xuat, vi du 25                                   key_export
+#   created         So may tao trong 2 den 7 ngay qua, vi du 12                escrow_broken
+#   days            So ngay con lai, vi du 21                                  dc_cert_expiring
+#   dc              Ten DC, vi du dc01.corp.local                              sync_failed, ldap_error, dc_cert_expiring, new_objects
+#   errorCode       Ma loi worker bao:                                         sync_failed, ldap_error
+#                     ldap_unreachable  khong DC nao tra loi o cong LDAP(S)
+#                     ldap_tls_failed   loi TLS / chung chi
+#                     ldap_bind_failed  sai tai khoan / mat khau, hoac khong co quyen bind
+#                     ldap_timeout      DC khong tra loi kip
+#                     ldap_search_base_failed  mot OU trong SearchBases khong doc duoc (khong ton tai / thieu quyen)
+#                     api_unreachable   worker khong goi duoc ingest API cua app
+#                     unknown           loi khac
+#   hours           So gio, vi du 6                                            dc_usn_stalled
+#   keyCount        So key moi, vi du 2 (co the la 0)                          new_objects
+#   keys            Phan "key moi" cua new_objects, giong computers            new_objects
+#   lastHeartbeatAt Thoi diem heartbeat cuoi, hoac "—"                         worker_silent
+#   lastRunAt       Thoi diem luot thanh cong gan nhat, hoac "—"               sync_stale, full_stale
+#   lastRunId       So cua luot do, vi du 812, hoac "—"                        sync_stale, full_stale
+#   maxHours        Nguong tinh bang gio, vi du 26 / 2                         full_stale, sync_run_aborted
+#   maxMinutes      Nguong tinh bang phut, vi du 60 / 90                       sync_stale, canary_stale
+#   minutesAgo      So phut tu heartbeat cuoi, vi du 42, hoac "—"              worker_silent
+#   mode            full | delta                                               sync_failed, new_objects
+#   note            Ghi chu nguoi dung nhap kem ly do, hoac "—"                key_export
+#   problem         prev_hash_mismatch (dong khong noi dung dong truoc, thuong do bi xoa) |
+#                   hash_mismatch (noi dung dong bi sua)                       audit_chain_broken
+#   reason          Ma ly do: user_locked_out, hardware_change, bios_update,
+#                   disk_recovery, other                                       key_export
+#   reasonLabel     Ly do bang tieng Viet, vi du "Khoi phuc du lieu o cung"    key_export
+#   rowId           So dong nhat ky, vi du 10452                               audit_chain_broken
+#   rows            So dong nhat ky da kiem tra, vi du 182344                  audit_chain_broken_recovered
+#   runId           So luot sync, vi du 812                                    sync_failed(_recovered), sync_anomaly, new_objects
+#   runs            "#812, #813"                                               sync_run_aborted
+#   summary         Ghep tu parts: "3 may moi, 2 key moi" / "1 key moi"        new_objects
+#   ticket          So ticket, hoac "—"                                        key_export
+#   usn             highestCommittedUSN, vi du 48211931                        dc_usn_stalled
+#   user            Ten dang nhap, vi du nguyenvana hoac admin                 reveal_out_of_hours, key_export, sync_anomaly_recovered
+#   withoutKey      Trong so do, so may chua co key, vi du 9                   escrow_broken
+#   worker          Ten worker (ten may chay worker), vi du BLK-SYNC-01, hoac "—"  worker_silent, ldap_error
+#
+#   Chi trong new_objects.parts:
+#   count           So may / key            summary_computers, summary_keys
+#   name            Ten may                 computer_line, key_line
+#   branch          Ma chi nhanh hoac N/A   computer_line, key_line
+#   keyIdPrefix     8 ky tu dau Key ID, vi du 1A2B3C4D (khong bao gio la mat khau)   key_line
+#   link            Manh `link`, hoac rong neu chua dat "Dia chi web cua app"        computer_line, key_line
+#   url             https://<app>/computers/<id>                                     link
+#   more            So dong bi luoc, vi du 200                                       more_line
+#
+#   Chi trong alert_subject_prefix:
+#   severity        HIGH | MEDIUM | INFO
+# ============================================================================================
+
+# Them vao dau tieu de cua moi mau `kind: alert`.
+alert_subject_prefix: "[BitLocker][{{severity}}] "
+
+templates:
+
+  # ------------------------------------------------------------------------------------------
+  # Canh bao sync (ingest API gui khi worker ket thuc mot luot)
+  # ------------------------------------------------------------------------------------------
+  sync_failed:
+    kind: alert
+    used_by: Sync AD (ingest API)
+    sent_when: Worker báo lượt sync lỗi (không tới được DC, sai tài khoản, không gọi được API...). Nhắc lại tối đa 4 giờ một lần khi vẫn lỗi.
+    recipients: Quản trị > Thông báo > Cảnh báo hệ thống (Admin HQ, địa chỉ thêm, NOTIFY_TO trong .env)
+    variables: [runId, mode, dc, errorCode]
+    subject: "Sync AD lỗi: {{errorCode}}"
+    body: |
+      Lượt sync #{{runId}} ({{mode}}, DC {{dc}}) báo lỗi {{errorCode}}.
+      Kiểm tra worker và kết nối LDAPS từ worker tới DC.
+
+  sync_failed_recovered:
+    kind: alert
+    used_by: Sync AD (ingest API)
+    sent_when: Một lượt sync thành công sau khi đã gửi cảnh báo sync_failed.
+    recipients: như sync_failed
+    variables: [runId, alertSubject]
+    subject: "Đã khôi phục: {{alertSubject}}"
+    body: |
+      Lượt sync #{{runId}} đã chạy thành công.
+
+  sync_anomaly:
+    kind: alert
+    used_by: Sync AD (kiểm tra bất thường khi lượt sync báo thành công)
+    sent_when: Lượt sync báo thành công nhưng số liệu bất thường (thiếu nhiều máy hoặc key, một chi nhánh giảm mạnh, key không có mật khẩu, quá nhiều máy không còn thấy). Lượt bị giữ lại chờ Admin HQ chấp nhận hoặc bác bỏ.
+    recipients: Quản trị > Thông báo > Cảnh báo hệ thống
+    variables: [runId, anomalies, anomaliesVi]
+    subject: "Sync AD có dữ liệu bất thường, lượt #{{runId}} bị giữ lại"
+    body: |
+      Lượt sync #{{runId}} bị giữ lại vì:
+      {{anomaliesVi}}
+      Vào Quản trị > Sync AD để chấp nhận hoặc bác bỏ.
+
+  sync_anomaly_recovered:
+    kind: alert
+    used_by: Quản trị > Sync AD (chấp nhận / bác bỏ)
+    sent_when: Admin HQ chấp nhận hoặc bác bỏ lượt sync bị giữ lại.
+    recipients: như sync_anomaly
+    variables: [user, alertSubject]
+    subject: "Đã xử lý: {{alertSubject}}"
+    body: |
+      Admin HQ ({{user}}) đã xử lý lượt sync bị giữ lại.
+
+  # ------------------------------------------------------------------------------------------
+  # Canh bao cua watchdog (job sync-watchdog, moi 5 phut)
+  # Chi gui MOT mail: sync_offline. Cac mau ben duoi (worker_silent ... no_key_rising) khong gui
+  # mail rieng: tieu de / noi dung cua chung hien o Quan tri > Sync AD va tieu de duoc liet ke
+  # trong mail sync_offline. Het moi dieu kien (online tro lai) thi khong gui gi nua.
+  # ------------------------------------------------------------------------------------------
+  sync_offline:
+    kind: alert
+    used_by: Watchdog sync
+    sent_when: Có ít nhất một điều kiện watchdog bên dưới; đồng bộ AD được đánh dấu Offline. Gửi khi chuyển sang Offline, sau đó tối đa 1 lần mỗi ngày cho tới khi hết mọi điều kiện (Online trở lại thì không gửi nữa).
+    recipients: Quản trị > Thông báo > Cảnh báo hệ thống
+    variables: [count, conditions, checkedAt]
+    subject: "Đồng bộ AD đang Offline ({{count}} sự cố)"
+    body: |
+      Watchdog kiểm tra lúc {{checkedAt}} thấy đồng bộ AD đang có sự cố:
+      {{conditions}}
+      Chi tiết ở Quản trị > Sync AD.
+      Mail này gửi tối đa 1 lần mỗi ngày cho tới khi đồng bộ AD hoạt động bình thường trở lại.
+
+  worker_silent:
+    kind: alert
+    used_by: Watchdog sync
+    sent_when: Không nhận được heartbeat của worker lâu hơn watchdog.heartbeat_max_minutes (15 phút).
+    recipients: Quản trị > Thông báo > Cảnh báo hệ thống
+    variables: [worker, lastHeartbeatAt, minutesAgo]
+    subject: "Sync worker không gửi heartbeat"
+    body: |
+      Heartbeat cuối: {{lastHeartbeatAt}} ({{minutesAgo}} phút trước), từ worker {{worker}}.
+      Kiểm tra service BitlockerSync trên máy chủ worker.
+
+  sync_stale:
+    kind: alert
+    used_by: Watchdog sync
+    sent_when: Không có lượt sync thành công lâu hơn watchdog.delta_max_minutes (60 phút).
+    recipients: Quản trị > Thông báo > Cảnh báo hệ thống
+    variables: [maxMinutes, lastRunId, lastRunAt]
+    subject: "Không có lượt sync thành công quá {{maxMinutes}} phút"
+    body: |
+      Lượt sync thành công gần nhất: #{{lastRunId}} lúc {{lastRunAt}}.
+
+  full_stale:
+    kind: alert
+    used_by: Watchdog sync
+    sent_when: Không có lượt full sync thành công lâu hơn watchdog.full_max_hours (26 giờ).
+    recipients: Quản trị > Thông báo > Cảnh báo hệ thống
+    variables: [maxHours, lastRunId, lastRunAt]
+    subject: "Không có full sync thành công quá {{maxHours}} giờ"
+    body: |
+      Lượt full sync thành công gần nhất: #{{lastRunId}} lúc {{lastRunAt}}.
+
+  sync_run_aborted:
+    kind: alert
+    used_by: Watchdog sync
+    sent_when: Có lượt sync ở trạng thái "đang chạy" lâu hơn watchdog.running_max_hours (2 giờ) và bị đánh dấu hủy.
+    recipients: Quản trị > Thông báo > Cảnh báo hệ thống
+    variables: [runs, maxHours]
+    subject: "Lượt sync treo đã bị hủy"
+    body: |
+      Các lượt {{runs}} chạy quá {{maxHours}} giờ và đã bị đánh dấu hủy (aborted).
+
+  ldap_error:
+    kind: alert
+    used_by: Watchdog sync
+    sent_when: Heartbeat của worker báo không đọc được AD.
+    recipients: Quản trị > Thông báo > Cảnh báo hệ thống
+    variables: [worker, errorCode, dc]
+    subject: "Worker không đọc được AD: {{errorCode}}"
+    body: |
+      Worker {{worker}} báo lỗi LDAP {{errorCode}} với DC {{dc}}.
+
+  dc_cert_expiring:
+    kind: alert
+    used_by: Watchdog sync
+    sent_when: Chứng chỉ LDAPS của DC còn dưới 30 ngày.
+    recipients: Quản trị > Thông báo > Cảnh báo hệ thống
+    variables: [dc, days]
+    subject: "Chứng chỉ LDAPS của DC sắp hết hạn"
+    body: |
+      Chứng chỉ LDAPS của {{dc}} hết hạn sau {{days}} ngày.
+
+  canary_stale:
+    kind: alert
+    used_by: Watchdog sync
+    sent_when: Giá trị canary worker đọc từ AD cũ hơn anomaly.canary_max_age_minutes (90 phút).
+    recipients: Quản trị > Thông báo > Cảnh báo hệ thống
+    variables: [ageMinutes, maxMinutes]
+    subject: "Object canary không được cập nhật"
+    body: |
+      Giá trị canary đọc được đã cũ {{ageMinutes}} phút (ngưỡng {{maxMinutes}} phút).
+      Kiểm tra replicate AD, quyền đọc của tài khoản worker và worker.
+
+  dc_usn_stalled:
+    kind: alert
+    used_by: Watchdog sync
+    sent_when: highestCommittedUSN của DC đang ghim không đổi trong anomaly.usn_stall_hours (6 giờ).
+    recipients: Quản trị > Thông báo > Cảnh báo hệ thống
+    variables: [hours, usn]
+    subject: "DC đang ghim có thể đã ngừng replicate"
+    body: |
+      highestCommittedUSN không đổi trong {{hours}} giờ ({{usn}}).
+      Sync vẫn chạy nhưng có thể đang đọc dữ liệu cũ.
+
+  escrow_broken:
+    kind: alert
+    used_by: Watchdog sync
+    sent_when: Quá nhiều máy tạo trong 2 đến 7 ngày qua chưa có key trên AD.
+    recipients: Quản trị > Thông báo > Cảnh báo hệ thống
+    variables: [withoutKey, created]
+    subject: "Máy mới không lưu key lên AD"
+    body: |
+      {{withoutKey}}/{{created}} máy tạo trong 7 ngày qua (đã quá 48 giờ) chưa có key.
+      Kiểm tra GPO lưu BitLocker key lên AD và image cài máy.
+
+  no_key_rising:
+    kind: alert
+    used_by: Watchdog sync
+    sent_when: Tỉ lệ máy chưa có key của một chi nhánh tăng so với tuần trước.
+    recipients: Quản trị > Thông báo > Cảnh báo hệ thống
+    variables: [branches]
+    subject: "Tỉ lệ máy chưa có key tăng"
+    body: |
+      {{branches}}
+
+  audit_chain_broken:
+    kind: alert
+    used_by: Kiểm tra chuỗi hash nhật ký (job audit-chain-check, 02:00 hằng ngày)
+    sent_when: Chuỗi hash của nhật ký truy cập không khớp (có dòng bị sửa hoặc xóa).
+    recipients: Quản trị > Thông báo > Cảnh báo hệ thống
+    variables: [rowId, problem]
+    subject: "Chuỗi hash nhật ký truy cập bị gãy"
+    body: |
+      Phát hiện tại dòng #{{rowId}} ({{problem}}). Có thể nhật ký đã bị sửa hoặc xóa.
+      Đối chiếu với bản lưu trên SIEM.
+
+  audit_chain_broken_recovered:
+    kind: alert
+    used_by: Kiểm tra chuỗi hash nhật ký
+    sent_when: Chuỗi kiểm tra lại hợp lệ sau cảnh báo audit_chain_broken.
+    recipients: như audit_chain_broken
+    variables: [rows, alertSubject]
+    subject: "Đã khôi phục: {{alertSubject}}"
+    body: |
+      Chuỗi hash nhật ký truy cập hợp lệ ({{rows}} dòng).
+
+  # Dung cho moi thong bao "da khoi phuc" khac (cac canh bao watchdog tu het).
+  recovered:
+    kind: alert
+    used_by: Cảnh báo không có mẫu <tên>_recovered riêng, khi trở lại bình thường (watchdog không dùng, hết lỗi thì không gửi)
+    sent_when: Một cảnh báo đang mở trở lại bình thường.
+    recipients: như cảnh báo gốc
+    variables: [alertType, alertSubject]
+    subject: "Đã khôi phục: {{alertSubject}}"
+    body: |
+      Đã trở lại bình thường.
+
+  # ------------------------------------------------------------------------------------------
+  # Key
+  # ------------------------------------------------------------------------------------------
+  backup_failed:
+    kind: alert
+    used_by: Sao lưu (Quản trị > Sao lưu)
+    sent_when: Lượt sao lưu (theo lịch hoặc "Sao lưu ngay") lỗi một phần hoặc toàn bộ. Nhắc lại tối đa 4 giờ một lần khi vẫn lỗi.
+    recipients: Quản trị > Thông báo > Cảnh báo hệ thống
+    variables: [errors, trigger]
+    subject: "Sao lưu lỗi"
+    body: |
+      Lượt sao lưu ({{trigger}}) không hoàn tất:
+      {{errors}}
+      Kiểm tra ở Quản trị > Sao lưu.
+
+  backup_failed_recovered:
+    kind: alert
+    used_by: Sao lưu (Quản trị > Sao lưu)
+    sent_when: Một lượt sao lưu thành công sau khi đã gửi cảnh báo backup_failed.
+    recipients: như backup_failed
+    variables: [files, alertSubject]
+    subject: "Đã khôi phục: {{alertSubject}}"
+    body: |
+      Sao lưu đã chạy thành công: {{files}}
+
+  key_duplicate:
+    kind: alert
+    used_by: Sync AD (lượt full kết thúc)
+    sent_when: Cùng một Key ID nằm dưới 2 máy đều còn trong AD (ví dụ máy clone từ image đã bật BitLocker), hoặc cùng Key ID nhưng mật khẩu khác. Mỗi cặp chỉ gửi 1 lần, sau khi một lượt full xác nhận; không nhắc lại. Không liên quan trạng thái Online / Offline.
+    recipients: Quản trị > Thông báo > Cảnh báo hệ thống
+    variables: [count, items]
+    subject: "Key ID trùng giữa 2 máy ({{count}})"
+    body: |
+      Phát hiện Key ID BitLocker nằm dưới nhiều máy cùng còn trong AD:
+      {{items}}
+      Key vẫn giữ ở máy cũ, không bị ghi đè. Kiểm tra (máy clone, đặt lại BitLocker) rồi bấm "Đã xem xét" ở Quản trị > Sync AD.
+
+  reveal_out_of_hours:
+    kind: alert
+    used_by: Hiện key (Tìm máy > máy > Hiện key)
+    sent_when: Có người hiện key ngoài giờ làm việc (cài đặt reveal.working_hours). Tắt ở Quản trị > Tính năng > "Cảnh báo khi xem key ngoài giờ".
+    recipients: Quản trị > Thông báo > Cảnh báo hệ thống
+    variables: [user, computer, branch]
+    subject: "Xem key ngoài giờ làm việc: {{computer}}"
+    body: |
+      {{user}} vừa xem recovery key của máy {{computer}} (chi nhánh {{branch}}) ngoài giờ làm việc.
+
+  key_export:
+    kind: alert
+    used_by: Xuất kèm key (Tìm máy > Xuất kèm key, POST /api/keys/export)
+    sent_when: Mỗi lần xuất recovery key ra file CSV.
+    recipients: Quản trị > Thông báo > Cảnh báo hệ thống
+    variables: [user, count, reason, reasonLabel, note, ticket]
+    subject: "{{user}} vừa xuất {{count}} recovery key"
+    body: |
+      {{user}} vừa xuất {{count}} recovery key ra file CSV.
+      Lý do: {{reasonLabel}}
+      Ghi chú: {{note}}
+      Ticket: {{ticket}}
+      Chi tiết trong Nhật ký.
+
+  # ------------------------------------------------------------------------------------------
+  # Thong bao cho nguoi dung (khong phai canh bao: khong co tien to [BitLocker][MUC DO])
+  # ------------------------------------------------------------------------------------------
+  new_objects:
+    kind: notification
+    used_by: Sync AD (sau mỗi lượt có máy mới / key mới)
+    sent_when: Lượt sync lưu máy hoặc key lần đầu. Mỗi người một email, chỉ liệt kê những gì trong phạm vi của họ. Mặc định không gửi cho lượt full sync đầu tiên.
+    recipients: Quản trị > Thông báo > "Máy mới, key mới" (người dùng IT / Trưởng IT của chi nhánh và / hoặc Admin HQ)
+    variables: [runId, mode, dc, summary, computerCount, keyCount, computers, keys]
+    subject: "[BitLocker] Sync #{{runId}}: {{summary}}"
+    body: |
+      Lượt sync #{{runId}} ({{mode}}, DC {{dc}}) vừa ghi nhận {{summary}} trong phạm vi của bạn.
+
+      {{computers}}{{keys}}Email tự động từ hệ thống quản lý BitLocker Key.
+      Admin HQ có thể tắt loại thông báo này ở Quản trị > Thông báo.
+    # Cac manh ghep thanh {{summary}}, {{computers}} va {{keys}} (phan nao rong thi bo qua).
+    parts:
+      summary_computers: "{{count}} máy mới"
+      summary_keys: "{{count}} key mới"
+      summary_join: ", "
+      computers_title: "Máy mới:"
+      computer_line: "- {{name}} (chi nhánh {{branch}}){{link}}"
+      keys_title: "Key mới (chỉ có Key ID, không có mật khẩu):"
+      key_line: "- {{name}} (chi nhánh {{branch}}): Key ID {{keyIdPrefix}}...{{link}}"
+      more_line: "- ... và {{more}} mục khác (xem trên web)"
+      link: "  {{url}}"
+
+  # Bao cao hang ngay cho Admin HQ. Chi tieu de va cau mo dau lay tu day; phan so lieu, bang va
+  # bieu do (ban HTML) do code tao.
+  daily_report:
+    kind: notification
+    used_by: Báo cáo hằng ngày (Quản trị > Thông báo > Báo cáo hằng ngày)
+    sent_when: Mỗi ngày một lần vào giờ đã cấu hình (khi bật), hoặc khi bấm "Gửi thử ngay".
+    recipients: Mọi Admin HQ có email (nếu chọn) và các địa chỉ thêm của báo cáo
+    variables: [day, period, syncStatus, computers, keys, computersChange, keysChange]
+    subject: "Báo cáo BitLocker {{day}}: đồng bộ AD {{syncStatus}}, máy {{computersChange}}, key {{keysChange}}"
+    body: |
+      Tình hình hệ thống quản lý recovery key BitLocker {{period}}.
+
+  smtp_test:
+    kind: notification
+    used_by: Quản trị > Mail server > Gửi thử
+    sent_when: Admin HQ bấm "Gửi thử". Gửi ngay, không qua hàng đợi.
+    recipients: địa chỉ nhập trên trang
+    variables: []
+    subject: "[BitLocker] Email thử"
+    body: |
+      Email thử từ hệ thống quản lý BitLocker Key.
+      Nếu bạn nhận được email này, cấu hình SMTP đã đúng.

@@ -1,0 +1,25 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+
+# .NET worker
+bin/
+obj/
+*.user
+worker/**/state*.json
+!worker/**/sample-directory.json
+TestResults/
+
+# Dev TLS certificates (cert/generate-self-signed.sh); never commit keys
+cert/*.crt
+cert/*.key
+cert/*.srl
+
+# Backup files (encrypted, but they hold every recovery key)
+backups/

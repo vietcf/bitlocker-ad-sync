@@ -1,0 +1,31 @@
+<%- include('../partials/head') %>
+<p class="crumbs"><a href="/computers/<%= computerId %>">← Quay lại máy</a></p>
+<section class="card narrow">
+  <h1>Hiện recovery key</h1>
+  <p>Key ID: <code><strong><%= keyId.slice(0, 8).toUpperCase() %></strong><%= keyId.slice(8).toUpperCase() %></code></p>
+  <p class="muted">Lượt xem này được ghi lại (người xem, thời điểm, máy, lý do). Key hiện trong 60 giây.
+    Sau khi người dùng mở được máy, cần xoay key.</p>
+  <%- include('../partials/error-box', { error }) %>
+  <form method="post" action="/computers/<%= computerId %>/keys/<%= keyId %>/reveal" class="form">
+    <%- include('../partials/csrf') %>
+    <label>Lý do
+      <select name="reason" required>
+        <option value="">— Chọn lý do —</option>
+        <% reasons.forEach((r) => { %>
+          <option value="<%= r.value %>" <%= form.reason === r.value ? 'selected' : '' %>><%= r.label %></option>
+        <% }) %>
+      </select>
+    </label>
+    <label>Ghi chú <span class="muted">(bắt buộc nếu chọn “Lý do khác”)</span>
+      <textarea name="reasonNote" maxlength="500" rows="3"><%= form.reasonNote ?? '' %></textarea>
+    </label>
+    <label>Số ticket <% if (!ticketRequired) { %><span class="muted">(nếu có)</span><% } %>
+      <input name="ticketNo" maxlength="64" value="<%= form.ticketNo ?? '' %>" <%= ticketRequired ? 'required' : '' %>>
+    </label>
+    <div class="actions">
+      <button type="submit">Hiện key</button>
+      <a class="button secondary" href="/computers/<%= computerId %>">Hủy</a>
+    </div>
+  </form>
+</section>
+<%- include('../partials/foot') %>

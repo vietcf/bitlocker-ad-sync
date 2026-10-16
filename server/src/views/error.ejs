@@ -1,0 +1,8 @@
+<%- include('partials/head') %>
+<section class="card narrow">
+  <h1><%= status === 404 ? 'Không tìm thấy' : status === 403 ? 'Không có quyền' : 'Có lỗi' %></h1>
+  <p><%= message %></p>
+  <% if (requestId) { %><p class="muted">Mã lỗi: <code><%= requestId %></code></p><% } %>
+  <p><a href="/">← Về trang chính</a></p>
+</section>
+<%- include('partials/foot') %>

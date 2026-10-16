@@ -1,0 +1,141 @@
+# Local development: `docker compose up --build --watch`
+#   db       PostgreSQL (dev + test databases)
+#   migrate  applies db/migrations once, then exits
+#   server   Node.js app (HTTP inside the Docker network only), restarts itself when you edit server/src
+#   nginx    HTTPS reverse proxy, one certificate (./cert) for both ports:
+#              https://localhost        web + JSON API          (HTTPS_PORT, default 443)
+#              https://localhost:8443   ingest API for workers  (INGEST_HTTPS_PORT, default 8443)
+#              http://localhost         redirects to https      (HTTP_PORT, default 80)
+#            Certificate: bash cert/generate-self-signed.sh (dev), or a real one (README "HTTPS va chung chi").
+#            BIND_ADDR=0.0.0.0 to reach it from other machines (default: this machine only).
+#
+# All passwords and secrets below are dev-only placeholders. Production runs on hardened
+# servers with real secrets (see the design doc), not this file.
+
+# Container logs (the app logs JSON to stdout): rotated by Docker, never growing without limit.
+# 'local' keeps up to max-file x max-size per container, compressed; read them with 'docker compose logs'.
+x-logging: &logging
+  driver: local
+  options:
+    max-size: "20m"
+    max-file: "10"
+
+x-db-urls: &db-urls
+  DATABASE_URL: postgres://app_node:${APP_NODE_PASSWORD:-dev_app_pw}@db:5432/blk
+  MIGRATION_DATABASE_URL: postgres://blk_owner:${BLK_OWNER_PASSWORD:-dev_owner_pw}@db:5432/blk
+
+services:
+  db:
+    image: postgres:17.6
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_postgres_pw}
+      POSTGRES_DB: blk
+      BLK_OWNER_PASSWORD: ${BLK_OWNER_PASSWORD:-dev_owner_pw}
+      APP_NODE_PASSWORD: ${APP_NODE_PASSWORD:-dev_app_pw}
+      BLK_BACKUP_PASSWORD: ${BLK_BACKUP_PASSWORD:-dev_backup_pw}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - ./server/db/init:/docker-entrypoint-initdb.d:ro
+      - blk-pg:/var/lib/postgresql/data
+    logging: *logging
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-d", "blk_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  migrate:
+    build: ./server
+    command: ["node", "src/db/migrate.js"]
+    environment:
+      <<: *db-urls
+    volumes:
+      - ./server/db/migrations:/app/db/migrations:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  server:
+    build: ./server
+    command: ["node", "src/index.js"]
+    # Settings (LDAP, alerts, ingest API key...) come from server/.env; the values below only adapt it to Docker.
+    # After editing server/.env: docker compose up -d --force-recreate server  (watch ignores .env: it is in .dockerignore).
+    env_file:
+      - path: ./server/.env
+        required: false
+    environment:
+      <<: *db-urls
+      NODE_ENV: development
+      LOG_LEVEL: debug
+      USER_HOST: 0.0.0.0
+      USER_PORT: "3000"
+      INGEST_HOST: 0.0.0.0
+      INGEST_PORT: "8443"
+      # Worker IP allow-list (comma-separated), checked against the address nginx sees. Empty = no filter (dev).
+      # On Docker Desktop (Windows / macOS) every client shows as the Docker gateway (e.g. 172.18.0.1);
+      # on a Linux host the real worker address is kept. Example: INGEST_ALLOWED_IPS=10.0.5.21 docker compose up -d
+      INGEST_ALLOWED_IPS: ${INGEST_ALLOWED_IPS:-}
+      # TLS is done by the nginx container, the one proxy in front ("1"): the client / worker address
+      # comes from the X-Forwarded-For nginx writes; secure cookies (the browser only ever talks HTTPS).
+      TRUST_PROXY: "1"
+      INGEST_TRUST_PROXY: "1"
+      COOKIE_SECURE: "true"
+      SESSION_SECRET: dev-only-session-secret-change-me-0000000000
+      LOG_HMAC_KEY: "0000000000000000000000000000000000000000000000000000000000000001"
+      # Backups (Quan tri > Sao luu): encrypted zip files in ./backups; pg_dump uses the read-only role blk_backup.
+      BACKUP_DIR: /app/backups
+      BACKUP_DATABASE_URL: postgres://blk_backup:${BLK_BACKUP_PASSWORD:-dev_backup_pw}@db:5432/blk
+    volumes:
+      - ./backups:/app/backups
+    # No published port: reached through nginx only (HTTPS).
+    expose:
+      - "3000"
+      - "8443"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    logging: *logging
+    # `docker compose up --watch`: copies edited files into the container and restarts it.
+    # (A plain bind mount does not deliver file-change events from Windows into Linux containers.)
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./server/src
+          target: /app/src
+        - action: sync+restart
+          path: ./server/public
+          target: /app/public
+        - action: sync+restart
+          path: ./server/openapi
+          target: /app/openapi
+        - action: sync
+          path: ./server/templates
+          target: /app/templates
+        - action: rebuild
+          path: ./server/package.json
+
+  nginx:
+    image: nginx:1.28.0-alpine
+    ports:
+      - "${BIND_ADDR:-127.0.0.1}:${HTTPS_PORT:-443}:443"
+      - "${BIND_ADDR:-127.0.0.1}:${INGEST_HTTPS_PORT:-8443}:8443"
+      - "${BIND_ADDR:-127.0.0.1}:${HTTP_PORT:-80}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./cert:/etc/nginx/cert:ro
+    depends_on:
+      - server
+    restart: unless-stopped
+    logging: *logging
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "--no-check-certificate", "https://127.0.0.1/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  blk-pg:

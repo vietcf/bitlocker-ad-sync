@@ -1,0 +1,23 @@
+<%- include('../partials/head') %>
+<section class="card narrow">
+  <h1>Đăng nhập</h1>
+  <p class="muted">Quản lý BitLocker recovery key</p>
+  <% if (expired && !error) { %><div class="notice notice-info" role="status">Phiên đăng nhập đã hết hạn (không hoạt động quá lâu hoặc quá thời gian tối đa). Đăng nhập lại để tiếp tục.</div><% } %>
+  <%- include('../partials/error-box', { error }) %>
+  <form method="post" action="/login" class="form">
+    <%- include('../partials/csrf') %>
+    <input type="hidden" name="next" value="<%= next %>">
+    <label>Tên đăng nhập
+      <input name="username" value="<%= username %>" autocomplete="username" required autofocus
+             placeholder="<%= ldapEnabled ? 'tài khoản Windows, ví dụ nguyenvana' : '' %>">
+    </label>
+    <label>Mật khẩu
+      <input name="password" type="password" autocomplete="current-password" required>
+    </label>
+    <button type="submit">Đăng nhập</button>
+  </form>
+  <% if (ldapEnabled) { %>
+    <p class="muted small">Dùng tài khoản và mật khẩu Windows (AD). Chỉ tài khoản đã được Admin HQ tạo trong hệ thống mới đăng nhập được.</p>
+  <% } %>
+</section>
+<%- include('../partials/foot') %>

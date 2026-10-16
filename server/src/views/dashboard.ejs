@@ -1,0 +1,154 @@
+<%- include('partials/head') %>
+<div class="title-row">
+  <h1>Tổng quan</h1>
+  <span class="muted">Số liệu trong phạm vi chi nhánh của bạn</span>
+</div>
+
+<p class="freshness muted">
+  <% if (freshness.lastSyncAt) { %>
+    Dữ liệu cập nhật lần cuối lúc <strong><%= h.dateTime(freshness.lastSyncAt) %></strong>
+    (<%= freshness.ageMinutes < 1 ? 'vừa xong' : `${h.number(freshness.ageMinutes)} phút trước` %>, lượt đồng bộ AD thành công gần nhất).
+  <% } else { %>
+    Chưa có lượt đồng bộ AD nào thành công.
+  <% } %>
+</p>
+<% if (freshness.stale) { %>
+  <div class="notice notice-warn" role="status">
+    <% if (freshness.lastSyncAt) { %>
+      Đồng bộ AD đã quá <%= freshness.maxMinutes %> phút chưa chạy thành công: key và máy tạo trên AD sau
+      <%= h.dateTime(freshness.lastSyncAt) %> có thể chưa có trong hệ thống.
+    <% } else { %>
+      Dữ liệu chưa được đồng bộ từ AD: danh sách máy và key có thể trống hoặc chưa đầy đủ.
+    <% } %>
+    Nếu cần key gấp mà không tìm thấy, liên hệ Admin HQ.
+  </div>
+<% } %>
+
+<% if (sync && (sync.highAlerts || sync.openAlerts)) { %>
+  <a class="notice notice-<%= sync.highAlerts ? 'error' : 'warn' %> block-link" href="/admin/sync">
+    <% if (sync.offlineSince) { %><strong>Đồng bộ AD đang Offline</strong> từ <%= h.dateTime(sync.offlineSince) %> · <% } %>
+    <strong><%= sync.openAlerts %> cảnh báo sync đang mở</strong><% if (sync.highAlerts) { %> (<%= sync.highAlerts %> mức cao)<% } %> · xem chi tiết →
+  </a>
+<% } %>
+
+<section class="tiles">
+  <div class="tile">
+    <div class="tile-label">Máy trong AD</div>
+    <div class="tile-value"><%= h.number(totals.computers) %></div>
+  </div>
+  <div class="tile">
+    <div class="tile-label">Đã có key trên AD</div>
+    <div class="tile-value"><%= totals.coveragePct === null ? '—' : `${h.number(totals.coveragePct)}%` %></div>
+    <div class="tile-sub"><%= h.number(totals.noKey) %> máy chưa có key</div>
+  </div>
+  <% if (activity) { %>
+  <div class="tile">
+    <div class="tile-label">Lượt hiện key 7 ngày</div>
+    <div class="tile-value"><%= h.number(activity.reveals7d) %></div>
+    <div class="tile-sub">hôm nay <%= h.number(activity.today) %></div>
+  </div>
+  <% } %>
+  <% if (sync) { %>
+  <div class="tile">
+    <div class="tile-label">Sync AD thành công gần nhất</div>
+    <div class="tile-value tile-value-sm"><%= sync.lastSuccessAt ? h.dateTime(sync.lastSuccessAt) : 'Chưa có' %></div>
+    <div class="tile-sub">heartbeat: <%= sync.lastHeartbeatAt ? h.dateTime(sync.lastHeartbeatAt) : 'chưa có' %></div>
+  </div>
+  <% } %>
+</section>
+
+<section class="two-col">
+  <div class="card">
+    <h2>Số máy trên hệ thống, <%= inventoryDaily.length %> ngày gần nhất</h2>
+    <p class="chart-now">Hiện tại <strong><%= h.number(charts.computers.last?.value ?? 0) %></strong> máy</p>
+    <%- include('partials/line-chart', { chart: charts.computers, label: 'Số máy trên hệ thống theo ngày', cls: 'series-1' }) %>
+  </div>
+  <div class="card">
+    <h2>Số key trên hệ thống, <%= inventoryDaily.length %> ngày gần nhất</h2>
+    <p class="chart-now">Hiện tại <strong><%= h.number(charts.keys.last?.value ?? 0) %></strong> key</p>
+    <%- include('partials/line-chart', { chart: charts.keys, label: 'Số key trên hệ thống theo ngày', cls: 'series-2' }) %>
+  </div>
+</section>
+<p class="muted small chart-note">Máy được tính từ ngày hệ thống ghi nhận đến khi bị gắn nhãn "Không còn trong AD"; key được tính từ ngày ghi nhận. Rê chuột lên biểu đồ để xem số từng ngày.</p>
+
+<% if (charts.reveals) { %>
+<section class="card">
+  <h2>Lượt hiện key mỗi ngày, 14 ngày gần nhất</h2>
+  <%- include('partials/line-chart', { chart: charts.reveals, label: 'Lượt hiện key mỗi ngày trong 14 ngày gần nhất', cls: 'series-1' }) %>
+</section>
+<% } %>
+
+<section class="card" id="branches">
+  <div class="title-row">
+    <h2>Theo chi nhánh</h2>
+    <span class="muted small">
+      <% if (branches.length > branchLimit && !allBranches) { %>Top <%= branchLimit %> / <%= branches.length %> chi nhánh, nhiều máy nhất<% } else { %><%= branches.length %> chi nhánh<% } %>
+    </span>
+  </div>
+  <% const shown = allBranches ? branches : branches.slice(0, branchLimit); %>
+  <div class="hbar-legend" aria-hidden="true"><span><i class="hbar-ok"></i>Có key</span><span><i class="hbar-bad"></i>Chưa có key</span></div>
+  <% if (!branches.length) { %><p class="muted">Chưa có máy nào trong phạm vi của bạn.</p><% } else { %>
+  <%- include('partials/branch-bars', { rows: shown,
+        total: branches.length > 1 ? { computers: totals.computers, with_key: totals.withKey, no_key: totals.noKey } : null }) %>
+  <% } %>
+  <details class="table-view">
+    <summary>Xem bảng số liệu</summary>
+    <table class="dense">
+      <thead>
+        <tr><th>Chi nhánh</th><th class="num">Máy</th><th class="num">Có key</th><th class="num">Chưa có key</th><th class="num">Số key</th>
+          <% if (activity) { %><th class="num">Hiện key 30 ngày</th><% } %></tr>
+      </thead>
+      <tbody>
+      <% (allBranches ? branches : branches.slice(0, branchLimit)).forEach((b) => { %>
+        <tr>
+          <td title="<%= b.branch_name ?? 'Máy chưa thuộc chi nhánh nào' %>"><strong><%= h.branchCode(b.branch_code) %></strong><% if (b.branch_name) { %> <span class="muted">· <%= b.branch_name %></span><% } %></td>
+          <td class="num"><%= h.number(b.computers) %></td>
+          <td class="num"><%= h.number(b.with_key) %></td>
+          <td class="num"><% if (b.no_key) { %><a href="/?branchId=<%= b.branch_id ?? 'na' %>&status=no_key"><%= h.number(b.no_key) %></a><% } else { %>—<% } %></td>
+          <td class="num"><%= h.number(b.keys) %></td>
+          <% if (activity) { %><td class="num"><%= h.number(b.reveals_30d) %></td><% } %>
+        </tr>
+      <% }) %>
+      <% if (!branches.length) { %><tr><td colspan="6" class="muted">Chưa có máy nào trong phạm vi của bạn.</td></tr><% } %>
+      </tbody>
+      <% if (branches.length > 1) { %>
+      <tfoot>
+        <tr>
+          <th>Tổng</th>
+          <th class="num"><%= h.number(totals.computers) %></th>
+          <th class="num"><%= h.number(totals.withKey) %></th>
+          <th class="num"><%= h.number(totals.noKey) %></th>
+          <th class="num"><%= h.number(totals.keys) %></th>
+          <% if (activity) { %><th class="num"><%= h.number(branches.reduce((s, b) => s + (b.reveals_30d ?? 0), 0)) %></th><% } %>
+        </tr>
+      </tfoot>
+      <% } %>
+    </table>
+    </details>
+  <% if (branches.length > branchLimit) { %>
+    <p class="more-link">
+      <% if (allBranches) { %><a href="/dashboard#branches">Thu gọn (top <%= branchLimit %>)</a>
+      <% } else { %><a href="/dashboard?branches=all#branches">Xem tất cả <%= branches.length %> chi nhánh →</a><% } %>
+    </p>
+  <% } %>
+  <p class="muted small">Mỗi thanh là toàn bộ máy của chi nhánh. Rê chuột lên thanh để xem số máy; bấm phần đỏ để mở danh sách máy chưa có key.</p>
+</section>
+
+<section>
+  <% if (activity) { %>
+  <div class="card">
+    <h2>Xem key nhiều nhất, 7 ngày</h2>
+    <table class="dense">
+      <thead><tr><th>Người dùng</th><th class="num">Lượt hiện key</th><th>Gần nhất</th></tr></thead>
+      <tbody>
+      <% activity.top.forEach((u) => { %>
+        <tr><td><%= u.user_upn %></td><td class="num"><%= u.reveals %></td><td><%= h.dateTime(u.last_at) %></td></tr>
+      <% }) %>
+      <% if (!activity.top.length) { %><tr><td colspan="3" class="muted">Chưa có lượt xem key nào.</td></tr><% } %>
+      </tbody>
+    </table>
+    <% if (can('logs')) { %><p><a href="/audit?action=reveal">Xem nhật ký hiện key →</a></p><% } %>
+  </div>
+  <% } %>
+</section>
+<%- include('partials/foot') %>

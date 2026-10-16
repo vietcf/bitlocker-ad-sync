@@ -1,0 +1,29 @@
+<%# Line chart from web/charts.js lineChart(). Locals: chart, label (aria-label), cls (series-1 | series-2). %>
+<figure class="chart">
+  <svg viewBox="0 0 <%= chart.width %> <%= chart.height %>" role="img" aria-label="<%= label %>" class="<%= cls %>">
+    <g class="grid">
+      <% chart.ticks.forEach((t) => { %>
+        <line x1="<%= chart.plot.left %>" x2="<%= chart.plot.right %>" y1="<%= t.y %>" y2="<%= t.y %>"></line>
+        <text x="<%= chart.plot.left - 8 %>" y="<%= t.y + 4 %>" text-anchor="end"><%= h.number(t.value) %></text>
+      <% }) %>
+    </g>
+    <path class="series-line" d="<%= chart.line %>"></path>
+    <% if (chart.last) { %><circle class="series-dot" cx="<%= chart.last.cx %>" cy="<%= chart.last.cy %>" r="4"></circle><% } %>
+    <g class="xlabels">
+      <% chart.labels.forEach((l) => { %><text x="<%= l.x %>" y="<%= chart.height - 8 %>" text-anchor="middle"><%= l.text %></text><% }) %>
+    </g>
+    <% chart.points.forEach((p) => { %>
+      <g class="pt">
+        <title><%= p.label %>: <%= p.tip %></title>
+        <rect class="hit" x="<%= p.hit.x %>" y="<%= chart.plot.top %>" width="<%= p.hit.w %>" height="<%= chart.plot.base - chart.plot.top %>"></rect>
+        <line class="cross" x1="<%= p.cx %>" x2="<%= p.cx %>" y1="<%= chart.plot.top %>" y2="<%= chart.plot.base %>"></line>
+        <circle class="hover-dot" cx="<%= p.cx %>" cy="<%= p.cy %>" r="5"></circle>
+        <g class="tip">
+          <rect x="<%= p.tipBox.x %>" y="<%= p.tipBox.y %>" width="<%= p.tipBox.w %>" height="<%= p.tipBox.h %>" rx="6"></rect>
+          <text class="tip-day" x="<%= p.tipBox.x + 10 %>" y="<%= p.tipBox.y + 14 %>"><%= p.label %></text>
+          <text class="tip-value" x="<%= p.tipBox.x + 10 %>" y="<%= p.tipBox.y + 29 %>"><%= p.tip %></text>
+        </g>
+      </g>
+    <% }) %>
+  </svg>
+</figure>

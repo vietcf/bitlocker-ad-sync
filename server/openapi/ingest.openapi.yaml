@@ -1,0 +1,542 @@
+openapi: 3.1.0
+info:
+  title: BitLocker Key Management – Ingest API
+  version: 1.0.0
+  summary: API the .NET sync worker uses to push Active Directory data.
+  description: |
+    The sync worker (a .NET Windows Service running as a gMSA) reads computer objects and
+    `msFVE-RecoveryInformation` objects from Active Directory over LDAPS and pushes them here.
+    The worker never decides what is stored: branch mapping, key status, "deleted from AD"
+    marking and anomaly checks all happen on the server.
+
+    ## One sync run
+
+    1. `POST /sync-runs` – open a run (`delta` or `full`). Use the returned `mode` and `sinceUsn`:
+       the server turns a delta into a full run when the DC differs from the last successful run
+       or when there has never been one.
+    2. Read `highestCommittedUSN` (and `invocationId`) from the DC's RootDSE **before** querying.
+       This value is the run's `highestUsn`.
+    3. Read computers (`uSNChanged >= sinceUsn + 1` for a delta) and send them in batches of
+       at most 500: `POST /computers`.
+    4. Read recovery keys the same way and send them in batches of at most 500: `POST /keys`.
+       Always after the computers, because a key is attached to its computer by the parent DN.
+    5. `POST /sync-runs/{runId}/complete` with the counts and `highestUsn`.
+
+    Every batch is idempotent (upsert by objectGUID, insert-if-new by Key ID), so a batch that
+    failed on the network can simply be sent again.
+
+    ## Orphan keys
+
+    `POST /keys` returns `orphans`: key IDs whose computer is not known yet. Within the same run,
+    read each orphan's parent computer object (the key's parent DN), send it with
+    `POST /computers`, then send the orphan keys again. If some are still orphans, complete the
+    run with `errors > 0` and `highestUsn = sinceUsn`, so the next delta reads them again.
+
+    ## Errors
+
+    Errors are JSON: `{ "error": "<code>", "message": "<text>", ... }`. Validation errors (400)
+    also list the bad `fields`. Retry 5xx and network errors with backoff; do not retry 4xx.
+
+    ## Security
+
+    HTTPS only (at the server or the reverse proxy in front), requests accepted only from the worker's
+    IP (INGEST_ALLOWED_IPS), and the worker authenticates with the API key
+    (`Authorization: Bearer <key>`). Never log a recovery password on the worker side.
+servers:
+  - url: http://localhost:8443/api/ingest
+    description: Local development (docker compose)
+  - url: https://blk.corp.local:8443/api/ingest
+    description: Production (example host)
+security:
+  - apiKey: []
+tags:
+  - name: Sync runs
+    description: Open and close a sync run (delta or full).
+  - name: Data
+    description: Batches of computers and recovery keys read from AD.
+  - name: Health
+    description: Worker heartbeat and manual sync requests.
+paths:
+  /sync-runs/last:
+    get:
+      tags: [Sync runs]
+      operationId: getLastSuccessfulRun
+      summary: Last successful run
+      description: The DC and USN of the last successful run. An empty object when there has never been one.
+      responses:
+        '200':
+          description: Last successful run, or `{}`.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/LastRun'
+                  - type: object
+                    additionalProperties: false
+                    description: No successful run yet.
+              examples:
+                found:
+                  value: { runId: 1841, dcName: DC01.corp.local, highestUsn: 48211930, finishedAt: '2026-10-13T01:12:44.120Z' }
+                none:
+                  value: {}
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /sync-runs:
+    post:
+      tags: [Sync runs]
+      operationId: openSyncRun
+      summary: Open a sync run
+      description: |
+        Opens a run. Only one run can be open at a time. A `delta` request becomes `full` when
+        `dcName` differs from the last successful run's DC (USNs are per DC) or when there is no
+        successful run yet; always use the returned `mode` and `sinceUsn`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OpenRunRequest' }
+            example: { mode: delta, dcName: DC01.corp.local }
+      responses:
+        '201':
+          description: Run opened.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OpenRunResponse' }
+              examples:
+                delta:
+                  value: { runId: 1842, mode: delta, sinceUsn: 48211930 }
+                forcedFull:
+                  summary: Delta requested against another DC
+                  value: { runId: 1843, mode: full, sinceUsn: 0 }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: Another run is still open (`run_in_progress`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: run_in_progress, message: Một lượt sync khác đang chạy. }
+  /computers:
+    post:
+      tags: [Data]
+      operationId: ingestComputers
+      summary: Send a batch of computers
+      description: |
+        Upserts computers by `objectGuid`. The server maps each computer to a branch from its DN
+        (longest matching root OU), logs computers that moved to another branch, and records that
+        this run saw them (used by full runs to detect computers deleted from AD).
+        **A full run must send every computer it read.**
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ComputersBatch' }
+            example:
+              runId: 1842
+              items:
+                - objectGuid: 8f1c2d3e-4b5a-4c6d-8e7f-0a1b2c3d4e5f
+                  name: HN-LT-0231
+                  dnsName: hn-lt-0231.corp.local
+                  dn: CN=HN-LT-0231,OU=Laptops,OU=Computers,OU=HN,DC=corp,DC=local
+                  os: Windows 11 Enterprise
+                  usnChanged: 48212004
+                  whenChanged: '2026-10-12T08:14:00Z'
+                  whenCreated: '2025-03-02T02:00:00Z'
+      responses:
+        '200':
+          description: Batch stored.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ComputersResult' }
+              example: { upserted: 1, moved: 0, unmapped: 0 }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/RunNotFound' }
+        '409': { $ref: '#/components/responses/RunClosed' }
+        '413': { $ref: '#/components/responses/TooLarge' }
+  /keys:
+    post:
+      tags: [Data]
+      operationId: ingestKeys
+      summary: Send a batch of recovery keys
+      description: |
+        Inserts keys whose Key ID is new; existing keys are never overwritten or deleted.
+        Per volume (`volumeGuid`), the newest key is `active` and older keys of that volume `superseded`.
+
+        - The computer is found by `computerObjectGuid` (preferred), else by `computerDn`, or by the parent of `dn` (the key object's own DN).
+        - Send `recoveryPassword: ""` when the object was readable but the confidential attribute
+          was not: the server counts these and quarantines the run (lost permission).
+        - Keys whose computer is unknown come back in `orphans` (see "Orphan keys" above).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/KeysBatch' }
+            example:
+              runId: 1842
+              items:
+                - keyId: 1a2b3c4d-5e6f-4a1b-8c2d-3e4f5a6b7c8d
+                  dn: CN=2026-10-12T15:13:55-08:00{1A2B3C4D-5E6F-4A1B-8C2D-3E4F5A6B7C8D},CN=HN-LT-0231,OU=Laptops,OU=Computers,OU=HN,DC=corp,DC=local
+                  volumeGuid: 7c9e1f20-3b4a-4d5e-9f60-718293a4b5c6
+                  recoveryPassword: 123456-234567-345678-456789-567890-678901-789012-890123
+                  whenCreated: '2026-10-12T08:13:55Z'
+      responses:
+        '200':
+          description: Batch processed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KeysResult' }
+              example: { inserted: 1, skipped: 0, emptyPassword: 0, orphans: [] }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/RunNotFound' }
+        '409': { $ref: '#/components/responses/RunClosed' }
+        '413': { $ref: '#/components/responses/TooLarge' }
+  /sync-runs/{runId}/complete:
+    post:
+      tags: [Sync runs]
+      operationId: completeSyncRun
+      summary: Close a sync run
+      description: |
+        - `status: failed` closes the run with the `errorCode` and raises an alert; the stored USN
+          does not move, so the next delta starts from the old mark.
+          `errorCode: cancelled` (the worker service is stopping) closes the run without an alert.
+        - `status: success` is checked for anomalies (computers or keys seen dropping, a branch
+          vanishing, keys with empty passwords, mass deletion). With anomalies the run is
+          `quarantined`: nothing destructive is applied and the USN does not move until Admin HQ
+          accepts it. Otherwise a full run marks computers it did not see as deleted from AD.
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CompleteRequest' }
+            examples:
+              success:
+                value: { status: success, highestUsn: 48215400, computersSeen: 1240, keysSeen: 1302, errors: 0, dcHighestUsn: 48215400 }
+              failed:
+                value: { status: failed, errors: 1, errorCode: ldap_unreachable }
+      responses:
+        '200':
+          description: Run closed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CompleteResult' }
+              examples:
+                success:
+                  value: { status: success, markedDeleted: 2 }
+                quarantined:
+                  value:
+                    status: quarantined
+                    anomalies:
+                      - code: computers_drop
+                        message: Lượt full chỉ thấy 610/1240 máy (49.2%), dưới ngưỡng 95.0%.
+                failed:
+                  value: { status: failed }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/RunNotFound' }
+        '409': { $ref: '#/components/responses/RunClosed' }
+  /heartbeat:
+    post:
+      tags: [Health]
+      operationId: heartbeat
+      summary: Worker heartbeat (every 5 minutes)
+      description: |
+        Tells the server the worker is alive and how its last LDAP contact went. The server raises
+        an alert after 15 minutes without a heartbeat. The response carries a manual sync request
+        from Admin HQ, delivered to exactly one heartbeat: when `syncRequested` is not null, start
+        that run now.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/HeartbeatRequest' }
+            example:
+              workerId: BLK-SYNC-01
+              version: 1.0.0
+              dcName: DC01.corp.local
+              ldapOk: true
+              lastErrorCode: null
+              queueLen: 0
+              dcCertExpiresAt: '2027-04-30T00:00:00Z'
+              canaryValue: '2026-10-13T02:00:00Z'
+      responses:
+        '200':
+          description: Recorded.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HeartbeatResponse' }
+              examples:
+                nothing:
+                  value: { syncRequested: null }
+                fullRequested:
+                  value: { syncRequested: full }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+components:
+  securitySchemes:
+    apiKey:
+      type: http
+      scheme: bearer
+      description: 'The shared secret INGEST_API_KEY (32+ characters), sent as `Authorization: Bearer <key>`.'
+  responses:
+    ValidationError:
+      description: The body or a parameter is invalid (`invalid_request`); `fields` lists the problems.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ValidationErrorBody' }
+          example:
+            error: invalid_request
+            message: Dữ liệu gửi lên không hợp lệ.
+            fields: [{ field: items.0.objectGuid, message: Invalid GUID }]
+    Unauthorized:
+      description: Missing or wrong API key (`bad_api_key`).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: bad_api_key, message: Invalid API key }
+    Forbidden:
+      description: The caller's IP is not in INGEST_ALLOWED_IPS.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: forbidden, message: Address not allowed }
+    RunNotFound:
+      description: No run with this id.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: not_found, message: Run not found. }
+    RunClosed:
+      description: The run is no longer open (`run_closed`), e.g. completed or aborted after 2 hours.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: run_closed, message: Lượt sync này đã đóng. }
+    TooLarge:
+      description: Request body over 2 MB (`too_large`). Send smaller batches.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  schemas:
+    Guid:
+      type: string
+      description: GUID in the usual 8-4-4-4-12 text form (any case; braces not allowed).
+      pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+      examples: [8f1c2d3e-4b5a-4c6d-8e7f-0a1b2c3d4e5f]
+    Usn:
+      type: integer
+      format: int64
+      minimum: 0
+      description: An AD update sequence number (per DC).
+    LastRun:
+      type: object
+      required: [runId, dcName, highestUsn, finishedAt]
+      properties:
+        runId: { type: integer, format: int64 }
+        dcName: { type: string }
+        highestUsn: { $ref: '#/components/schemas/Usn' }
+        finishedAt: { type: string, format: date-time }
+    OpenRunRequest:
+      type: object
+      required: [mode, dcName]
+      properties:
+        mode:
+          type: string
+          enum: [delta, full]
+        dcName:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: FQDN of the DC the worker reads from (the pinned DC).
+    OpenRunResponse:
+      type: object
+      required: [runId, mode, sinceUsn]
+      properties:
+        runId: { type: integer, format: int64 }
+        mode:
+          type: string
+          enum: [delta, full]
+          description: The mode to run; may be `full` even if `delta` was requested.
+        sinceUsn:
+          allOf: [{ $ref: '#/components/schemas/Usn' }]
+          description: For a delta, read objects with `uSNChanged >= sinceUsn + 1`. 0 for a full run.
+    Computer:
+      type: object
+      required: [objectGuid, name, dn]
+      properties:
+        objectGuid: { $ref: '#/components/schemas/Guid' }
+        name: { type: string, minLength: 1, maxLength: 64, description: '`name` (or `cn`).' }
+        dnsName: { type: [string, 'null'], maxLength: 255, description: '`dNSHostName`.' }
+        dn: { type: string, minLength: 3, maxLength: 2048, description: '`distinguishedName`.' }
+        os: { type: [string, 'null'], maxLength: 128, description: '`operatingSystem`.' }
+        usnChanged: { $ref: '#/components/schemas/Usn' }
+        whenChanged: { type: [string, 'null'], format: date-time }
+        whenCreated: { type: [string, 'null'], format: date-time, description: Used to find new computers without a key. }
+    ComputersBatch:
+      type: object
+      required: [runId, items]
+      properties:
+        runId: { type: integer, format: int64 }
+        items:
+          type: array
+          maxItems: 500
+          items: { $ref: '#/components/schemas/Computer' }
+    ComputersResult:
+      type: object
+      required: [upserted, moved, unmapped]
+      properties:
+        upserted: { type: integer, description: Computers stored (new or updated). }
+        moved: { type: integer, description: Computers whose branch changed (logged). }
+        unmapped: { type: integer, description: Computers whose DN matches no branch root OU. }
+    RecoveryKey:
+      type: object
+      required: [keyId, whenCreated]
+      description: One `msFVE-RecoveryInformation` object. Give `computerDn` or `dn` (at least one).
+      properties:
+        keyId:
+          allOf: [{ $ref: '#/components/schemas/Guid' }]
+          description: '`msFVE-RecoveryGuid` as a GUID string.'
+        computerObjectGuid:
+          oneOf: [{ $ref: '#/components/schemas/Guid' }, { type: 'null' }]
+          description: |
+            `objectGUID` of the computer that owns the key. Preferred: when given, the key is linked by it
+            (DN only as a fallback when it is missing), so a renamed computer, or a computer deleted and
+            joined again under the same name (same DN, new objectGUID), always gets the right key.
+        computerDn:
+          type: string
+          minLength: 3
+          maxLength: 2048
+          description: DN of the computer that owns the key (the parent of the key object).
+        dn:
+          type: string
+          minLength: 3
+          maxLength: 2048
+          description: The key object's own DN; the server takes its parent as the computer DN.
+        volumeGuid:
+          oneOf: [{ $ref: '#/components/schemas/Guid' }, { type: 'null' }]
+          description: |
+            `msFVE-VolumeGuid`: the encrypted volume (C:, D:...) the key protects. Per volume, the newest
+            key is active and older ones superseded. Also fills the volume of keys stored without it.
+        recoveryPassword:
+          type: string
+          maxLength: 64
+          default: ''
+          description: |
+            `msFVE-RecoveryPassword`: 8 groups of 6 digits separated by dashes. Empty string when the
+            attribute could not be read. Never log this value.
+          examples: ['123456-234567-345678-456789-567890-678901-789012-890123']
+        whenCreated: { type: string, format: date-time }
+      anyOf:
+        - required: [computerDn]
+        - required: [dn]
+    KeysBatch:
+      type: object
+      required: [runId, items]
+      properties:
+        runId: { type: integer, format: int64 }
+        items:
+          type: array
+          maxItems: 500
+          items: { $ref: '#/components/schemas/RecoveryKey' }
+    KeysResult:
+      type: object
+      required: [inserted, skipped, emptyPassword, orphans]
+      properties:
+        inserted: { type: integer, description: New keys stored. }
+        skipped: { type: integer, description: 'Keys already known (their volume is filled in if it was missing), or with a malformed password.' }
+        emptyPassword: { type: integer, description: Keys sent with an empty password (not stored). }
+        orphans:
+          type: array
+          items: { $ref: '#/components/schemas/Guid' }
+          description: Key IDs whose computer is not known yet.
+    ErrorCode:
+      type: string
+      description: Why a run failed (worker side).
+      enum: [ldap_unreachable, ldap_tls_failed, ldap_bind_failed, ldap_timeout, key_attr_unreadable, ldap_search_base_failed, usn_regressed, api_unreachable, unknown]
+    CompleteRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [success, failed]
+        highestUsn:
+          oneOf: [{ $ref: '#/components/schemas/Usn' }, { type: 'null' }]
+          description: The DC's highestCommittedUSN read before querying. Send `sinceUsn` instead if orphan keys remain.
+        computersSeen: { type: [integer, 'null'], minimum: 0 }
+        keysSeen: { type: [integer, 'null'], minimum: 0, description: Key objects read from AD (full runs are checked against it). }
+        errors: { type: integer, minimum: 0, default: 0 }
+        errorCode:
+          oneOf: [{ $ref: '#/components/schemas/ErrorCode' }, { type: 'null' }]
+          description: Required in practice when `status` is `failed`.
+        dcHighestUsn:
+          oneOf: [{ $ref: '#/components/schemas/Usn' }, { type: 'null' }]
+          description: highestCommittedUSN at the end of the run (lets the server notice a DC that stopped replicating).
+    Anomaly:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          enum: [computers_drop, keys_drop, branch_drop, key_attr_unreadable, mass_delete]
+        message: { type: string }
+    CompleteResult:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [success, quarantined, failed]
+        markedDeleted: { type: integer, description: 'success only: computers marked as deleted from AD.' }
+        anomalies:
+          type: array
+          items: { $ref: '#/components/schemas/Anomaly' }
+          description: 'quarantined only.'
+    HeartbeatRequest:
+      type: object
+      required: [workerId]
+      properties:
+        workerId: { type: string, minLength: 1, maxLength: 64 }
+        version: { type: [string, 'null'], maxLength: 32 }
+        dcName: { type: [string, 'null'], maxLength: 255 }
+        ldapOk: { type: [boolean, 'null'], description: Whether the last LDAP bind/search worked. }
+        lastErrorCode: { type: [string, 'null'], maxLength: 32 }
+        queueLen: { type: [integer, 'null'], minimum: 0, description: Batches waiting to be re-sent. }
+        dcCertExpiresAt: { type: [string, 'null'], format: date-time, description: Expiry of the DC's LDAPS certificate. }
+        canaryValue: { type: [string, 'null'], format: date-time, description: 'Timestamp read from the canary object, if used.' }
+    HeartbeatResponse:
+      type: object
+      required: [syncRequested]
+      properties:
+        syncRequested:
+          type: [string, 'null']
+          enum: [delta, full, null]
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string, description: Machine-readable code. }
+        message: { type: string, description: Human-readable text. }
+    ValidationErrorBody:
+      allOf:
+        - $ref: '#/components/schemas/Error'
+        - type: object
+          properties:
+            fields:
+              type: array
+              items:
+                type: object
+                properties:
+                  field: { type: string }
+                  message: { type: string }

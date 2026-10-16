@@ -1,0 +1,44 @@
+<%- include('../partials/head') %>
+<%- include('_tabs') %>
+<section class="card">
+  <h2>Bảo mật đăng nhập</h2>
+  <p class="muted">Thay đổi có hiệu lực trong vòng 30 giây và được ghi nhật ký.</p>
+  <%- include('../partials/error-box', { error }) %>
+  <form method="post" action="/admin/settings/security" class="form">
+    <%- include('../partials/csrf') %>
+    <fieldset>
+      <legend>Mật khẩu tài khoản nội bộ</legend>
+      <p class="muted small">Áp dụng khi người dùng đặt / đổi mật khẩu (tài khoản AD theo chính sách mật khẩu của AD). Mật khẩu hiện có
+        không bị kiểm tra lại; muốn áp dụng ngay thì bật "Bắt đổi mật khẩu ở lần đăng nhập sau" cho người dùng.</p>
+      <label>Độ dài tối thiểu
+        <span class="nowrap"><input type="number" name="pwMinLength" value="<%= form.password.minLength %>" min="<%= form.limits.pwMinLength[0] %>" max="<%= form.limits.pwMinLength[1] %>" required class="thr-input"> ký tự</span>
+        <span class="muted hint">Từ <%= form.limits.pwMinLength[0] %> đến <%= form.limits.pwMinLength[1] %>; mặc định 12.</span>
+      </label>
+      <p><strong>Độ phức tạp</strong> <span class="muted small">(chọn các loại ký tự bắt buộc phải có)</span></p>
+      <label class="check"><input type="checkbox" name="pwUpper" <%= form.password.upper ? 'checked' : '' %>> <span>Ít nhất một <strong>chữ hoa</strong> (A–Z)</span></label>
+      <label class="check"><input type="checkbox" name="pwLower" <%= form.password.lower ? 'checked' : '' %>> <span>Ít nhất một <strong>chữ thường</strong> (a–z)</span></label>
+      <label class="check"><input type="checkbox" name="pwDigit" <%= form.password.digit ? 'checked' : '' %>> <span>Ít nhất một <strong>chữ số</strong> (0–9)</span></label>
+      <label class="check"><input type="checkbox" name="pwSpecial" <%= form.password.special ? 'checked' : '' %>> <span>Ít nhất một <strong>ký tự đặc biệt</strong> (không phải chữ hoặc số, ví dụ - _ ! @ # hoặc dấu cách)</span></label>
+      <p class="muted small">Luôn áp dụng: không chứa tên đăng nhập, khác mật khẩu hiện tại. Mật khẩu một lần do hệ thống tạo luôn đạt các yêu cầu này.
+        Đang áp dụng: <%= form.passwordText %></p>
+    </fieldset>
+    <fieldset>
+      <legend>Phiên đăng nhập</legend>
+      <p class="muted small">Áp dụng cho mọi người dùng, cả trên web và API, kể cả với phiên đang mở.</p>
+    <label>Tự đăng xuất sau khi không hoạt động
+      <span class="nowrap"><input type="number" name="idleMinutes" value="<%= form.idleMinutes %>" min="<%= form.limits.idleMinutes[0] %>" max="<%= form.limits.idleMinutes[1] %>" required class="thr-input"> phút</span>
+      <span class="muted hint">Không có thao tác nào (mở trang, bấm nút) trong khoảng này thì phiên bị hủy và trang đang mở tự chuyển về
+        màn hình đăng nhập (ví dụ trang hiện key bị bỏ quên). Từ <%= form.limits.idleMinutes[0] %> đến <%= form.limits.idleMinutes[1] %> phút;
+        mặc định <%= form.defaults.idleMinutes %> (SESSION_IDLE_MINUTES trong .env).</span>
+    </label>
+    <label>Thời gian tối đa của một phiên
+      <span class="nowrap"><input type="number" name="maxHours" value="<%= form.maxHours %>" min="<%= form.limits.maxHours[0] %>" max="<%= form.limits.maxHours[1] %>" required class="thr-input"> giờ</span>
+      <span class="muted hint">Sau khoảng này kể từ lúc đăng nhập thì phải đăng nhập lại, dù vẫn đang dùng. Từ <%= form.limits.maxHours[0] %>
+        đến <%= form.limits.maxHours[1] %> giờ; mặc định <%= form.defaults.maxHours %> (SESSION_MAX_HOURS).</span>
+    </label>
+    </fieldset>
+    <div class="actions"><button type="submit">Lưu</button></div>
+  </form>
+  <p class="muted small">Xác thực 2 bước và bắt đổi mật khẩu được bật cho từng người ở Quản trị &gt; Người dùng &gt; Sửa.</p>
+</section>
+<%- include('../partials/foot') %>

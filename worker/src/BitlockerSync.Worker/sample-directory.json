@@ -1,0 +1,20 @@
+{
+  "dc": {
+    "dnsHostName": "dc01.corp.local",
+    "highestCommittedUsn": 50000,
+    "invocationId": "6f1c2a3b-4d5e-4f60-8a7b-9c0d1e2f3a4b",
+    "certificateExpiresAt": "2027-06-30T00:00:00Z"
+  },
+  "computers": [
+    { "objectGuid": "a1000000-0000-4000-8000-000000000001", "name": "HN-WS-0001", "dnsName": "hn-ws-0001.corp.local", "dn": "CN=HN-WS-0001,OU=Workstations,OU=Computers,OU=HN,DC=corp,DC=local", "operatingSystem": "Windows 11 Enterprise", "usnChanged": 41001, "whenChanged": "2026-10-10T03:00:00Z", "whenCreated": "2025-01-15T02:00:00Z" },
+    { "objectGuid": "a1000000-0000-4000-8000-000000000002", "name": "HN-WS-0002", "dnsName": "hn-ws-0002.corp.local", "dn": "CN=HN-WS-0002,OU=Workstations,OU=Computers,OU=HN,DC=corp,DC=local", "operatingSystem": "Windows 11 Enterprise", "usnChanged": 41002, "whenChanged": "2026-10-10T03:00:00Z", "whenCreated": "2025-01-15T02:00:00Z" },
+    { "objectGuid": "a1000000-0000-4000-8000-000000000003", "name": "HCM-WS-0001", "dnsName": "hcm-ws-0001.corp.local", "dn": "CN=HCM-WS-0001,OU=Workstations,OU=Computers,OU=HCM,DC=corp,DC=local", "operatingSystem": "Windows 11 Pro", "usnChanged": 41003, "whenChanged": "2026-10-11T03:00:00Z", "whenCreated": "2025-02-01T02:00:00Z" },
+    { "objectGuid": "a1000000-0000-4000-8000-000000000004", "name": "DN-WS-0001", "dnsName": "dn-ws-0001.corp.local", "dn": "CN=DN-WS-0001,OU=Workstations,OU=Computers,OU=DN,DC=corp,DC=local", "operatingSystem": "Windows 10 Enterprise", "usnChanged": 49990, "whenChanged": "2026-10-12T03:00:00Z", "whenCreated": "2026-10-01T02:00:00Z" }
+  ],
+  "keys": [
+    { "keyId": "b2000000-0000-4000-8000-000000000001", "volumeGuid": "a1000000-0000-4000-8000-00000000000c", "dn": "CN=2025-01-15T09:10:00+07:00{B2000000-0000-4000-8000-000000000001},CN=HN-WS-0001,OU=Workstations,OU=Computers,OU=HN,DC=corp,DC=local", "recoveryPassword": "111111-222222-333333-444444-555555-666666-777777-888888", "whenCreated": "2025-01-15T02:10:00Z", "usnChanged": 41010 },
+    { "keyId": "b2000000-0000-4000-8000-000000000002", "volumeGuid": "a1000000-0000-4000-8000-00000000002c", "dn": "CN=2025-01-15T09:20:00+07:00{B2000000-0000-4000-8000-000000000002},CN=HN-WS-0002,OU=Workstations,OU=Computers,OU=HN,DC=corp,DC=local", "recoveryPassword": "121212-232323-343434-454545-565656-676767-787878-898989", "whenCreated": "2025-01-15T02:20:00Z", "usnChanged": 41011 },
+    { "keyId": "b2000000-0000-4000-8000-000000000003", "volumeGuid": "a1000000-0000-4000-8000-00000000003c", "dn": "CN=2025-02-01T09:00:00+07:00{B2000000-0000-4000-8000-000000000003},CN=HCM-WS-0001,OU=Workstations,OU=Computers,OU=HCM,DC=corp,DC=local", "recoveryPassword": "131313-242424-353535-464646-575757-686868-797979-808080", "whenCreated": "2025-02-01T02:00:00Z", "usnChanged": 41012 },
+    { "keyId": "b2000000-0000-4000-8000-000000000004", "volumeGuid": "a1000000-0000-4000-8000-00000000004c", "dn": "CN=2026-10-01T09:00:00+07:00{B2000000-0000-4000-8000-000000000004},CN=DN-WS-0001,OU=Workstations,OU=Computers,OU=DN,DC=corp,DC=local", "recoveryPassword": "141414-252525-363636-474747-585858-696969-707070-818181", "whenCreated": "2026-10-01T02:00:00Z", "usnChanged": 49995 }
+  ]
+}

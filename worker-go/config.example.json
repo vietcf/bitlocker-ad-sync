@@ -1,0 +1,96 @@
+{
+  // =====================================================================================================
+  // blk-sync (Go) - FILE CAU HINH MAU. Chep thanh config.json roi sua:
+  //   - khi phat trien: worker-go/config.json
+  //   - tren may chu Linux: /etc/blk-sync/config.json (install.sh tu chep)
+  // JSON cho phep comment (//, /* */) va dau phay thua. Moi khoa ghi de duoc bang bien moi truong
+  // Muc__Khoa, vi du: Ldap__Servers=dc01.corp.local,dc02.corp.local   Schedule__DeltaEveryMinutes=10
+  // Tham chieu day du: docs/configuration.md
+  //
+  // ---------------------------------------------- VI DU -----------------------------------------------
+  // Domain corp.local, 2 DC, tai khoan svc-blk chi duoc cap quyen doc OU may tinh cua 3 chi nhanh:
+  //
+  //   "Servers":     [ "dc01.corp.local", "dc02.corp.local" ]
+  //   "Username":    "svc-blk@corp.local"        hoac "CORP\\svc-blk" (trong JSON viet \\)
+  //   "BaseDn":      "DC=corp,DC=local"
+  //   "SearchBases": [
+  //     "OU=Computers,OU=HO,DC=corp,DC=local",
+  //     "OU=Computers,OU=HN,DC=corp,DC=local",
+  //     "OU=Computers,OU=HCM,DC=corp,DC=local"
+  //   ]
+  //
+  // Quy tac SearchBases:
+  //   - [] (rong) = doc toan bo BaseDn. Chi dung khi tai khoan doc duoc key tren ca domain.
+  //   - Moi OU la DN day du va PHAI nam trong BaseDn (cung phan DC=...), neu khong worker khong khoi dong.
+  //     Sai:  BaseDn "DC=corp,DC=local" + SearchBases "OU=HO,DC=example,DC=local"
+  //   - Phai phu het OU goc cua moi chi nhanh trong app (Quan tri > Chi nhanh & OU); may nam ngoai
+  //     SearchBases bi gan nhan "Khong con trong AD" sau luot full.
+  //   - Moi OU phai duoc cap quyen doc key (dsacls, README muc 4B.3); OU khong doc duoc lam dung ca luot
+  //     (ldap_search_base_failed). Sua xong chay: blk-sync check  -> moi OU mot dong OK / FAIL.
+  //   - OU trung hoac OU con cua OU da liet ke duoc tu bo qua (khong doc 2 lan).
+  //
+  // Bi mat (Ldap.Password, Ingest.ApiKey) - khong ghi gia tri that vao file:
+  //   "cred:ldap-password"                 systemd credential (khuyen nghi tren may chu, xem README 4B.7)
+  //   "file:/etc/blk-sync/ldap-password"   file chi user blk-sync doc duoc (chmod 0400)
+  //   "env:BLK_LDAP_PASSWORD"              bien moi truong (khi phat trien)
+  // =====================================================================================================
+  "Ldap": {
+    // Ldap (doc AD that) | JsonFile (chi de phat trien: doc JsonFilePath)
+    "Source": "Ldap",
+    // Thu theo thu tu: DC dau la DC chinh, cac DC sau du phong (doi DC thi server buoc chay full).
+    // Vi du: [ "dc01.corp.local" ] | [ "dc01.corp.local", "dc02.corp.local" ] | [ "10.0.0.10" ] (chi voi Ldap)
+    "Servers": [ "dc01.corp.local", "dc02.corp.local" ],
+    // Ldap (mac dinh): cong 389, khong can cai gi tren AD, nhung mat khau bind va recovery key di
+    //   KHONG MA HOA - chi dung tren mang tin cay (README "Dung LDAP khong ma hoa tren mang tin cay").
+    // Ldaps (636) | StartTls (389 + TLS): co ma hoa, can DC co chung chi TLS; khi do Servers dung ten, khong dung IP.
+    "Protocol": "Ldap",
+    // "Port": 389,                  // mac dinh 389, hoac 636 voi Ldaps
+    // Simple bind. Vi du: "svc-blk@corp.local" | "CORP\\svc-blk" | "CN=svc-blk,OU=Service,DC=corp,DC=local"
+    "Auth": "Basic",
+    "Username": "svc-blk@corp.local",
+    // Vi du: "cred:ldap-password" | "file:/etc/blk-sync/ldap-password" | "env:BLK_LDAP_PASSWORD"
+    "Password": "cred:ldap-password",
+    // Vi du: "DC=corp,DC=local" (domain corp.local) | "DC=example,DC=local" (domain example.local)
+    "BaseDn": "DC=corp,DC=local",
+    // Xem quy tac o dau file. [] = ca domain.
+    "SearchBases": [
+      "OU=Computers,OU=HO,DC=corp,DC=local",
+      "OU=Computers,OU=HN,DC=corp,DC=local"
+    ],
+    "PageSize": 1000,               // 1-1000 object moi trang
+    "TimeoutSeconds": 60,           // 5-600
+    // Chi cho Ldaps / StartTls. CaFile: file PEM cua CA cap chung chi cho DC, vi du "/etc/blk-sync/corp-ca.pem".
+    // SkipCertificateValidation: true = chap nhan moi chung chi (chi cho lab).
+    "CaFile": "",
+    "SkipCertificateValidation": false
+  },
+  "Ingest": {
+    // Vi du: "https://blk.corp.local:8443/api/ingest" | "http://localhost:8443/api/ingest" (chi khi dev)
+    "BaseUrl": "https://blk.corp.local:8443/api/ingest",
+    // API key = INGEST_API_KEY trong server/.env, gui "Authorization: Bearer <key>" qua HTTPS. Day la cach
+    // xac thuc duy nhat cua worker; server con kiem tra IP worker (INGEST_ALLOWED_IPS).
+    // Vi du: "cred:ingest-api-key" | "file:/etc/blk-sync/ingest-api-key" | "env:BLK_INGEST_API_KEY"
+    "ApiKey": "cred:ingest-api-key",
+    // File PEM cua CA cap chung chi HTTPS cho server, neu may chua tin CA do. Vi du: "/etc/blk-sync/corp-ca.pem"
+    "CaFile": "",
+    "TimeoutSeconds": 60,           // 5-600
+    "BatchSize": 500,               // 1-500 may / key moi lo
+    "RetryForMinutes": 60,          // thu lai khi loi mang / 5xx trong bao lau
+    // Tat kiem tra chung chi HTTPS cua server: true = chap nhan MOI chung chi (tu ky, sai ten, het han).
+    // Van ma hoa, nhung khong phat hien duoc server gia -> chi dung cho lab / chung chi tu ky khi chua co CaFile.
+    // Uu tien dung CaFile (tin dung CA tu ky) thay vi tat kiem tra. Bat thi worker ghi canh bao vao log.
+    // Vi du: false (mac dinh, production) | true (lab)
+    "SkipCertificateValidation": false
+  },
+  "Schedule": {
+    "DeltaEveryMinutes": 15,        // delta sync: chi doc object thay doi
+    "FullAt": "01:00",              // full sync hang dem, gio dia phuong cua may (HH:mm)
+    "HeartbeatEveryMinutes": 5,
+    "WorkerId": "",                 // rong = ten may. Vi du: "sync01"
+    "StateFile": "/var/lib/blk-sync/state.json"   // dev: "state.dev.json" (tuong doi = canh file cau hinh)
+  },
+  "Logging": {
+    "Level": "Information",         // Debug | Information | Warning | Error
+    "Format": "text"                // text | json (journald giu duoc ca hai)
+  }
+}

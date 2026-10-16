@@ -1,0 +1,39 @@
+<%- include('../partials/head') %>
+<%- include('_tabs') %>
+<p class="crumbs"><a href="/admin/branches">← Chi nhánh</a></p>
+<section class="card narrow wide-ish">
+  <h2><%= title %></h2>
+  <%- include('../partials/error-box', { error }) %>
+  <form method="post" action="/admin/branches<%= branchId ? `/${branchId}` : '' %>" class="form">
+    <%- include('../partials/csrf') %>
+    <label>Mã chi nhánh <input name="code" value="<%= form.code ?? '' %>" maxlength="16" required placeholder="HN"></label>
+    <label>Tên <input name="name" value="<%= form.name ?? '' %>" maxlength="128" required placeholder="Hà Nội"></label>
+    <label>OU gốc <span class="muted">(mỗi dòng một DN)</span>
+      <textarea name="ous" rows="4" spellcheck="false" placeholder="OU=Computers,OU=HN,DC=corp,DC=local"><%= form.ous ?? '' %></textarea>
+    </label>
+    <label class="check"><input type="checkbox" name="isActive" <%= form.isActive ? 'checked' : '' %>> Đang hoạt động</label>
+
+    <% if (preview) { %>
+      <div class="notice notice-info">
+        <% if (!preview.length) { %>
+          Các OU này không khớp máy nào.
+        <% } else { %>
+          Khớp <%= preview.reduce((s, p) => s + p.computers, 0) %> máy, hiện thuộc:
+          <% preview.forEach((p) => { %><span class="badge badge-muted"><%= p.current_branch %>: <%= p.computers %></span> <% }) %>
+        <% } %>
+      </div>
+    <% } %>
+
+    <div class="actions">
+      <button type="submit" name="intent" value="save">Lưu</button>
+      <button type="submit" name="intent" value="preview" class="secondary">Xem trước số máy khớp</button>
+      <a class="button secondary" href="/admin/branches">Hủy</a>
+    </div>
+    <p class="muted">Khi lưu, hệ thống quét toàn bộ máy và gán vào chi nhánh theo OU ngay lập tức (không cần chờ lượt sync).</p>
+  </form>
+  <% if (branchId) { %>
+    <p class="danger-zone"><a class="button danger small" href="/admin/branches/<%= branchId %>/delete">Xóa chi nhánh…</a>
+      <span class="muted small">Máy của chi nhánh chuyển về N/A; cần xác nhận ở bước sau.</span></p>
+  <% } %>
+</section>
+<%- include('../partials/foot') %>

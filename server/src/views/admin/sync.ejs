@@ -1,0 +1,128 @@
+<%- include('../partials/head') %>
+<%- include('_tabs') %>
+<h2>Tình trạng sync AD</h2>
+
+<% const offline = openAlerts.find((a) => a.type === 'sync_offline'); %>
+<% if (offline) { %>
+  <div class="notice notice-<%= offline.severity === 'high' ? 'error' : 'warn' %>" role="status">
+    <strong>Đồng bộ AD: Offline</strong> từ <%= h.dateTime(offline.opened_at) %>.
+    Mail cảnh báo gửi khi chuyển sang Offline, sau đó tối đa 1 lần mỗi ngày<% if (offline.last_notified_at) { %> (gần nhất <%= h.dateTime(offline.last_notified_at) %>)<% } %>;
+    hết mọi cảnh báo dưới đây thì tự về Online và không gửi nữa.
+  </div>
+<% } else { %>
+  <p><span class="badge badge-good">Online</span> <span class="muted small">Watchdog (5 phút một lần) không thấy sự cố nào.</span></p>
+<% } %>
+<% if (openAlerts.some((a) => a.type !== 'sync_offline')) { %>
+<section class="card">
+  <h2>Cảnh báo đang mở</h2>
+  <% openAlerts.filter((a) => a.type !== 'sync_offline').forEach((a) => { %>
+    <div class="notice notice-<%= a.severity === 'high' ? 'error' : 'warn' %>">
+      <strong><%= a.detail.subject %></strong> <span class="muted">· từ <%= h.dateTime(a.opened_at) %></span>
+      <div class="pre"><%= a.detail.text %></div>
+    </div>
+  <% }) %>
+</section>
+<% } %>
+
+<% if (duplicates.length) { %>
+<section class="card">
+  <h2>Key ID trùng giữa nhiều máy (<%= duplicates.length %>)</h2>
+  <p class="muted small">Cùng một Key ID nằm dưới 2 máy đều còn trong AD (ví dụ máy clone từ image đã bật BitLocker), hoặc cùng Key ID nhưng mật khẩu khác.
+    Key vẫn giữ ở máy đang giữ, không bị ghi đè. Không ảnh hưởng trạng thái Online / Offline. Tự đóng khi một trong hai máy rời AD.</p>
+  <div class="table-scroll">
+  <table class="dense">
+    <thead><tr><th>Key ID</th><th>Máy đang giữ key</th><th>Máy cũng có Key ID này</th><th>Mật khẩu</th><th>Phát hiện</th><th></th></tr></thead>
+    <tbody>
+    <% duplicates.forEach((d) => { %>
+      <tr>
+        <td><code><%= d.key_id.slice(0, 8).toUpperCase() %>…</code></td>
+        <td><a href="/computers/<%= d.owner_id %>"><%= d.owner_name %></a><br><span class="guid"><%= d.owner_guid %></span></td>
+        <td><a href="/computers/<%= d.other_id %>"><%= d.other_name %></a><br><span class="guid"><%= d.other_guid %></span></td>
+        <td><% if (d.same_password) { %>giống nhau<% } else { %><span class="badge badge-bad">khác nhau</span><% } %></td>
+        <td><%= h.dateTime(d.detected_at) %><% if (d.notified_at) { %><br><span class="muted small">đã gửi mail</span><% } %></td>
+        <td>
+          <form method="post" action="/admin/sync/key-duplicates/<%= d.id %>/review">
+            <%- include('../partials/csrf') %>
+            <button type="submit" class="small secondary" title="Đóng cảnh báo cho cặp máy này; sẽ không cảnh báo lại">Đã xem xét</button>
+          </form>
+        </td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+  </div>
+</section>
+<% } %>
+
+<section class="card two-col">
+  <div>
+    <h2>Worker</h2>
+    <% if (!heartbeats.length) { %>
+      <p class="muted">Chưa nhận heartbeat nào từ sync worker.</p>
+    <% } %>
+    <% heartbeats.forEach((hb) => { %>
+      <dl class="facts">
+        <dt>Worker</dt><dd><%= hb.worker_id %> <span class="muted">v<%= hb.version ?? '?' %></span>
+          <% if (hb.online) { %><span class="badge badge-good" title="Có heartbeat trong <%= heartbeatMax %> phút gần nhất">● Online</span>
+          <% } else { %><span class="badge badge-bad" title="Không có heartbeat quá <%= heartbeatMax %> phút">● Offline</span><% } %></dd>
+        <dt>Heartbeat</dt><dd><%= h.dateTime(hb.at) %> <span class="muted">(<%= hb.minutesAgo < 1 ? 'vừa xong' : `${h.number(hb.minutesAgo)} phút trước` %>)</span></dd>
+        <dt>DC</dt><dd><%= hb.dc_name ?? '—' %></dd>
+        <dt>LDAP</dt><dd><%= hb.ldap_ok === false ? `Lỗi: ${hb.last_error_code ?? ''}` : hb.ldap_ok ? 'OK' : '—' %></dd>
+        <dt>Hàng đợi</dt><dd><%= hb.queue_len ?? '—' %></dd>
+        <dt>Cert DC hết hạn</dt><dd><%= h.date(hb.dc_cert_expires_at) %></dd>
+        <dt>Canary</dt><dd><%= h.dateTime(hb.canary_value) %></dd>
+      </dl>
+    <% }) %>
+  </div>
+  <div>
+    <h2>Chạy sync ngay</h2>
+    <p class="muted">Worker nhận yêu cầu ở lần heartbeat tới (tối đa ~5 phút).
+      <% if (requested) { %><br>Đang chờ: <strong><%= requested.mode %></strong> (<%= requested.by %>, <%= h.dateTime(requested.at) %>)<% } %></p>
+    <% if (features['feature.manual_sync']) { %>
+    <form method="post" action="/admin/sync/request" class="actions">
+      <%- include('../partials/csrf') %>
+      <button type="submit" name="mode" value="delta" class="secondary">Delta</button>
+      <button type="submit" name="mode" value="full" class="secondary">Full</button>
+    </form>
+    <% } else { %>
+    <p class="muted">Yêu cầu sync từ web đang tắt (Quản trị &gt; Tính năng).</p>
+    <% } %>
+    <p class="muted">Lần sync thành công gần nhất: <%= lastSuccess ? h.dateTime(lastSuccess.finished_at) : 'chưa có' %></p>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Các lượt sync gần đây</h2>
+  <table class="dense">
+    <thead><tr><th>#</th><th>Bắt đầu</th><th>Kiểu</th><th>DC</th><th>Trạng thái</th><th class="num">Máy</th><th class="num">Key mới</th><th>Ghi chú</th></tr></thead>
+    <tbody>
+    <% runs.forEach((r) => { const st = h.runStatus(r.status); %>
+      <tr>
+        <td><%= r.id %></td>
+        <td><%= h.dateTime(r.started_at) %></td>
+        <td><%= r.mode %></td>
+        <td><%= r.dc_name %></td>
+        <td><span class="badge badge-<%= st.tone %>"><%= st.label %></span></td>
+        <td class="num"><%= h.number(r.computers_seen) %></td>
+        <td class="num"><%= h.number(r.keys_added) %></td>
+        <td>
+          <% if (r.error_code) { %><code><%= r.error_code %></code><% } %>
+          <% if (r.keys_empty_pwd) { %><span class="badge badge-warn"><%= r.keys_empty_pwd %> key rỗng</span><% } %>
+          <% if (r.anomalies) { %><ul class="anomalies"><% r.anomalies.forEach((a) => { %><li><%= h.anomalyText(a) %></li><% }) %></ul><% } %>
+          <% if (r.status === 'quarantined' && !r.ack_decision) { %>
+            <form method="post" action="/admin/sync/runs/<%= r.id %>/ack" class="actions">
+              <%- include('../partials/csrf') %>
+              <button type="submit" name="decision" value="accept" class="small" data-confirm="Chấp nhận: áp dụng các thay đổi đang giữ (kể cả gắn nhãn "Không còn trong AD" cho máy không thấy; không xóa dữ liệu)?">Chấp nhận</button>
+              <button type="submit" name="decision" value="reject" class="small secondary">Bác bỏ</button>
+            </form>
+          <% } else if (r.ack_decision) { %>
+            <span class="muted"><%= r.ack_decision === 'accept' ? 'Đã chấp nhận' : 'Đã bác bỏ' %> bởi <%= r.ack_by %></span>
+          <% } %>
+        </td>
+      </tr>
+    <% }) %>
+    <% if (!runs.length) { %><tr><td colspan="8" class="muted">Chưa có lượt sync nào.</td></tr><% } %>
+    </tbody>
+  </table>
+</section>
+<%- include('../partials/foot') %>

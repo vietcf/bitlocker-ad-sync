@@ -1,0 +1,10 @@
+<% if (error) { %>
+  <div class="notice notice-error" role="alert">
+    <%= h.errorText(error) %>
+    <% if (error.details && error.details.fields) { %>
+      <ul class="fields">
+        <% error.details.fields.forEach((f) => { %><li><strong><%= f.field %></strong>: <%= h.fieldText(f.message) %></li><% }) %>
+      </ul>
+    <% } %>
+  </div>
+<% } %>

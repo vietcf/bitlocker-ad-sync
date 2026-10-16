@@ -1,0 +1,113 @@
+<%- include('../partials/head') %>
+<%- include('_tabs') %>
+<p class="crumbs"><a href="/admin/users">← Người dùng</a></p>
+<section class="card narrow wide-ish">
+  <h2><%= title %></h2>
+  <%- include('../partials/error-box', { error }) %>
+  <form method="post" action="/admin/users<%= userId ? `/${userId}` : '' %>" class="form">
+    <%- include('../partials/csrf') %>
+    <fieldset>
+      <legend>Cách đăng nhập</legend>
+      <label class="check"><input type="radio" name="authSource" value="ldap" <%= form.authSource === 'ldap' ? 'checked' : '' %>>
+        <span><strong>Tài khoản AD</strong>: tên và mật khẩu Windows của người dùng, kiểm tra qua LDAPS</span></label>
+      <label class="check"><input type="radio" name="authSource" value="local" <%= form.authSource === 'local' ? 'checked' : '' %>>
+        <span><strong>Tài khoản nội bộ</strong>: mật khẩu lưu trong hệ thống (dùng cho admin dự phòng khi AD lỗi)</span></label>
+      <% if (userId && form.authSource === 'ldap') { %>
+        <p class="muted">Liên kết AD:
+          <% if (form.adObjectGuid) { %>objectGUID <code><%= form.adObjectGuid %></code>, từ <%= h.dateTime(form.adLinkedAt) %>
+          <% } else { %>chưa đăng nhập lần nào (sẽ liên kết ở lần đăng nhập đầu)<% } %></p>
+      <% } %>
+    </fieldset>
+    <% if (userId) { %>
+      <p>Tên đăng nhập: <strong><%= form.username %></strong></p>
+    <% } else { %>
+      <label>Tên đăng nhập
+        <input name="username" value="<%= form.username ?? '' %>" required maxlength="64" placeholder="nguyenvana" autocomplete="off" spellcheck="false">
+        <span class="muted hint">Tài khoản AD: sAMAccountName (tên đăng nhập Windows). Tài khoản nội bộ: tên tùy chọn.</span>
+      </label>
+    <% } %>
+    <label>Họ tên <input name="displayName" value="<%= form.displayName ?? '' %>" required maxlength="256"></label>
+    <label>Email
+      <input type="email" name="email" value="<%= form.email ?? '' %>" required maxlength="254" placeholder="nguyenvana@corp.local" autocomplete="off" spellcheck="false">
+      <% if (userId && !form.email) { %><span class="muted hint">User này chưa có email: cần nhập trước khi lưu.</span><% } %>
+    </label>
+    <% if (userId) { %>
+      <label class="check"><input type="checkbox" name="isActive" <%= form.isActive ? 'checked' : '' %>> Đang hoạt động (bỏ chọn để khóa tài khoản)</label>
+    <% } else { %>
+      <input type="hidden" name="isActive" value="on">
+    <% } %>
+
+    <fieldset>
+      <legend>Bảo mật đăng nhập</legend>
+      <label class="check"><input type="checkbox" name="totpRequired" <%= form.totpRequired ? 'checked' : '' %>>
+        <span><strong>Bắt buộc xác thực 2 bước</strong>: sau mật khẩu phải nhập mã 6 số trong app Microsoft / Google Authenticator</span></label>
+      <% if (userId && form.totpRequired) { %>
+        <p class="muted small">
+          <% if (form.totpEnrolledAt) { %>Đã thiết lập app xác thực lúc <%= h.dateTime(form.totpEnrolledAt) %>.
+          <% } else { %>Chưa thiết lập: lần đăng nhập tới người dùng sẽ quét mã QR.<% } %>
+          Bỏ chọn rồi lưu thì tắt và xóa thiết lập cũ.</p>
+      <% } else if (!userId) { %>
+        <p class="muted small">Lần đăng nhập đầu, người dùng quét mã QR để thiết lập app xác thực.</p>
+      <% } %>
+      <label class="check" data-local-only><input type="checkbox" name="mustChangePassword" <%= form.mustChangePassword ? 'checked' : '' %>
+             <%= form.authSource === 'ldap' ? 'disabled' : '' %>>
+        <span><strong>Bắt đổi mật khẩu ở lần đăng nhập sau</strong> <span class="muted">(chỉ tài khoản nội bộ; tài khoản AD đổi mật khẩu trên Windows)</span></span></label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Quyền</legend>
+      <table class="grants">
+        <thead><tr><th>Chi nhánh</th><% ['it', 'lead', 'auditor'].forEach((r) => { %><th><%= h.role(r) %></th><% }) %></tr></thead>
+        <tbody>
+          <% branches.forEach((b) => { %>
+          <tr>
+            <td><%= b.code %> · <%= b.name %></td>
+            <% ['it', 'lead', 'auditor'].forEach((r) => { const v = `${r}:${b.id}`; %>
+              <td><input type="checkbox" name="grants" value="<%= v %>" <%= form.grants.includes(v) ? 'checked' : '' %> aria-label="<%= h.role(r) %> <%= b.code %>"></td>
+            <% }) %>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+      <label class="check admin-check"><input type="checkbox" name="grants" value="admin:all" <%= form.grants.includes('admin:all') ? 'checked' : '' %>>
+        <strong>Admin HQ</strong>: toàn quyền, xem key mọi chi nhánh, quản trị hệ thống</label>
+    </fieldset>
+
+    <div class="actions">
+      <button type="submit">Lưu</button>
+      <a class="button secondary" href="/admin/users">Hủy</a>
+    </div>
+    <p class="muted">Tài khoản nội bộ: mật khẩu một lần được tạo tự động và hiện ở bước sau; người dùng phải đổi ở lần đăng nhập đầu.
+      Tài khoản AD: không có mật khẩu trong hệ thống.</p>
+  </form>
+
+  <% if (userId) { %>
+  <hr>
+  <div class="actions">
+    <% if (form.authSource === 'local') { %>
+    <form method="post" action="/admin/users/<%= userId %>/reset-password" class="inline" data-confirm="Tạo mật khẩu mới cho <%= form.username %>? Mật khẩu cũ sẽ không dùng được nữa.">
+      <%- include('../partials/csrf') %>
+      <button type="submit" class="secondary">Đặt lại mật khẩu</button>
+    </form>
+    <% } else if (form.adObjectGuid) { %>
+    <form method="post" action="/admin/users/<%= userId %>/unlink-ad" class="inline" data-confirm="Gỡ liên kết tài khoản AD? Dùng khi tài khoản AD của người này bị xóa và tạo lại.">
+      <%- include('../partials/csrf') %>
+      <button type="submit" class="secondary">Gỡ liên kết AD</button>
+    </form>
+    <% } %>
+    <% if (form.totpEnrolledAt) { %>
+    <form method="post" action="/admin/users/<%= userId %>/reset-2fa" class="inline" data-confirm="Đặt lại xác thực 2 bước của <%= form.username %>? App xác thực cũ không dùng được nữa; lần đăng nhập tới người dùng quét mã QR mới.">
+      <%- include('../partials/csrf') %>
+      <button type="submit" class="secondary">Đặt lại xác thực 2 bước</button>
+    </form>
+    <% } %>
+    <% if (form.isLocked) { %>
+    <form method="post" action="/admin/users/<%= userId %>/unlock" class="inline">
+      <%- include('../partials/csrf') %>
+      <button type="submit" class="secondary">Mở khóa (sai mật khẩu)</button>
+    </form>
+    <% } %>
+  </div>
+  <% } %>
+</section>
+<%- include('../partials/foot') %>

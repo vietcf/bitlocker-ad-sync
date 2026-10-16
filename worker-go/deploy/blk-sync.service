@@ -1,0 +1,42 @@
+[Unit]
+Description=BitLocker recovery key sync worker (AD -> blk server)
+Documentation=file:///opt/blk-sync/README.md
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=blk-sync
+Group=blk-sync
+ExecStart=/opt/blk-sync/blk-sync --config /etc/blk-sync/config.json
+Restart=on-failure
+RestartSec=30
+# On stop the worker closes the open sync run as "cancelled" (up to 10 s).
+TimeoutStopSec=30
+StateDirectory=blk-sync
+StateDirectoryMode=0750
+
+# Secrets as systemd credentials: config "cred:ldap-password" / "cred:ingest-api-key".
+# Encrypted with this host's key (and TPM if present): systemd-creds encrypt --name=ldap-password - /etc/blk-sync/ldap-password.cred
+LoadCredentialEncrypted=ldap-password:/etc/blk-sync/ldap-password.cred
+LoadCredentialEncrypted=ingest-api-key:/etc/blk-sync/ingest-api-key.cred
+
+# Hardening: the worker only needs the network, its state directory and its config.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target

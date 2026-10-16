@@ -1,0 +1,4 @@
+* text=auto
+# Mounted into the Linux Postgres container; CRLF would break them.
+*.sh  text eol=lf
+*.sql text eol=lf

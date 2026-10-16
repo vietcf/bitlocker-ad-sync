@@ -1,0 +1,17 @@
+<%- include('../partials/head') %>
+<section class="card narrow reveal" data-reveal data-seconds="<%= result.expiresInSec %>" data-back="/computers/<%= result.computerId %>">
+  <h1><%= result.computerName %></h1>
+  <p>Key ID: <code><strong><%= result.keyId.slice(0, 8).toUpperCase() %></strong><%= result.keyId.slice(8).toUpperCase() %></code></p>
+  <p class="key-label">Recovery key</p>
+  <div class="recovery-key" data-key aria-live="polite">
+    <% result.recoveryPassword.split('-').forEach((group, i) => { %><span class="group"><span class="index"><%= i + 1 %></span><%= group %></span><% }) %>
+  </div>
+  <p class="countdown">Tự ẩn sau <strong data-countdown><%= result.expiresInSec %></strong> giây.</p>
+  <p class="actions">
+    <button type="button" data-copy-key>Sao chép key</button>
+    <a class="button secondary" href="/computers/<%= result.computerId %>" data-hide-now>Ẩn key và quay lại</a>
+  </p>
+  <p class="muted small" data-copy-note>Key được sao chép kèm dấu gạch ngang, dán thẳng vào màn hình BitLocker được.
+    Khi key tự ẩn, trang cố xóa clipboard; nếu trình duyệt không cho, hãy tự xóa (copy một nội dung khác) sau khi dùng xong.</p>
+</section>
+<%- include('../partials/foot') %>

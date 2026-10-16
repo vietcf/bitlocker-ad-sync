@@ -1,0 +1,6 @@
+bin/
+dist/
+state*.json
+config.local.json
+*.cred
+config.json

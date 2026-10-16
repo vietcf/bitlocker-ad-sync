@@ -1,0 +1,37 @@
+<%# Thanh tab cua khu Quan tri, o dau moi trang quan tri: 4 nhom, nhom dang mo hien cac tab con. Nhan co dinh. %>
+<% const groups = [
+  ['Người dùng & chi nhánh', [
+    ['/admin/branches', 'Chi nhánh & OU'],
+    ['/admin/users', 'Người dùng'],
+  ]],
+  ['Đồng bộ AD', [
+    ['/admin/sync', 'Tình trạng sync'],
+    ['/admin/settings/thresholds', 'Ngưỡng cảnh báo'],
+  ]],
+  ['Email', [
+    ['/admin/settings/notifications', 'Thông báo'],
+    ['/admin/settings/mail-server', 'Mail server'],
+    ['/admin/mail', 'Log email'],
+  ]],
+  ['Hệ thống', [
+    ['/admin/settings/security', 'Bảo mật'],
+    ['/admin/backup', 'Sao lưu'],
+    ['/admin/settings/features', 'Tính năng'],
+    ['/admin/settings/retention', 'Lưu trữ'],
+  ]],
+];
+  const isOn = (href) => path === href || path.startsWith(`${href}/`);
+  const current = groups.find(([, tabs]) => tabs.some(([href]) => isOn(href))) ?? groups[0]; %>
+<div class="admin-head">
+  <h1>Quản trị</h1>
+  <nav class="admin-groups" aria-label="Quản trị">
+    <% groups.forEach((g) => { %>
+      <a href="<%= g[1][0][0] %>" <%- g === current ? 'aria-current="true"' : '' %>><%= g[0] %></a>
+    <% }) %>
+  </nav>
+  <nav class="admin-tabs" aria-label="<%= current[0] %>">
+    <% current[1].forEach(([href, label]) => { %>
+      <a href="<%= href %>" <%- isOn(href) ? 'aria-current="page"' : '' %>><%= label %></a>
+    <% }) %>
+  </nav>
+</div>

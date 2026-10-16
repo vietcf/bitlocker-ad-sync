@@ -1,0 +1,36 @@
+<%#
+  Pagination. Params: page, pages, query (current query string values), optional total, pageSize, unit.
+  Shows: first · prev · a window of page numbers · next · last, plus "Hiển thị a–b / total".
+%>
+<% const size = typeof pageSize !== 'undefined' ? pageSize : null; %>
+<% const count = typeof total !== 'undefined' ? total : null; %>
+<% const noun = typeof unit !== 'undefined' ? unit : 'dòng'; %>
+<% if (pages > 1 || (count !== null && size)) { %>
+<nav class="pager" aria-label="Phân trang">
+  <% if (count !== null && size) { %>
+    <span class="pager-info">
+      <% if (count === 0) { %>Không có <%= noun %> nào<% } else { %>
+      Hiển thị <%= h.number((page - 1) * size + 1) %>–<%= h.number(Math.min(page * size, count)) %> / <%= h.number(count) %> <%= noun %><% } %>
+    </span>
+  <% } %>
+  <% if (pages > 1) { %>
+    <span class="pager-links">
+      <% const win = 2; const from = Math.max(1, page - win); const to = Math.min(pages, page + win); %>
+      <% if (page > 1) { %>
+        <a href="<%= h.query(query, { page: 1 }) %>" aria-label="Trang đầu">«</a>
+        <a href="<%= h.query(query, { page: page - 1 }) %>" aria-label="Trang trước">‹</a>
+      <% } else { %><span class="disabled">«</span><span class="disabled">‹</span><% } %>
+      <% if (from > 1) { %><span class="gap">…</span><% } %>
+      <% for (let p = from; p <= to; p++) { %>
+        <% if (p === page) { %><span class="current" aria-current="page"><%= p %></span>
+        <% } else { %><a href="<%= h.query(query, { page: p }) %>"><%= p %></a><% } %>
+      <% } %>
+      <% if (to < pages) { %><span class="gap">…</span><% } %>
+      <% if (page < pages) { %>
+        <a href="<%= h.query(query, { page: page + 1 }) %>" aria-label="Trang sau">›</a>
+        <a href="<%= h.query(query, { page: pages }) %>" aria-label="Trang cuối">»</a>
+      <% } else { %><span class="disabled">›</span><span class="disabled">»</span><% } %>
+    </span>
+  <% } %>
+</nav>
+<% } %>

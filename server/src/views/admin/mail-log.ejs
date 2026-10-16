@@ -1,0 +1,52 @@
+<%- include('../partials/head') %>
+<%- include('_tabs') %>
+<% const STATUS = { pending: ['Chờ gửi', 'badge-info'], sent: ['Đã gửi', 'badge-good'], failed: ['Thất bại', 'badge-bad'], no_recipient: ['Không gửi (thiếu email)', 'badge-warn'] }; %>
+<% const KIND = { alert: 'Cảnh báo', new_objects: 'Máy/key mới', daily_report: 'Báo cáo hằng ngày', test: 'Thử' }; %>
+<section class="card">
+  <div class="title-row"><h2>Log email</h2></div>
+  <div class="stat-row">
+    <span class="badge badge-info">Chờ gửi: <%= h.number(log.counts.pending ?? 0) %></span>
+    <span class="badge badge-good">Đã gửi: <%= h.number(log.counts.sent ?? 0) %></span>
+    <span class="badge badge-bad">Thất bại: <%= h.number(log.counts.failed ?? 0) %></span>
+    <span class="badge badge-warn">Không gửi (thiếu email): <%= h.number(log.counts.no_recipient ?? 0) %></span>
+  </div>
+  <p class="muted small">Email đã gửi hoặc thất bại được giữ <%= log.retentionDays %> ngày
+    (đổi ở tab <a href="/admin/settings/retention">Lưu trữ</a>). Job gửi mail chạy mỗi phút. Lỗi tạm thời được thử lại sau 1, 5, 15, 60 và 240 phút; sau đó mail bị đánh dấu thất bại.
+    Khi Mail server chưa bật, email nằm ở <strong>Chờ gửi</strong> và tự gửi khi bật. Người dùng lẽ ra nhận
+    email nhưng chưa có địa chỉ email được liệt kê ở cột Người nhận (dòng "Không có email"); email không gửi được
+    cho ai được ghi là <strong>Không gửi (thiếu email)</strong>, kèm lý do. Thêm email ở tab <a href="/admin/users">Người dùng</a>.</p>
+
+  <form method="get" action="/admin/mail" class="filters">
+    <label>Trạng thái
+      <select name="status">
+        <option value="">Tất cả</option>
+        <% Object.entries(STATUS).forEach(([k, [label]]) => { %><option value="<%= k %>" <%= log.filters.status === k ? 'selected' : '' %>><%= label %></option><% }) %>
+      </select>
+    </label>
+    <label>Tìm theo tiêu đề / người nhận / tên người dùng <input name="q" value="<%= log.filters.q %>" maxlength="100"></label>
+    <button type="submit" class="secondary">Lọc</button>
+  </form>
+
+  <table>
+    <thead><tr><th>#</th><th>Tạo lúc</th><th>Loại</th><th>Người nhận</th><th>Tiêu đề</th><th>Trạng thái</th><th>Gửi lúc</th></tr></thead>
+    <tbody>
+    <% log.rows.forEach((m) => { const st = STATUS[m.status]; %>
+      <tr>
+        <td><a href="/admin/mail/<%= m.id %>"><%= m.id %></a></td>
+        <td><%= h.dateTime(m.created_at) %></td>
+        <td><%= KIND[m.kind] ?? m.kind %></td>
+        <td class="small"><% if (!m.recipients.length) { %><span class="muted">—</span><% } %><%= m.recipients.slice(0, 3).join(', ') %><% if (m.recipients.length > 3) { %> <span class="muted">+<%= m.recipients.length - 3 %></span><% } %>
+          <% if (m.missing_recipients.length) { %><br><span class="warn-text" title="Người dùng lẽ ra nhận nhưng chưa có email">Không có email: <%= m.missing_recipients.join(', ') %></span><% } %></td>
+        <td><a href="/admin/mail/<%= m.id %>"><%= m.subject %></a></td>
+        <td><span class="badge <%= st[1] %>"><%= st[0] %></span>
+          <% if (m.last_error) { %><br><span class="muted small" title="<%= m.last_error %>"><%= m.last_error.slice(0, 60) %></span><% } %></td>
+        <td><%= h.dateTime(m.sent_at) %></td>
+      </tr>
+    <% }) %>
+    <% if (!log.rows.length) { %><tr><td colspan="7" class="muted">Chưa có email nào.</td></tr><% } %>
+    </tbody>
+  </table>
+  <%- include('../partials/pager', { page: log.page, pages: log.pages, query, total: log.total, pageSize: log.pageSize, unit: 'email' }) %>
+</section>
+
+<%- include('../partials/foot') %>

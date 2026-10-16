@@ -1,0 +1,62 @@
+<%- include('../partials/head') %>
+<%- include('_tabs') %>
+<% const UNIT = { percent: '%', minutes: 'phút', hours: 'giờ', count: '', points: 'điểm %' }; %>
+<% const GROUPS = [
+  ['run', 'Kiểm tra khi lượt sync kết thúc', 'Vượt ngưỡng thì lượt sync bị giữ lại (cách ly) và chờ Admin HQ chấp nhận hoặc bác bỏ ở tab Sync AD. Các ngưỡng này chỉ xét lượt full (lượt delta chỉ đọc phần thay đổi); riêng key đọc được mà không có mật khẩu thì lượt nào cũng giữ lại.'],
+  ['watchdog', 'Watchdog (mỗi 5 phút)', 'Vượt bất kỳ ngưỡng nào thì đồng bộ AD chuyển sang Offline và gửi một mail (theo tab Thông báo), nhắc lại tối đa 1 lần mỗi ngày; hết vượt thì tự về Online, không gửi gì nữa.'],
+]; %>
+<section class="card">
+  <h2>Ngưỡng cảnh báo</h2>
+  <p class="muted">Thay đổi có hiệu lực trong vòng 30 giây và được ghi vào nhật ký. Cột "Mặc định" là giá trị khi cài đặt.</p>
+  <div class="notice notice-info">
+    <strong>Cách các ngưỡng kết hợp</strong>
+    <ul>
+      <li><strong>Các ngưỡng độc lập với nhau (HOẶC):</strong> chỉ cần <em>một</em> ngưỡng bị vượt là lượt sync bị giữ lại
+        (hoặc mở cảnh báo). Nhiều ngưỡng cùng vượt thì liệt kê đủ các lý do.</li>
+      <li><strong>Các ngưỡng nằm chung một khung viền xanh (VÀ)</strong>: phải vượt <em>cả hai</em> mới tính.
+        Ngưỡng thứ hai để tránh báo nhầm khi số lượng quá nhỏ.<br>
+        Ví dụ "chi nhánh giảm quá 20% <strong>và</strong> quá 10 máy": chi nhánh 30 máy còn 20 (giảm 33% nhưng chỉ 10 máy) thì
+        không bị giữ; chi nhánh 100 máy còn 75 (giảm 25% và 25 máy) thì bị giữ.</li>
+      <li>"Quá" nghĩa là lớn hơn hẳn: ngưỡng 20% thì giảm đúng 20% chưa tính.</li>
+    </ul>
+  </div>
+  <%- include('../partials/error-box', { error }) %>
+  <form method="post" action="/admin/settings/thresholds" class="form">
+    <%- include('../partials/csrf') %>
+    <% GROUPS.forEach(([group, title, help]) => { %>
+      <fieldset>
+        <legend><%= title %></legend>
+        <p class="muted small"><%= help %></p>
+        <%
+          // Gom dong "..." (VA) vao cung khung voi dong ngay tren
+          const units = [];
+          list.filter((t) => t.group === group).forEach((t) => {
+            if (t.label.startsWith('...') && units.length) units[units.length - 1].push(t);
+            else units.push([t]);
+          });
+        %>
+        <div class="thr-list">
+          <div class="thr-row thr-head"><span>Ngưỡng</span><span>Giá trị</span><span>Mặc định</span></div>
+          <% units.forEach((unit) => { %>
+            <% if (unit.length > 1) { %><div class="thr-and" role="group" aria-label="Phải vượt cả <%= unit.length %> ngưỡng">
+              <span class="thr-and-tag">VÀ · phải vượt cả <%= unit.length %> ngưỡng mới tính</span><% } %>
+            <% unit.forEach((t, i) => { %>
+              <% if (i > 0) { %><div class="thr-and-sep"><span>và</span></div><% } %>
+              <div class="thr-row">
+                <label for="<%= t.key %>"><%= t.label.replace(/^\.\.\.\s*(và\s+)?/, '') %></label>
+                <span class="nowrap">
+                  <input id="<%= t.key %>" name="<%= t.key %>" type="number" value="<%= values[t.key] %>" class="thr-input"
+                         min="<%= t.min %>" max="<%= t.max %>" step="<%= t.unit === 'percent' ? '0.1' : '1' %>" required> <%= UNIT[t.unit] %>
+                </span>
+                <span class="muted"><%= t.defaultValue %> <%= UNIT[t.unit] %></span>
+              </div>
+            <% }) %>
+            <% if (unit.length > 1) { %></div><% } %>
+          <% }) %>
+        </div>
+      </fieldset>
+    <% }) %>
+    <div class="actions"><button type="submit">Lưu</button></div>
+  </form>
+</section>
+<%- include('../partials/foot') %>

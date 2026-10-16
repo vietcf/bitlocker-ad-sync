@@ -1,0 +1,49 @@
+<%- include('../partials/head') %>
+<section class="card">
+  <div class="title-row">
+    <h1>Nhật ký truy cập</h1>
+    <% if (features['feature.audit_export']) { %><a class="button secondary small" href="/audit/export.csv<%= h.query(query, { page: undefined }) %>">Xuất CSV</a><% } %>
+  </div>
+  <form method="get" action="/audit" class="filters">
+    <label>Chi nhánh
+      <select name="branchId">
+        <option value="">Tất cả</option>
+        <% branches.forEach((b) => { %><option value="<%= b.id %>" <%= filters.branchId === b.id ? 'selected' : '' %>><%= b.code %></option><% }) %>
+      </select>
+    </label>
+    <label>Hành động
+      <select name="action">
+        <option value="">Tất cả</option>
+        <% actions.forEach((a) => { %><option value="<%= a %>" <%= filters.action === a ? 'selected' : '' %>><%= h.action(a) %></option><% }) %>
+      </select>
+    </label>
+    <label>Người dùng <input name="user" value="<%= filters.user ?? '' %>" placeholder="tên đăng nhập"></label>
+    <label>Máy <input name="computer" value="<%= filters.computer ?? '' %>" placeholder="tên máy"></label>
+    <label>Từ ngày <input type="date" name="from" value="<%= filters.from ? filters.from.toISOString().slice(0, 10) : '' %>"></label>
+    <label>Đến ngày <input type="date" name="to" value="<%= filters.to ? filters.to.toISOString().slice(0, 10) : '' %>"></label>
+    <button type="submit">Lọc</button>
+  </form>
+  <p class="muted"><%= h.number(result.total) %> dòng. Xuất CSV không bao giờ chứa key, và việc xuất cũng được ghi log.</p>
+  <table class="dense">
+    <thead><tr><th>Thời gian</th><th>Người dùng</th><th>Hành động</th><th>Chi nhánh</th><th>Máy</th><th>Lý do / chi tiết</th><th>IP</th></tr></thead>
+    <tbody>
+    <% result.rows.forEach((l) => { %>
+      <tr class="<%= l.action === 'login_failed' ? 'warn-row' : '' %>">
+        <td><%= h.dateTime(l.at) %></td>
+        <td><%= l.user_upn %></td>
+        <td><%= h.action(l.action) %></td>
+        <td><%= l.branch_code ?? '—' %></td>
+        <td><% if (l.computer_id && can('keys')) { %><a href="/computers/<%= l.computer_id %>"><%= l.computer_name %></a><% } else { %><%= l.computer_name ?? '—' %><% } %></td>
+        <td>
+          <% if (l.reason) { %><%= l.reason %><% if (l.reason_note) { %>: <%= l.reason_note %><% } %><% } %>
+          <% if (l.ticket_no) { %> · ticket <%= l.ticket_no %><% } %>
+          <% if (!l.reason && l.detail) { %><span class="muted detail"><%= JSON.stringify(l.detail) %></span><% } %>
+        </td>
+        <td><%= l.client_ip ?? '' %></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+  <%- include('../partials/pager', { page: result.page, pages: result.pages, query, total: result.total, pageSize: result.pageSize, unit: 'dòng' }) %>
+</section>
+<%- include('../partials/foot') %>
