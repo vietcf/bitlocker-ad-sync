@@ -1,4 +1,6 @@
 import { createCipheriv, createHmac, pbkdf2Sync, randomBytes } from 'node:crypto';
+import fs from 'node:fs';
+import { once } from 'node:events';
 import { crc32, deflateRawSync, inflateRawSync } from 'node:zlib';
 
 // Password-protected ZIP with WinZip AES-256 encryption (format "AE-2"), which 7-Zip, WinRAR and
@@ -19,11 +21,11 @@ function deriveKeys(password, salt) {
 }
 
 /** AES-256-CTR as WinZip does it: 16-byte little-endian counter starting at 1 (same op both ways). */
-function ctr(aesKey, data) {
+function ctr(aesKey, data, firstBlock = 1n) {
   const out = Buffer.alloc(data.length);
   const ecb = createCipheriv('aes-256-ecb', aesKey, null).setAutoPadding(false);
   const CHUNK = 4096; // blocks per round
-  let block = 1n;
+  let block = firstBlock;
   for (let off = 0; off < data.length; off += CHUNK * 16) {
     const n = Math.min(CHUNK, Math.ceil((data.length - off) / 16));
     const counters = Buffer.alloc(n * 16);
@@ -166,3 +168,132 @@ export function unzipAes(buf, password = null) {
   return out;
 }
 
+
+/**
+ * Same archive as zipAes, written to a file without holding big entries in memory.
+ * entries: [{ name, data (Buffer | string), compress = true } | { name, file: { path, size, crc } }]
+ * A file entry is stored (not deflated) and streamed in 1 MB pieces, so a large pg_dump never sits in RAM
+ * and the event loop is released between pieces. crc: CRC-32 of the file (needed only without a password).
+ * No ZIP64: the archive must stay under 4 GB. On error the partly written file is removed.
+ */
+export async function zipAesToFile(dest, entries, password, { date = new Date() } = {}) {
+  const encrypt = !!password;
+  const out = fs.createWriteStream(dest, { mode: 0o600 });
+  const failed = new Promise((_, reject) => out.on('error', reject));
+  failed.catch(() => undefined);
+  let offset = 0;
+  const write = async (buf) => {
+    offset += buf.length;
+    if (!out.write(buf)) await Promise.race([once(out, 'drain'), failed]);
+  };
+  const central = [];
+  try {
+    for (const f of entries) {
+      const name = Buffer.from(f.name, 'utf8');
+      const big = !!f.file;
+      const raw = big ? null : (Buffer.isBuffer(f.data) ? f.data : Buffer.from(f.data, 'utf8'));
+      const rawLen = big ? f.file.size : raw.length;
+      const method = big || f.compress === false ? 0 : 8;
+      const packed = big ? null : (method === 8 ? deflateRawSync(raw, { level: 6 }) : raw);
+      const packedLen = big ? rawLen : packed.length;
+      const extra = encrypt ? aesExtra(method) : Buffer.alloc(0);
+      const bodyLen = encrypt ? SALT_LEN + 2 + packedLen + 10 : packedLen;
+      const version = encrypt ? 51 : 20;
+      const flags = (encrypt ? 0x0001 : 0) | 0x0800;
+      const zipMethod = encrypt ? 99 : method;
+      const crc = encrypt ? 0 : (big ? f.file.crc : crc32(raw));
+      const start = offset;
+
+      const head = Buffer.alloc(30);
+      head.writeUInt32LE(0x04034b50, 0);
+      head.writeUInt16LE(version, 4);
+      head.writeUInt16LE(flags, 6);
+      head.writeUInt16LE(zipMethod, 8);
+      head.writeUInt16LE(dosTime(date), 10);
+      head.writeUInt16LE(dosDate(date), 12);
+      head.writeUInt32LE(crc, 14);
+      head.writeUInt32LE(bodyLen, 18);
+      head.writeUInt32LE(rawLen, 22);
+      head.writeUInt16LE(name.length, 26);
+      head.writeUInt16LE(extra.length, 28);
+      const dir = Buffer.alloc(46);
+      dir.writeUInt32LE(0x02014b50, 0);
+      dir.writeUInt16LE(63, 4);
+      dir.writeUInt16LE(version, 6);
+      dir.writeUInt16LE(flags, 8);
+      dir.writeUInt16LE(zipMethod, 10);
+      dir.writeUInt16LE(dosTime(date), 12);
+      dir.writeUInt16LE(dosDate(date), 14);
+      dir.writeUInt32LE(crc, 16);
+      dir.writeUInt32LE(bodyLen, 20);
+      dir.writeUInt32LE(rawLen, 24);
+      dir.writeUInt16LE(name.length, 28);
+      dir.writeUInt16LE(extra.length, 30);
+      dir.writeUInt32LE(start, 42);
+      central.push(dir, name, extra);
+
+      await write(head);
+      await write(name);
+      await write(extra);
+      if (!big) {
+        if (!encrypt) {
+          await write(packed);
+        } else {
+          const salt = randomBytes(SALT_LEN);
+          const { aesKey, hmacKey, verifier } = deriveKeys(password, salt);
+          const encrypted = ctr(aesKey, packed);
+          const auth = createHmac('sha1', hmacKey).update(encrypted).digest().subarray(0, 10);
+          await write(Buffer.concat([salt, verifier, encrypted, auth]));
+        }
+        continue;
+      }
+      if (!encrypt) {
+        for await (const chunk of fs.createReadStream(f.file.path, { highWaterMark: 1 << 20 })) await write(chunk);
+        continue;
+      }
+      const salt = randomBytes(SALT_LEN);
+      const { aesKey, hmacKey, verifier } = deriveKeys(password, salt);
+      await write(salt);
+      await write(verifier);
+      const hmac = createHmac('sha1', hmacKey);
+      let block = 1n;
+      let carry = Buffer.alloc(0);
+      let sent = 0;
+      for await (const chunk of fs.createReadStream(f.file.path, { highWaterMark: 1 << 20 })) {
+        const buf = carry.length ? Buffer.concat([carry, chunk]) : chunk;
+        const usable = buf.length - (buf.length % 16);
+        carry = buf.subarray(usable);
+        if (usable) {
+          const enc = ctr(aesKey, buf.subarray(0, usable), block);
+          block += BigInt(usable / 16);
+          hmac.update(enc);
+          await write(enc);
+        }
+        sent += chunk.length;
+      }
+      if (carry.length) {
+        const enc = ctr(aesKey, carry, block);
+        hmac.update(enc);
+        await write(enc);
+      }
+      if (sent !== rawLen) throw new Error('zipAesToFile: the file changed while it was being archived');
+      await write(hmac.digest().subarray(0, 10));
+    }
+    const centralBuf = Buffer.concat(central);
+    const end = Buffer.alloc(22);
+    end.writeUInt32LE(0x06054b50, 0);
+    end.writeUInt16LE(entries.length, 8);
+    end.writeUInt16LE(entries.length, 10);
+    end.writeUInt32LE(centralBuf.length, 12);
+    end.writeUInt32LE(offset, 16);
+    if (offset > 0xffffffff) throw new Error('zipAesToFile: archive larger than 4 GB');
+    await write(centralBuf);
+    await write(end);
+    out.end();
+    await Promise.race([once(out, 'finish'), failed]);
+  } catch (err) {
+    out.destroy();
+    await fs.promises.rm(dest, { force: true });
+    throw err;
+  }
+}

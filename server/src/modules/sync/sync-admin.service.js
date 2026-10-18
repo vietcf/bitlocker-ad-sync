@@ -139,6 +139,8 @@ export class SyncAdminService {
           keysSeen: run.keys_seen,
           errors: run.errors,
           anomalies: run.anomalies,
+          // duyet muon: giu gio ket thuc cua luot, khong coi la vua sync xong (healthz, watchdog)
+          keepFinishedAt: true,
         });
         await ackRun(tx, runId, { by: scope.upn, decision, status: 'success' });
       } else {

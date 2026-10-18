@@ -28,11 +28,15 @@ export function backupWeb({ backup }) {
     res.redirect('/admin/backup');
   }, render));
 
+  // Runs in the background: a big database takes minutes (the proxy would cut the request). The page shows the result.
   r.post('/run', async (req, res) => {
-    const result = await backup.runNow(req.scope, clientInfo(req));
-    flash(req, result.ok ? 'success' : 'error', result.ok
-      ? `Đã sao lưu: ${result.files.map((f) => f.name).join(', ')}.`
-      : `Sao lưu lỗi: ${result.errors.map((e) => e.error).join(' ')}`);
+    try {
+      backup.runNow(req.scope, clientInfo(req));
+      flash(req, 'info', 'Đã bắt đầu sao lưu, chạy nền. Tải lại trang sau ít phút để xem kết quả ở mục "Lần chạy gần nhất".');
+    } catch (err) {
+      if (err.code !== 'backup_running') throw err;
+      flash(req, 'error', 'Đang có một lượt sao lưu chạy, chờ nó xong.');
+    }
     res.redirect('/admin/backup');
   });
 

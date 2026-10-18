@@ -10,8 +10,8 @@
     <tbody>
     <% users.forEach((u) => { %>
       <tr>
-        <td><strong><%= u.username %></strong></td>
-        <td><%= u.display_name %></td>
+        <td><strong><%= u.username %></strong><% if (u.is_root) { %> <span class="badge badge-info" title="Admin gốc: tài khoản tạo lúc khởi tạo, không admin nào khác sửa được">Superadmin</span><% } %></td>
+        <td><%= u.display_name || u.username %></td>
         <td><%= u.email ?? '' %><% if (!u.email) { %><span class="badge badge-warn">Chưa có email</span><% } %></td>
         <td><%= u.auth_source === 'ldap' ? 'Tài khoản AD' : 'Nội bộ' %></td>
         <td><% u.grants.forEach((g) => { %><span class="badge badge-muted"><%= h.grant(g) %></span> <% }) %><% if (!u.grants.length) { %><span class="muted">Chưa cấp quyền</span><% } %></td>

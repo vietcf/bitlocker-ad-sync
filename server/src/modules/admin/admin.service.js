@@ -7,6 +7,7 @@ import { normalizeDn } from '../branchmap/branchmap.js';
 import { generatePassword, hashPassword, loadPasswordPolicy } from '../auth/password.js';
 import {
   countActiveAdmins,
+  rootExists,
   createUser,
   getUser,
   listUsers,
@@ -15,6 +16,8 @@ import {
   setPassword,
   unlinkAd,
   unlockUser,
+  userHasLogEntries,
+  deleteUserRow,
   updateUser,
   resetTotp,
   setMustChangePassword,
@@ -83,13 +86,22 @@ const USERNAME_HELP = {
 
 const authSource = z.enum(['ldap', 'local']).default('ldap');
 const email = z.string().trim().toLowerCase().max(254).pipe(z.email({ message: 'invalid_email' }));
+// AD users may leave name and e-mail empty: they are filled from AD at the first sign-in (never overwritten later).
+// Local accounts need both (checked in requireNameAndEmail).
+const optionalEmail = z.preprocess((v) => (typeof v === 'string' && v.trim() === '' ? null : v), email.nullable().default(null));
+const personName = z.string().trim().max(256).default('');
+function requireNameAndEmail(authSource, { displayName, email: mail }) {
+  if (authSource === 'local' && (!displayName || !mail)) {
+    throw badRequest('name_email_required_local', 'Local accounts need a display name and an e-mail address.');
+  }
+}
 
 const userCreateInput = z
   .object({
     // "CORP\nguyenvana" is accepted and stored as "nguyenvana".
     username: z.string().trim().max(128).transform((u) => u.slice(u.lastIndexOf('\\') + 1)),
-    displayName: z.string().trim().min(1).max(256),
-    email,
+    displayName: personName,
+    email: optionalEmail,
     authSource,
     grants: grantList,
     totpRequired: checkbox,
@@ -103,8 +115,8 @@ const userCreateInput = z
   });
 
 const userUpdateInput = z.object({
-  displayName: z.string().trim().min(1).max(256),
-  email,
+  displayName: personName,
+  email: optionalEmail,
   isActive: checkbox,
   // No default here: leaving it out must never switch how an existing user signs in.
   authSource: z.enum(['ldap', 'local']).optional(),
@@ -129,6 +141,20 @@ export class AdminService {
 
   #check(scope) {
     if (!can(scope, 'admin')) throw forbidden();
+  }
+
+  /**
+   * Chi admin goc (tai khoan admin tao luc khoi tao) duoc sua admin goc, va ha quyen / khoa admin khac.
+   * Khong co admin goc nao trong DB (ban rat cu): khong han che.
+   */
+  async #guardRoot(db, scope, target, { demotes = false } = {}) {
+    if (!(await rootExists(db))) return;
+    const actor = await getUser(db, scope.userId);
+    if (actor?.is_root) return;
+    if (target.is_root) throw forbidden('root_admin_protected', 'Only the original admin can change the original admin account.');
+    if (demotes && target.grants.some((g) => g.role === 'admin')) {
+      throw forbidden('only_root_can_demote_admin', 'Only the original admin can remove the admin role from, or disable, another admin.');
+    }
   }
 
   #log(tx, scope, client, detail) {
@@ -265,6 +291,7 @@ export class AdminService {
   async createUser(scope, raw, client = {}) {
     this.#check(scope);
     const input = parse(userCreateInput, raw);
+    requireNameAndEmail(input.authSource, input);
     const oneTimePassword = input.authSource === 'local' ? await this.#oneTimePassword() : null;
     const passwordHash = oneTimePassword ? await hashPassword(oneTimePassword) : null;
     return withAllBranches(this.pool, async (tx) => {
@@ -292,7 +319,9 @@ export class AdminService {
     const input = parse(userUpdateInput, raw);
     const before = await getUser(this.pool, id);
     if (!before) throw notFound('User not found.');
+    await this.#guardRoot(this.pool, scope, before, { demotes: !input.isActive || !input.grants.some((g) => g.role === 'admin') });
     const switchTo = input.authSource && input.authSource !== before.auth_source ? input.authSource : null;
+    requireNameAndEmail(switchTo ?? before.auth_source, input);
     if (switchTo && !usernameOk(switchTo, before.username)) {
       throw badRequest('invalid_username', `The username is not valid for ${switchTo} sign-in; create a new user instead.`, { authSource: switchTo });
     }
@@ -300,6 +329,8 @@ export class AdminService {
     const passwordHash = oneTimePassword ? await hashPassword(oneTimePassword) : null;
 
     return withAllBranches(this.pool, async (tx) => {
+      // Khoa de hai admin cung ha quyen nhau khong the de lai 0 admin.
+      await tx.query(`SELECT pg_advisory_xact_lock(hashtext('admin_roles'))`);
       const staysAdmin = input.isActive && input.grants.some((g) => g.role === 'admin');
       if (id === scope.userId && !staysAdmin) {
         throw badRequest('self_lockout', 'You cannot remove your own admin role or disable your own account.');
@@ -339,6 +370,7 @@ export class AdminService {
     return withAllBranches(this.pool, async (tx) => {
       const u = await getUser(tx, id);
       if (!u) throw notFound('User not found.');
+      await this.#guardRoot(tx, scope, u);
       if (u.auth_source !== 'local') {
         throw badRequest('directory_user', 'This user signs in with AD; the password is managed by AD.');
       }
@@ -357,8 +389,34 @@ export class AdminService {
     return withAllBranches(this.pool, async (tx) => {
       const u = await getUser(tx, id);
       if (!u) throw notFound('User not found.');
+      await this.#guardRoot(tx, scope, u);
       await unlinkAd(tx, id);
       await this.#log(tx, scope, client, { op: 'unlink_ad', user: u.username, objectGuid: u.ad_object_guid });
+    });
+  }
+
+  /**
+   * Deletes a user nobody has logged anything for. Once the audit log mentions the user (sign-ins, key views...),
+   * the account can only be disabled, so the log always matches an account that still exists.
+   */
+  async deleteUser(scope, id, client = {}) {
+    this.#check(scope);
+    return withAllBranches(this.pool, async (tx) => {
+      await tx.query(`SELECT pg_advisory_xact_lock(hashtext('admin_roles'))`);
+      const u = await getUser(tx, id);
+      if (!u) throw notFound('User not found.');
+      if (u.id === scope.userId) throw badRequest('self_delete', 'You cannot delete your own account.');
+      if (u.is_root) throw forbidden('root_admin_protected', 'The original admin account cannot be deleted.');
+      await this.#guardRoot(tx, scope, u, { demotes: true });
+      const isAdmin = u.grants.some((g) => g.role === 'admin');
+      if (isAdmin && u.is_active && (await countActiveAdmins(tx, id)) === 0) {
+        throw badRequest('last_admin', 'At least one active admin must remain.');
+      }
+      if (await userHasLogEntries(tx, id, u.username)) {
+        throw conflict('user_has_log', 'This user appears in the audit log: disable the account instead of deleting it.', { username: u.username });
+      }
+      await deleteUserRow(tx, id);
+      await this.#log(tx, scope, client, { op: 'delete_user', user: u.username, authSource: u.auth_source });
     });
   }
 
@@ -368,6 +426,7 @@ export class AdminService {
     return withAllBranches(this.pool, async (tx) => {
       const u = await getUser(tx, id);
       if (!u) throw notFound('User not found.');
+      await this.#guardRoot(tx, scope, u);
       await resetTotp(tx, id);
       await this.#log(tx, scope, client, { op: 'reset_two_factor', user: u.username });
     });
@@ -378,6 +437,7 @@ export class AdminService {
     return withAllBranches(this.pool, async (tx) => {
       const u = await getUser(tx, id);
       if (!u) throw notFound('User not found.');
+      await this.#guardRoot(tx, scope, u);
       await unlockUser(tx, id);
       await this.#log(tx, scope, client, { op: 'unlock_user', user: u.username });
     });

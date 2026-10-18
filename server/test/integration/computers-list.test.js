@@ -42,6 +42,9 @@ describe('computer list (no search term)', () => {
   it('filters by status and can include machines deleted from AD', async () => {
     const { agent } = await apiLogin(app, 'it.hn');
     expect((await agent.get('/api/computers').query({ status: 'no_key' })).body.total).toBe(29);
+    const withKey = (await agent.get('/api/computers').query({ status: 'has_key' })).body.total;
+    expect(withKey).toBe(1);
+    expect(withKey + 29).toBe((await agent.get('/api/computers').query({ status: 'all' })).body.total);
     expect((await agent.get('/api/computers').query({ includeDeleted: 'on' })).body.total).toBe(31);
   });
 

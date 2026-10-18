@@ -14,6 +14,7 @@ export const GENESIS_HASH = Buffer.alloc(32);
 /** JSON with object keys sorted, so the same value always serialises the same way. */
 export function stableStringify(value) {
   if (value === null || value === undefined) return 'null';
+  if (value instanceof Date) return JSON.stringify(value.toISOString());
   if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
   if (typeof value === 'object') {
     const keys = Object.keys(value).filter((k) => value[k] !== undefined).sort();
@@ -54,6 +55,19 @@ export function chainHash(key, prevHash, entry) {
  * `expectedPrev` is the hash the first row must point to (GENESIS_HASH, or a checkpoint).
  * Returns { ok: true, checked, lastHash } or { ok: false, checked, brokenAtId, problem }.
  */
+/**
+ * Rows of action export_log written before the fix hashed a Date in detail.filters.from / to as {} (the stored
+ * JSON has the ISO text). Same row with those two values read as {}: only used when the normal hash does not match.
+ */
+function legacyExportLog(e) {
+  const f = e.detail?.filters;
+  if (e.action !== 'export_log' || !f || (typeof f.from !== 'string' && typeof f.to !== 'string')) return null;
+  const filters = { ...f };
+  if (typeof f.from === 'string') filters.from = {};
+  if (typeof f.to === 'string') filters.to = {};
+  return { ...e, detail: { ...e.detail, filters } };
+}
+
 export function verifyChain(key, rows, expectedPrev = GENESIS_HASH) {
   let prev = expectedPrev;
   let checked = 0;
@@ -61,7 +75,8 @@ export function verifyChain(key, rows, expectedPrev = GENESIS_HASH) {
     if (!timingSafeEqual(r.prevHash, prev)) {
       return { ok: false, checked, brokenAtId: r.id, problem: 'prev_hash_mismatch' };
     }
-    if (!timingSafeEqual(chainHash(key, prev, r), r.hash)) {
+    const legacy = legacyExportLog(r);
+    if (!timingSafeEqual(chainHash(key, prev, r), r.hash) && !(legacy && timingSafeEqual(chainHash(key, prev, legacy), r.hash))) {
       return { ok: false, checked, brokenAtId: r.id, problem: 'hash_mismatch' };
     }
     prev = r.hash;

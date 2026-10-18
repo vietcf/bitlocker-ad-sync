@@ -59,7 +59,7 @@ paths:
               type: object
               required: [username, password]
               properties:
-                username: { type: string, maxLength: 128, description: 'nguyenvana, CORP\nguyenvana or nguyenvana@corp.local for AD users', example: admin }
+                username: { type: string, maxLength: 128, description: 'A local account only (AD users sign in on the web)', example: admin }
                 password: { type: string, maxLength: 256, format: password }
       responses:
         '200':
@@ -81,7 +81,7 @@ paths:
                   mustChangePassword: { type: boolean, description: 'Local accounts only: call change-password before anything else.' }
                   csrfToken: { type: string }
         '401': { $ref: '#/components/responses/Error', description: 'invalid_credentials' }
-        '403': { $ref: '#/components/responses/Error', description: 'ad_account_mismatch' }
+        '403': { $ref: '#/components/responses/Error', description: 'ad_account_mismatch / api_requires_local (the API accepts local accounts only)' }
         '423': { $ref: '#/components/responses/Error', description: 'account_locked (after repeated failures, 15 minutes)' }
         '503': { $ref: '#/components/responses/Error', description: 'directory_unavailable / directory_not_configured' }
   /api/auth/2fa/setup:
@@ -231,7 +231,7 @@ paths:
         - { name: q, in: query, schema: { type: string, maxLength: 100 }, example: HN-LT }
         - { $ref: '#/components/parameters/Page' }
         - { name: branchId, in: query, schema: { oneOf: [{ type: integer }, { type: string, enum: [na] }] }, description: 'A branch id, or "na" for computers in no branch (Admin HQ only).' }
-        - { name: status, in: query, schema: { type: string, enum: [all, no_key], default: all } }
+        - { name: status, in: query, schema: { type: string, enum: [all, no_key, has_key], default: all } }
         - { name: includeDeleted, in: query, schema: { type: string, enum: ['on', 'true', '1'] }, description: 'Also list computers no longer in AD.' }
         - { name: dateField, in: query, schema: { type: string, enum: [seen, ad], default: seen }, description: 'Which date from/to apply to: seen = first recorded in this system, ad = created in AD.' }
         - { name: from, in: query, schema: { type: string, format: date }, description: 'Appeared on or after this day (YYYY-MM-DD, APP_TZ).' }
@@ -399,7 +399,7 @@ paths:
                 - type: object
                   properties:
                     branchId: { oneOf: [{ type: integer }, { type: string, enum: [na] }] }
-                    status: { type: string, enum: [all, no_key] }
+                    status: { type: string, enum: [all, no_key, has_key] }
                     includeDeleted: { type: boolean }
                     dateField: { type: string, enum: [seen, ad] }
                     from: { type: string, format: date }
@@ -596,11 +596,11 @@ paths:
           application/json:
             schema:
               type: object
-              required: [username, displayName, email]
+              required: [username]
               properties:
                 username: { type: string, description: 'AD: sAMAccountName (max 20; "CORP\name" is accepted). Local: 2-64 letters, digits, . _ -' }
-                displayName: { type: string, maxLength: 256 }
-                email: { type: string, format: email }
+                displayName: { type: string, maxLength: 256, description: 'Optional for AD users (filled from AD at first sign-in); required for local accounts' }
+                email: { type: string, format: email, description: 'Optional for AD users (filled from AD at first sign-in); required for local accounts' }
                 authSource: { type: string, enum: [ldap, local], default: ldap }
                 grants: { $ref: '#/components/schemas/Grants' }
       responses:
@@ -625,7 +625,7 @@ paths:
           application/json:
             schema:
               type: object
-              required: [displayName, email]
+              required: []
               properties:
                 displayName: { type: string }
                 email: { type: string, format: email }
@@ -637,6 +637,16 @@ paths:
       responses:
         '200': { description: '`{}` or `{ oneTimePassword }`', content: { application/json: { schema: { type: object, additionalProperties: true } } } }
         '400': { $ref: '#/components/responses/Error', description: 'self_lockout, last_admin, invalid_username' }
+    delete:
+      operationId: deleteAdminUsersById
+      tags: [Admin - users]
+      summary: Delete a user the audit log has never mentioned (otherwise disable the account)
+      description: Refused with 409 user_has_log when the log has any entry of this user; 400 self_delete / last_admin; 403 root_admin_protected.
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '204': { description: Deleted. }
+        '400': { $ref: '#/components/responses/Error', description: 'self_delete, last_admin' }
+        '409': { $ref: '#/components/responses/Error', description: user_has_log }
   /api/admin/users/{id}/reset-password:
     post:
       operationId: postAdminUsersByIdResetPassword
@@ -780,9 +790,21 @@ paths:
             schema:
               type: object
               properties:
-                alertsEnabled: { type: boolean }
-                alertsAdmins: { type: boolean, description: Send alerts to every Admin HQ user with an e-mail. }
-                alertsExtra: { type: array, items: { type: string, format: email } }
+                alertsEnabled: { type: boolean, description: Older single option; used for a group whose own fields are not sent. }
+                alertsAdmins: { type: boolean, description: Older single option (every Admin HQ user with an e-mail). }
+                alertsExtra: { type: array, items: { type: string, format: email }, description: Older single option (extra addresses). }
+                alertsAgentEnabled: { type: boolean, description: Mail when the sync worker stops (no heartbeat). }
+                alertsAgentAdmins: { type: boolean }
+                alertsAgentExtra: { type: array, items: { type: string, format: email } }
+                alertsAdEnabled: { type: boolean, description: Mail when the connection to AD or the sync has a problem. }
+                alertsAdAdmins: { type: boolean }
+                alertsAdExtra: { type: array, items: { type: string, format: email } }
+                alertsKeyEnabled: { type: boolean, description: Mail for keys revealed out of working hours, key exports, a broken log chain. }
+                alertsKeyAdmins: { type: boolean }
+                alertsKeyExtra: { type: array, items: { type: string, format: email } }
+                alertsBackupEnabled: { type: boolean, description: Mail when a backup run fails. }
+                alertsBackupAdmins: { type: boolean }
+                alertsBackupExtra: { type: array, items: { type: string, format: email } }
                 newComputers: { type: boolean }
                 newKeys: { type: boolean }
                 newBranchUsers: { type: boolean, description: IT / lead users of the computer's branch. }
@@ -990,7 +1012,7 @@ components:
           example: ['OU=Computers,OU=HN,DC=corp,DC=local']
     Grants:
       type: array
-      description: '"role:branchId" or "role:all"; admin is always all branches.'
+      description: '"role:branchId" or "role:all"; admin is always all branches and cannot be combined with other roles (400 admin_exclusive); one role per branch (400 one_role_per_branch).'
       items: { type: string, pattern: '^(it|lead|admin|auditor):(all|\d+)$' }
       example: ['it:1', 'lead:1']
     User:

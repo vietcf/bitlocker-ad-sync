@@ -7,7 +7,7 @@
     <dt>OU</dt><dd><code class="wrap"><%= computer.distinguished_name %></code></dd>
     <% if (computer.info_updated_at) { %><dt>Sửa gần nhất</dt><dd><%= h.dateTime(computer.info_updated_at) %> (<%= computer.info_updated_by %>)</dd><% } %>
   </dl>
-  <p class="muted" style="margin-top: 14px">Các trường này do người dùng nhập, không lấy từ AD và sync không bao giờ ghi đè.
+  <p class="muted mt-14">Các trường này do người dùng nhập, không lấy từ AD và sync không bao giờ ghi đè.
     Để trống một ô để xóa giá trị. Mỗi lần lưu được ghi vào nhật ký.</p>
   <%- include('../partials/error-box', { error }) %>
   <form method="post" action="/computers/<%= computer.id %>/edit" class="form">

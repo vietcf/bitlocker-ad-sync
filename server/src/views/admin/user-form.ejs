@@ -2,7 +2,7 @@
 <%- include('_tabs') %>
 <p class="crumbs"><a href="/admin/users">← Người dùng</a></p>
 <section class="card narrow wide-ish">
-  <h2><%= title %></h2>
+  <h2><%= title %><% if (form.isRoot) { %> <span class="badge badge-info" title="Admin gốc: chỉ chính tài khoản này sửa được (hoặc CLI trên máy chủ)">Superadmin</span><% } %></h2>
   <%- include('../partials/error-box', { error }) %>
   <form method="post" action="/admin/users<%= userId ? `/${userId}` : '' %>" class="form">
     <%- include('../partials/csrf') %>
@@ -26,10 +26,12 @@
         <span class="muted hint">Tài khoản AD: sAMAccountName (tên đăng nhập Windows). Tài khoản nội bộ: tên tùy chọn.</span>
       </label>
     <% } %>
-    <label>Họ tên <input name="displayName" value="<%= form.displayName ?? '' %>" required maxlength="256"></label>
+    <label>Họ tên <input name="displayName" value="<%= form.displayName ?? '' %>" maxlength="256">
+      <span class="muted hint">Tài khoản AD: để trống thì tự lấy từ AD ở lần đăng nhập đầu (đã có thì không bị ghi đè). Tài khoản nội bộ: bắt buộc.</span>
+    </label>
     <label>Email
-      <input type="email" name="email" value="<%= form.email ?? '' %>" required maxlength="254" placeholder="nguyenvana@corp.local" autocomplete="off" spellcheck="false">
-      <% if (userId && !form.email) { %><span class="muted hint">User này chưa có email: cần nhập trước khi lưu.</span><% } %>
+      <input type="email" name="email" value="<%= form.email ?? '' %>" maxlength="254" placeholder="nguyenvana@corp.local" autocomplete="off" spellcheck="false">
+      <span class="muted hint">Tài khoản AD: để trống thì tự lấy từ AD ở lần đăng nhập đầu. Chưa có email thì không nhận được thư cảnh báo. Tài khoản nội bộ: bắt buộc.</span>
     </label>
     <% if (userId) { %>
       <label class="check"><input type="checkbox" name="isActive" <%= form.isActive ? 'checked' : '' %>> Đang hoạt động (bỏ chọn để khóa tài khoản)</label>
@@ -70,7 +72,7 @@
         </tbody>
       </table>
       <label class="check admin-check"><input type="checkbox" name="grants" value="admin:all" <%= form.grants.includes('admin:all') ? 'checked' : '' %>>
-        <strong>Admin HQ</strong>: toàn quyền, xem key mọi chi nhánh, quản trị hệ thống</label>
+        <strong>Admin HQ</strong>: toàn quyền, xem key mọi chi nhánh, quản trị hệ thống. Chọn mục này thì không chọn thêm vai trò theo chi nhánh. Mỗi chi nhánh chỉ một vai trò.</label>
     </fieldset>
 
     <div class="actions">
@@ -92,7 +94,7 @@
     <% } else if (form.adObjectGuid) { %>
     <form method="post" action="/admin/users/<%= userId %>/unlink-ad" class="inline" data-confirm="Gỡ liên kết tài khoản AD? Dùng khi tài khoản AD của người này bị xóa và tạo lại.">
       <%- include('../partials/csrf') %>
-      <button type="submit" class="secondary">Gỡ liên kết AD</button>
+      <button type="submit" class="secondary" title="Xóa liên kết giữa user này và tài khoản AD đã ghi nhận (objectGUID). Dùng khi tài khoản AD bị xóa rồi tạo lại cho cùng người hoặc người khác trùng tên: lúc đó đăng nhập báo không khớp tài khoản AD. Sau khi gỡ, lần đăng nhập AD kế tiếp sẽ gắn với tài khoản AD hiện tại. Quyền và chi nhánh của user giữ nguyên.">Gỡ liên kết AD</button>
     </form>
     <% } %>
     <% if (form.totpEnrolledAt) { %>
@@ -105,6 +107,12 @@
     <form method="post" action="/admin/users/<%= userId %>/unlock" class="inline">
       <%- include('../partials/csrf') %>
       <button type="submit" class="secondary">Mở khóa (sai mật khẩu)</button>
+    </form>
+    <% } %>
+    <% if (!form.isRoot && form.username !== me.upn) { %>
+    <form method="post" action="/admin/users/<%= userId %>/delete" class="inline" data-confirm="Xóa hẳn người dùng <%= form.username %>? Không thể hoàn tác.">
+      <%- include('../partials/csrf') %>
+      <button type="submit" class="danger" title="Chỉ xóa được khi nhật ký chưa có dòng nào liên quan đến người này. Nếu đã có thì không xóa được, chỉ vô hiệu hóa (bỏ chọn Đang hoạt động).">Xóa người dùng</button>
     </form>
     <% } %>
   </div>

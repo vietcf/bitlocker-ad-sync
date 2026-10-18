@@ -124,6 +124,7 @@ describe('backup', () => {
     expect((await web.agent.post('/admin/backup/password').type('form').send({ _csrf: web.csrf, password: PASSWORD, confirm: PASSWORD })).status).toBe(302);
     expect((await web.agent.post('/admin/backup/options').type('form').send({ _csrf: web.csrf, enabled: 'on', time: '02:00', keys: 'on', keep: '7', encrypt: 'on' })).status).toBe(302);
     expect((await web.agent.post('/admin/backup/run').type('form').send({ _csrf: web.csrf })).status).toBe(302);
+    await services.backup.whenIdle(); // runs in the background
     const [name] = fs.readdirSync(dir);
     expect(name).toMatch(/^bitlocker-keys-\d{8}-\d{6}\.zip$/);
     const dl = await web.agent.get(`/admin/backup/files/${name}`).buffer(true).parse((r, cb) => {
@@ -140,5 +141,36 @@ describe('backup', () => {
     const lead = await webLogin(app, 'lead.hn');
     expect((await lead.agent.get('/admin/backup')).status).toBe(403);
     expect((await lead.agent.get(`/admin/backup/files/${name}`)).status).toBe(403);
+  });
+});
+
+describe('backup in the background', () => {
+  it('runs one backup at a time and the second request is refused', async () => {
+    await services.backup.setPassword(admin, { password: PASSWORD, confirm: PASSWORD });
+    let release;
+    services.backup.runPgDump = () => new Promise((resolve) => { release = () => resolve(Buffer.from('PGDMP slow')); });
+    expect(services.backup.runNow(admin)).toEqual({ started: true });
+    expect(() => services.backup.runNow(admin)).toThrow(/already running/);
+    expect((await services.backup.status(admin)).running).not.toBeNull();
+    await new Promise((r) => setTimeout(r, 50));
+    release();
+    await services.backup.whenIdle();
+    expect((await services.backup.status(admin)).running).toBeNull();
+    expect((await services.backup.status(admin)).lastResult.ok).toBe(true);
+    expect(fs.readdirSync(dir).filter((n) => n.startsWith('.'))).toEqual([]); // no temporary files left
+  });
+});
+
+describe('backup password fields', () => {
+  it('can be typed only while "encrypt" is ticked', async () => {
+    const { webLogin } = await import('./app.js');
+    const web = await webLogin(app, 'admin.hq');
+    const disabled = (html) => [...html.matchAll(/<(?:input|button)[^>]*data-needs-encrypt([^>]*)>/g)].map((m) => /disabled/.test(m[1]));
+    await services.settings.set('backup.options', { encrypt: false });
+    services.settings.invalidate();
+    expect(disabled((await web.agent.get('/admin/backup')).text)).toEqual([true, true, true]);
+    await services.settings.set('backup.options', { encrypt: true });
+    services.settings.invalidate();
+    expect(disabled((await web.agent.get('/admin/backup')).text)).toEqual([false, false, false]);
   });
 });

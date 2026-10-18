@@ -10,7 +10,7 @@
 <section class="card">
   <h2>Tính năng</h2>
   <p class="muted">Bật hoặc tắt từng tính năng. Thay đổi có hiệu lực trong vòng 30 giây và được ghi vào nhật ký.
-    Đăng nhập AD / local cấu hình trong file <code>.env</code> (<code>LDAP_URL</code>, <code>LOCAL_LOGIN_ENABLED</code>).</p>
+    Đăng nhập AD / local cấu hình trong file <code>.env</code> (<code>LDAP_SERVERS</code>, <code>LOCAL_LOGIN_ENABLED</code>).</p>
   <%- include('../partials/error-box', { error }) %>
   <form method="post" action="/admin/settings/features" class="form">
     <%- include('../partials/csrf') %>

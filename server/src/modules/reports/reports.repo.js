@@ -50,6 +50,27 @@ export async function computersWithKey(tx, branches) {
   return rows;
 }
 
+/**
+ * Computers that left the monitored scope (flagged "not in AD") within the period, with how many keys they hold
+ * (kept) and when a sync last saw them. Newest first. Never a key value. For the Excel export.
+ */
+export async function computersLeftInPeriod(tx, branches, period) {
+  const params = [];
+  const scope = branchFilter('c.branch_id', branches, params);
+  const { start, end } = periodParams(params, period);
+  const { rows } = await tx.query(
+    `SELECT c.id, c.name, c.os, c.distinguished_name, c.device_serial, c.owner_email, c.branch_id, b.code AS branch_code,
+            c.deleted_in_ad_at,
+            (SELECT r.started_at FROM sync_run r WHERE r.id = c.last_seen_run) AS last_seen_at,
+            (SELECT count(*)::int FROM recovery_key k WHERE k.computer_id = c.id) AS keys
+       FROM computer c LEFT JOIN branch b ON b.id = c.branch_id
+      WHERE ${scope} AND c.deleted_in_ad_at >= ${start} AND c.deleted_in_ad_at < ${end}
+      ORDER BY c.deleted_in_ad_at DESC, b.code NULLS FIRST, lower(c.name)`,
+    params,
+  );
+  return rows;
+}
+
 /** Computers present in AD with no recovery key at all (BitLocker key not escrowed). */
 export async function computersWithoutKey(tx, branches) {
   const params = [];

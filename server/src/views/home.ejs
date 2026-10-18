@@ -27,12 +27,12 @@
         <tr>
           <td><a href="/computers/<%= r.id %>?key=<%= r.key_id %>"><%= r.name %></a>
             <span class="guid" title="objectGUID trên AD"><%= r.object_guid %></span>
-            <% if (r.deleted_in_ad_at) { %><span class="badge badge-muted">Không còn trong phạm vi giám sát</span><% } %></td>
+            <% if (r.deleted_in_ad_at) { %><span class="badge badge-muted" title="Máy này không còn nằm trong phạm vi worker giám sát (bị xóa trên AD, chuyển ra ngoài các OU đã cấu hình, hoặc lượt đồng bộ đầy đủ không thấy). Dữ liệu và key vẫn được giữ; máy xuất hiện lại thì tự bỏ nhãn.">Không còn trong phạm vi giám sát</span><% } %></td>
           <td><%= h.branchCode(r.branch_code) %></td>
           <td><code><%= r.key_id.toUpperCase() %></code></td>
           <td><%= h.date(r.key_created_at) %></td>
           <td><%= h.date(r.key_first_synced_at) %></td>
-          <td><span class="badge badge-<%= st.tone %>"><%= st.label %></span></td>
+          <td><span class="badge badge-<%= st.tone %>"><%= st.label %></span><% if (r.deleted_in_ad_at) { %> <span class="badge badge-muted" title="Máy chứa key này hiện không nằm trong phạm vi worker giám sát. Key vẫn được lưu.">Máy ngoài phạm vi</span><% } %></td>
           <td><a class="button small" href="/computers/<%= r.id %>/keys/<%= r.key_id %>/reveal">Hiện key</a></td>
         </tr>
       <% }) %>
@@ -69,7 +69,7 @@
     </div>
     <% } %>
   </div>
-  <form method="get" action="/" class="filter-bar">
+  <form method="get" action="/" class="filter-bar" data-autosubmit>
     <div class="filter-fields">
     <% if (list.branches.length > 1 || list.seesUnmapped) { %>
     <label>Chi nhánh
@@ -83,6 +83,7 @@
     <label>Tình trạng
       <select name="status">
         <option value="all" <%= filters.status === 'all' ? 'selected' : '' %>>Tất cả</option>
+        <option value="has_key" <%= filters.status === 'has_key' ? 'selected' : '' %>>Đã có key</option>
         <option value="no_key" <%= filters.status === 'no_key' ? 'selected' : '' %>>Chưa có key</option>
       </select>
     </label>
@@ -121,7 +122,7 @@
         <td><%= h.date(c.ad_created_at) %></td>
         <td title="Lần đầu hệ thống ghi nhận máy này (qua đồng bộ AD)"><%= h.date(c.first_seen_at) %></td>
         <td>
-          <% if (c.deleted_in_ad_at) { %><span class="badge badge-muted">Không còn trong phạm vi giám sát</span>
+          <% if (c.deleted_in_ad_at) { %><span class="badge badge-muted" title="Máy này không còn nằm trong phạm vi worker giám sát (bị xóa trên AD, chuyển ra ngoài các OU đã cấu hình, hoặc lượt đồng bộ đầy đủ không thấy). Dữ liệu và key vẫn được giữ; máy xuất hiện lại thì tự bỏ nhãn.">Không còn trong phạm vi giám sát</span>
           <% } else if (c.key_count === 0) { %><span class="badge badge-bad">Chưa có key</span>
           <% } else { %><span class="badge badge-good">Có key</span><% } %>
         </td>

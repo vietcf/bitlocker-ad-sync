@@ -8,19 +8,22 @@
   <form method="post" action="/admin/settings/notifications" class="form">
     <%- include('../partials/csrf') %>
 
+    <h3>Cảnh báo hệ thống</h3>
+    <p class="muted small">Chọn riêng cho từng nhóm: bật hay tắt, gửi cho ai. Các địa chỉ trong <code>NOTIFY_TO</code> (file .env) luôn nhận mọi nhóm đang bật.</p>
+    <% [['agent', 'Agent'], ['ad', 'Ad'], ['key', 'Key'], ['backup', 'Backup']].forEach(([k, K]) => { const g = n.alerts[k]; const meta = n.alertGroups[k]; %>
     <fieldset>
-      <legend>Cảnh báo hệ thống</legend>
-      <p class="muted small">Sync lỗi, sync bất thường bị giữ lại, worker không gửi heartbeat, chứng chỉ LDAPS sắp hết hạn,
-        chuỗi hash nhật ký bị gãy, xem key ngoài giờ...</p>
-      <label class="check"><input type="checkbox" name="alertsEnabled" <%= n.alerts.enabled ? 'checked' : '' %>>
-        <span><strong>Gửi email cảnh báo</strong></span></label>
-      <label class="check"><input type="checkbox" name="alertsAdmins" <%= n.alerts.admins ? 'checked' : '' %>>
+      <legend><%= meta.label %></legend>
+      <p class="muted small"><%= meta.help %></p>
+      <label class="check"><input type="checkbox" name="alerts<%= K %>Enabled" <%= g.enabled ? 'checked' : '' %>>
+        <span><strong>Gửi email cảnh báo nhóm này</strong></span></label>
+      <label class="check"><input type="checkbox" name="alerts<%= K %>Admins" <%= g.admins ? 'checked' : '' %>>
         <span>Gửi cho mọi Admin HQ</span></label>
       <label>Gửi thêm cho các địa chỉ
-        <textarea name="alertsExtra" rows="3" placeholder="security@corp.local&#10;it-hq@corp.local"><%= n.alerts.extra.join('\n') %></textarea>
-        <span class="muted hint">Mỗi dòng một địa chỉ. Các địa chỉ trong <code>NOTIFY_TO</code> (file .env) luôn nhận.</span>
+        <textarea name="alerts<%= K %>Extra" rows="2" placeholder="security@corp.local&#10;it-hq@corp.local"><%= g.extra.join('\n') %></textarea>
+        <span class="muted hint">Mỗi dòng một địa chỉ.</span>
       </label>
     </fieldset>
+    <% }) %>
 
     <fieldset>
       <legend>Máy mới, key mới</legend>
@@ -37,7 +40,7 @@
       <label class="check"><input type="checkbox" name="skipFirstFull" <%= n.newObjects.skipFirstFull ? 'checked' : '' %>>
         <span>Không gửi cho lượt full sync đầu tiên <span class="muted">(lượt này thấy mọi máy là "mới")</span></span></label>
       <label>Số máy / key tối đa liệt kê trong một email
-        <input type="number" name="maxItems" value="<%= n.newObjects.maxItems %>" min="10" max="1000" style="max-width: 140px">
+        <input type="number" name="maxItems" value="<%= n.newObjects.maxItems %>" min="10" max="1000" class="mw-140">
         <span class="muted hint">Ví dụ đặt 100 mà lượt sync có 300 máy mới: email liệt kê 100 máy đầu, rồi ghi "... and 200 more". Danh sách đầy đủ xem trên web.</span>
       </label>
     </fieldset>

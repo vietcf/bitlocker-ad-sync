@@ -91,3 +91,44 @@ document.querySelectorAll('input[name="authSource"]').forEach((radio) => {
     if (box) box.disabled = radio.value !== 'local' || !radio.checked;
   });
 });
+
+// Sao luu: o mat khau chi nhap duoc khi tich "Ma hoa file sao luu".
+(() => {
+  const box = document.querySelector('input[name="encrypt"]');
+  const fields = document.querySelectorAll('[data-needs-encrypt]');
+  if (!box || !fields.length) return;
+  const sync = () => fields.forEach((f) => { f.disabled = !box.checked; });
+  box.addEventListener('change', sync);
+  sync();
+})();
+
+// Bo loc tu ap dung: doi ky / chi nhanh la xem luon (cho 0,7 giay de go xong ngay), khong can bam "Xem".
+document.querySelectorAll('form[data-autosubmit]').forEach((form) => {
+  let timer = null;
+  form.addEventListener('change', (e) => {
+    if (e.target.type === 'date' && e.target.value && e.target.value < '2000-01-01') return; // dang go nam
+    clearTimeout(timer);
+    timer = setTimeout(() => form.requestSubmit(), 700);
+  });
+});
+
+// Quyen nguoi dung: moi chi nhanh mot vai tro; chon Admin HQ thi cac vai tro theo chi nhanh bi mo va bo chon.
+(() => {
+  const table = document.querySelector('table.grants');
+  const adminBox = document.querySelector('.admin-check input[type="checkbox"]');
+  if (!table) return;
+  const boxes = [...table.querySelectorAll('input[type="checkbox"]')];
+  const sync = () => {
+    const off = !!adminBox && adminBox.checked;
+    if (off) boxes.forEach((b) => { b.checked = false; });
+    boxes.forEach((b) => { b.disabled = off; });
+    table.classList.toggle('dimmed', off);
+  };
+  table.addEventListener('change', (e) => {
+    if (!e.target.checked) return;
+    const row = e.target.closest('tr');
+    row.querySelectorAll('input[type="checkbox"]').forEach((b) => { if (b !== e.target) b.checked = false; });
+  });
+  if (adminBox) adminBox.addEventListener('change', sync);
+  sync();
+})();

@@ -26,6 +26,10 @@ export function adminApi({ admin, syncAdmin, settingsAdmin }) {
   r.post('/users/:id/reset-password', async (req, res) =>
     res.json(await admin.resetPassword(req.scope, parse(id, req.params.id), clientInfo(req))),
   );
+  r.delete('/users/:id', async (req, res) => {
+    await admin.deleteUser(req.scope, parse(id, req.params.id), clientInfo(req));
+    res.status(204).end();
+  });
   r.post('/users/:id/unlink-ad', async (req, res) => {
     await admin.unlinkAd(req.scope, parse(id, req.params.id), clientInfo(req));
     res.status(204).end();

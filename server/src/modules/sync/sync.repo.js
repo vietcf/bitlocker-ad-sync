@@ -36,9 +36,24 @@ export async function getRunForUpdate(db, id) {
   return rows[0] ?? null;
 }
 
+/** Ghi lan cuoi worker goi API cho luot nay. */
+export async function touchRun(db, id) {
+  await db.query('UPDATE sync_run SET last_activity_at = now() WHERE id = $1', [id]);
+}
+
+/** Luot 'running' im lang qua `minutes` phut (worker crash) -> 'aborted'. Tra ve id. */
+export async function abortOrphanRuns(db, minutes) {
+  const { rows } = await db.query(
+    `UPDATE sync_run SET status = 'aborted', finished_at = now(), error_code = 'orphaned'
+      WHERE status = 'running' AND coalesce(last_activity_at, started_at) < now() - make_interval(mins => $1) RETURNING id`,
+    [minutes],
+  );
+  return rows.map((r) => r.id);
+}
+
 export async function finishRun(db, id, f) {
   await db.query(
-    `UPDATE sync_run SET status = $2, finished_at = now(), highest_usn = $3, computers_seen = $4,
+    `UPDATE sync_run SET status = $2, finished_at = CASE WHEN $10::boolean THEN coalesce(finished_at, now()) ELSE now() END, highest_usn = $3, computers_seen = $4,
             keys_seen = $5, errors = $6, error_code = $7, pending = $8, anomalies = $9
       WHERE id = $1`,
     [
@@ -51,6 +66,7 @@ export async function finishRun(db, id, f) {
       f.errorCode ?? null,
       f.pending ? JSON.stringify(f.pending) : null,
       f.anomalies ? JSON.stringify(f.anomalies) : null,
+      f.keepFinishedAt === true,
     ],
   );
 }

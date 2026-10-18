@@ -85,6 +85,7 @@ export function adminWeb({ admin }) {
         totpRequired: u.totp_required,
         totpEnrolledAt: u.totp_enrolled_at,
         mustChangePassword: u.must_change_password,
+        isRoot: u.is_root,
         grants: u.grants.map((g) => `${g.role}:${g.branchId ?? 'all'}`),
       };
     } else {
@@ -133,6 +134,14 @@ export function adminWeb({ admin }) {
       res.redirect('/admin/users');
     }, renderUserForm),
   );
+
+  r.post('/users/:id/delete', async (req, res) => {
+    const userId = parse(id, req.params.id);
+    const u = await admin.getUser(req.scope, userId);
+    await admin.deleteUser(req.scope, userId, clientInfo(req));
+    flash(req, 'success', `Đã xóa người dùng ${u.username}.`);
+    res.redirect('/admin/users');
+  });
 
   r.post('/users/:id/unlink-ad', async (req, res) => {
     await admin.unlinkAd(req.scope, parse(id, req.params.id), clientInfo(req));

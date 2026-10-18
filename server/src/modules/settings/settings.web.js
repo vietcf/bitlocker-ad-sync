@@ -18,7 +18,7 @@ export function settingsWeb({ settingsAdmin }) {
   };
   r.get('/settings/mail-server', (req, res) => renderSmtp(req, res, null));
   r.post('/settings/mail-server', formAction(async (req, res) => {
-    await settingsAdmin.saveSmtp(req.scope, req.body, clientInfo(req));
+    await settingsAdmin.saveSmtp(req.scope, { ...req.body, rejectUnauthorized: req.body.rejectUnauthorized ?? 'off' }, clientInfo(req));
     flash(req, 'success', 'Đã lưu cấu hình mail server.');
     res.redirect('/admin/settings/mail-server');
   }, renderSmtp));

@@ -15,6 +15,8 @@ export async function runMigrations(connectionString, dir = MIGRATIONS_DIR) {
   await client.connect();
   const applied = [];
   try {
+    // Khoa phien: hai tien trinh migrate cung luc se cho nhau, khong ap dung trung.
+    await client.query(`SELECT pg_advisory_lock(hashtext('blk_migrate'))`);
     await client.query(`
       CREATE TABLE IF NOT EXISTS schema_migrations (
         name        text PRIMARY KEY,

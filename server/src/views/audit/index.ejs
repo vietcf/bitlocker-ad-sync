@@ -4,7 +4,8 @@
     <h1>Nhật ký truy cập</h1>
     <% if (features['feature.audit_export']) { %><a class="button secondary small" href="/audit/export.csv<%= h.query(query, { page: undefined }) %>">Xuất CSV</a><% } %>
   </div>
-  <form method="get" action="/audit" class="filters">
+  <form method="get" action="/audit" class="filter-bar" data-autosubmit>
+    <div class="filter-fields">
     <label>Chi nhánh
       <select name="branchId">
         <option value="">Tất cả</option>
@@ -19,9 +20,18 @@
     </label>
     <label>Người dùng <input name="user" value="<%= filters.user ?? '' %>" placeholder="tên đăng nhập"></label>
     <label>Máy <input name="computer" value="<%= filters.computer ?? '' %>" placeholder="tên máy"></label>
-    <label>Từ ngày <input type="date" name="from" value="<%= filters.from ? filters.from.toISOString().slice(0, 10) : '' %>"></label>
-    <label>Đến ngày <input type="date" name="to" value="<%= filters.to ? filters.to.toISOString().slice(0, 10) : '' %>"></label>
-    <button type="submit">Lọc</button>
+    <fieldset class="date-range">
+      <legend>Thời gian</legend>
+      <input type="date" name="from" value="<%= filters.from ? filters.from.toISOString().slice(0, 10) : '' %>" aria-label="Từ ngày" title="Từ ngày">
+      <span class="muted">–</span>
+      <input type="date" name="to" value="<%= filters.to ? filters.to.toISOString().slice(0, 10) : '' %>" aria-label="Đến ngày" title="Đến ngày">
+    </fieldset>
+    </div>
+  <div class="filter-actions">
+    <span class="spacer"></span>
+    <a href="/audit" class="small">Xóa lọc</a>
+    <button type="submit" class="small">Lọc</button>
+  </div>
   </form>
   <p class="muted"><%= h.number(result.total) %> dòng. Xuất CSV không bao giờ chứa key, và việc xuất cũng được ghi log.</p>
   <table class="dense">

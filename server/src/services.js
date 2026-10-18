@@ -31,7 +31,7 @@ export function createServices({ config, pool, logger, hmacKey, notifier, ldap, 
   // Event lines on stdout (audit, mail, sync_run, alert), in the background. Not in tests (they would flood the output).
   const eventLog = new EventLog({ write: eventWrite, enabled: config.NODE_ENV !== 'test' });
   const settings = new SettingsService(pool);
-  const audit = new AuditService({ pool, hmacKey, settings, eventLog });
+  const audit = new AuditService({ pool, hmacKey, settings, eventLog, tz: config.APP_TZ });
   const secretKey = deriveSecretKey(hmacKey);
   // Text of every mail: templates/mail-templates.yaml (or MAIL_TEMPLATES_FILE). Throws if it is broken.
   const templates = new MailTemplates({ file: config.MAIL_TEMPLATES_FILE ?? DEFAULT_TEMPLATES_FILE, logger });
@@ -40,10 +40,11 @@ export function createServices({ config, pool, logger, hmacKey, notifier, ldap, 
   const retention = new RetentionService({ pool, settings, mail, audit });
   notifier ??= new Notifier({ config, logger, mail, settings, adminEmails: () => adminEmails(pool), adminsWithoutEmail: () => adminsWithoutEmail(pool) });
   const alerts = new AlertsService({ pool, notifier, templates, eventLog });
-  // Tests pass their own directory stand-in; otherwise a real LDAPS client when LDAP_URL is set.
+  // Tests pass their own directory stand-in; otherwise a real LDAP client when LDAP_SERVERS is set.
   ldap ??= ldapEnabled(config)
     ? new LdapAuthenticator({
-        urls: config.LDAP_URL,
+        servers: config.LDAP_SERVERS,
+        protocol: config.LDAP_PROTOCOL,
         domain: config.LDAP_DOMAIN,
         baseDn: config.LDAP_BASE_DN,
         caFile: config.LDAP_CA_FILE,
@@ -63,6 +64,7 @@ export function createServices({ config, pool, logger, hmacKey, notifier, ldap, 
     alerts,
     auth: new AuthService({
       pool,
+      logger,
       audit,
       ldap,
       secretKey,

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import http from 'node:http';
 import https from 'node:https';
-import { loadConfig } from './config.js';
+import { loadConfig, ldapIsPlain } from './config.js';
 import { createLogger } from './logger.js';
 import { createPool } from './db/pool.js';
 import { createServices } from './services.js';
@@ -34,10 +34,14 @@ if (await ensureDefaultAdmin(pool)) {
   logger.warn({ username: DEFAULT_ADMIN.username }, 'No users existed: created the default admin account. Its password must be changed at first sign-in.');
 }
 
+if (ldapIsPlain(config)) {
+  logger.warn({ servers: config.LDAP_SERVERS }, 'LDAP sign-in without TLS: AD passwords travel unencrypted. Set LDAP_PROTOCOL=ldaps or starttls when the DCs have a certificate.');
+}
+
 // User-facing pages + API (plain HTTP behind the TLS-terminating reverse proxy).
 const userServer = createUserApp({ config, pool, logger, services }).listen(config.USER_PORT, config.USER_HOST, () => {
   logger.info(
-    { host: config.USER_HOST, port: config.USER_PORT, ldap: config.LDAP_URL.length ? config.LDAP_URL : 'off', localLogin: config.LOCAL_LOGIN_ENABLED },
+    { host: config.USER_HOST, port: config.USER_PORT, ldap: config.LDAP_SERVERS.length ? { servers: config.LDAP_SERVERS, protocol: config.LDAP_PROTOCOL } : 'off', localLogin: config.LOCAL_LOGIN_ENABLED },
     'user app listening',
   );
 });

@@ -16,7 +16,7 @@
   <a class="button small" href="/reports/export.xlsx<%= qs %>" title="Tải file Excel gồm tổng quan, chi tiết từng chi nhánh, xem key theo chi nhánh, người xem key và máy chưa có key (được ghi nhật ký)">Xuất Excel</a>
 </div>
 
-<form method="get" action="/reports" class="filter-bar">
+<form method="get" action="/reports" class="filter-bar" data-autosubmit>
   <div class="filter-fields">
     <fieldset class="date-range">
       <legend>Kỳ báo cáo</legend>
@@ -37,13 +37,14 @@
     <% } %>
   </div>
   <div class="filter-actions">
-    <span class="muted small">Nhanh:
-      <% [7, 30, 90].forEach((n, i) => { %><%= i ? ' · ' : '' %><a href="/reports<%= h.query(query, { from: h.daysAgo(n - 1), to: undefined, period: undefined }) %>"><%= n %> ngày</a><% }) %>
-      · <a href="/reports<%= h.query(query, { period: 'all', from: undefined, to: undefined }) %>">Toàn bộ</a>
+    <span class="muted small quick">Nhanh:
+      <% [7, 30, 90].forEach((n) => { const on = !report.period.all && report.period.to === h.daysAgo(0) && report.period.from === h.daysAgo(n - 1); %>
+      <a href="/reports<%= h.query(query, { from: h.daysAgo(n - 1), to: undefined, period: undefined }) %>" <%- on ? 'aria-current="true"' : '' %>><%= n %> ngày</a><% }) %>
+      <a href="/reports<%= h.query(query, { period: 'all', from: undefined, to: undefined }) %>" <%- report.period.all ? 'aria-current="true"' : '' %>>Toàn bộ</a>
     </span>
     <span class="spacer"></span>
-    <a href="/reports" class="small">Mặc định (30 ngày)</a>
-    <button type="submit" class="small">Xem</button>
+    <a href="/reports" class="small" title="Về kỳ mặc định 30 ngày">Xóa lọc</a>
+    <button type="submit" class="small" title="Tự áp dụng khi bạn đổi kỳ hoặc chi nhánh">Lọc</button>
   </div>
 </form>
 

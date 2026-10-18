@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { can } from '../../domain/scope.js';
 import { checkbox, id, page as pageNo, parse } from '../../http/validate.js';
 import { badRequest, forbidden, notFound } from '../../http/errors.js';
-import { ALERT_MAIL_DEFAULTS } from '../alerts/notifier.js';
+import { ALERT_GROUPS, loadAlertOptions } from '../alerts/notifier.js';
 import { getMail, listMails, mailCounts, retryMail } from '../mail/mail.repo.js';
 import { SMTP_DEFAULTS } from '../mail/mail.service.js';
 import { NEW_OBJECTS_DEFAULTS } from '../mail/new-objects.js';
@@ -35,7 +35,8 @@ const smtpInput = z.object({
   password: z.string().max(512).optional(),
   clearPassword: checkbox,
   from: email,
-  rejectUnauthorized: checkbox,
+  // Bo trong (API) = kiem tra chung chi; form web luon gui 'on'/'off'.
+  rejectUnauthorized: z.preprocess((v) => (v === undefined ? 'on' : v), checkbox),
   appUrl: z.preprocess((v) => (v === '' ? undefined : v), z.url({ protocol: /^https?$/ }).max(255).optional()),
   // How often the mail job sends what is waiting (minutes).
   sendIntervalMinutes: z.coerce.number().int().min(JOB_SCHEDULE.mailIntervalMinutes.min).max(JOB_SCHEDULE.mailIntervalMinutes.max)
@@ -44,10 +45,17 @@ const smtpInput = z.object({
   if (s.enabled && !s.host) ctx.addIssue({ code: 'custom', path: ['host'], message: 'host_required' });
 });
 
+// Per group of alert mails: alertsAgentEnabled / alertsAgentAdmins / alertsAgentExtra, same for Ad, Key and Backup.
+const GROUP_FIELDS = { agent: 'Agent', ad: 'Ad', key: 'Key', backup: 'Backup' };
+const alertGroupShape = Object.fromEntries(Object.values(GROUP_FIELDS).flatMap((G) => [
+  [`alerts${G}Enabled`, checkbox], [`alerts${G}Admins`, checkbox], [`alerts${G}Extra`, emailList],
+]));
 const notifyInput = z.object({
+  // One set for all groups (older clients): used for a group whose own fields are not sent.
   alertsEnabled: checkbox,
   alertsAdmins: checkbox,
   alertsExtra: emailList,
+  ...alertGroupShape,
   newComputers: checkbox,
   newKeys: checkbox,
   newBranchUsers: checkbox,
@@ -132,7 +140,8 @@ export class SettingsAdminService {
   async notifications(scope) {
     this.#check(scope);
     return {
-      alerts: { ...ALERT_MAIL_DEFAULTS, ...(await this.settings.get('notify.alerts', {})) },
+      alerts: await loadAlertOptions(this.settings),
+      alertGroups: ALERT_GROUPS,
       newObjects: { ...NEW_OBJECTS_DEFAULTS, ...(await this.settings.get('notify.new_objects', {})) },
       dailyReport: {
         ...DAILY_REPORT_DEFAULTS,
@@ -250,7 +259,15 @@ export class SettingsAdminService {
   async saveNotifications(scope, raw, client = {}) {
     this.#check(scope);
     const n = parse(notifyInput, raw);
-    const alerts = { enabled: n.alertsEnabled, admins: n.alertsAdmins, extra: n.alertsExtra };
+    const alerts = {};
+    for (const [group, G] of Object.entries(GROUP_FIELDS)) {
+      const own = (f) => raw?.[`alerts${G}${f}`] !== undefined;
+      alerts[group] = {
+        enabled: own('Enabled') ? n[`alerts${G}Enabled`] : n.alertsEnabled,
+        admins: own('Admins') ? n[`alerts${G}Admins`] : n.alertsAdmins,
+        extra: own('Extra') ? n[`alerts${G}Extra`] : n.alertsExtra,
+      };
+    }
     const newObjects = {
       computers: n.newComputers,
       keys: n.newKeys,

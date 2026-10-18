@@ -1,5 +1,6 @@
 import express, { Router } from 'express';
 import { verifyCsrf } from '../http/csrf.js';
+import { rejectNul } from '../http/validate.js';
 import { loadUser, requireCapability, requireUser } from '../modules/auth/auth.middleware.js';
 import { authWeb } from '../modules/auth/auth.web.js';
 import { backupWeb } from '../modules/backup/backup.web.js';
@@ -15,7 +16,7 @@ import { templateLocals, webErrorHandler } from './middleware.js';
 /** Server-rendered pages (EJS). Same services as the API; forms carry a CSRF token. */
 export function createWebRouter({ services, config, sessions }) {
   const web = Router();
-  web.use(sessions, express.urlencoded({ extended: false, limit: '100kb' }));
+  web.use(sessions, express.urlencoded({ extended: false, limit: '100kb' }), rejectNul);
   web.use(loadUser({ auth: services.auth, config, settings: services.settings }));
   web.use(templateLocals);
   // Feature switches (Quan tri > Tinh nang) for templates: show or hide buttons.

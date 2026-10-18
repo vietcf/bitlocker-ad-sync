@@ -8,6 +8,8 @@
 //   node src/cli/users.js revoke <username> <grant>...
 //   node src/cli/users.js reset-password <username>
 //   node src/cli/users.js unlock <username>
+//   node src/cli/users.js disable-2fa <username>   (turn two-step sign-in off for the user)
+//   node src/cli/users.js reset-2fa <username>     (forget the authenticator: a new QR code at the next sign-in)
 //   node src/cli/users.js disable <username>
 //   node src/cli/users.js enable <username>
 //
@@ -24,7 +26,7 @@
 import { loadConfig } from '../config.js';
 import { createPool } from '../db/pool.js';
 import { AuditService } from '../modules/audit/audit.service.js';
-import { createUser, setPassword } from '../modules/auth/users.repo.js';
+import { createUser, resetTotp, setPassword, setTotpRequired } from '../modules/auth/users.repo.js';
 import { generatePassword, hashPassword } from '../modules/auth/password.js';
 
 const ROLES = ['it', 'lead', 'admin', 'auditor'];
@@ -167,6 +169,20 @@ const commands = {
     await pool.query('UPDATE app_user SET failed_attempts = 0, locked_until = NULL WHERE id = $1', [id]);
     await record(username, { op: 'unlock' });
     console.log(`Unlocked ${username}`);
+  },
+
+  async 'disable-2fa'(username) {
+    const id = await userId(username);
+    await setTotpRequired(pool, id, false);
+    await record(username, { op: 'disable_two_factor' });
+    console.log(`Two-step sign-in is off for ${username} (the authenticator is forgotten). Turn it on again in Quan tri > Nguoi dung.`);
+  },
+
+  async 'reset-2fa'(username) {
+    const id = await userId(username);
+    await resetTotp(pool, id);
+    await record(username, { op: 'reset_two_factor' });
+    console.log(`${username}: authenticator forgotten; a new QR code is shown at the next sign-in.`);
   },
 
   async disable(username) {

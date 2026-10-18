@@ -122,7 +122,7 @@ export async function listKeyMetadata(tx, computerId) {
 
 /**
  * WHERE conditions on computer `c` for the list filters (shared by the list, its CSV export and
- * the key export). filters: { branchId (id or 'na' = no branch), status: 'all' | 'no_key', includeDeleted,
+ * the key export). filters: { branchId (id or 'na' = no branch), status: 'all' | 'no_key' | 'has_key', includeDeleted,
  * dateField: 'seen' (first recorded here) | 'ad' (created in AD), from, to: 'YYYY-MM-DD' inclusive, in APP_TZ }
  */
 export function computerFilters(branches, filters, params) {
@@ -136,6 +136,8 @@ export function computerFilters(branches, filters, params) {
   if (!filters.includeDeleted) where.push('c.deleted_in_ad_at IS NULL');
   if (filters.status === 'no_key') {
     where.push('NOT EXISTS (SELECT 1 FROM recovery_key k WHERE k.computer_id = c.id)');
+  } else if (filters.status === 'has_key') {
+    where.push('EXISTS (SELECT 1 FROM recovery_key k WHERE k.computer_id = c.id)');
   }
   if (filters.from || filters.to) {
     const column = filters.dateField === 'ad' ? 'c.ad_created_at' : 'c.first_seen_at';

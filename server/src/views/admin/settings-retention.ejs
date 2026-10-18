@@ -19,7 +19,7 @@
       <label class="check"><input type="checkbox" name="keepAccessLog" <%= form.keepAccessLog ? 'checked' : '' %>>
         <span><strong>Giữ mãi</strong> <span class="muted">(khuyến nghị: nhật ký là bằng chứng kiểm toán)</span></span></label>
       <label>Hoặc giữ (ngày)
-        <input type="number" name="accessLogDays" value="<%= form.accessLogDays ?? '' %>" min="1" max="36500" placeholder="ví dụ 90" style="max-width: 200px">
+        <input type="number" name="accessLogDays" value="<%= form.accessLogDays ?? '' %>" min="1" max="36500" placeholder="ví dụ 90" class="mw-200">
         <span class="muted hint">Tùy bạn chọn (từ 1 ngày). Chỉ xóa phần cũ nhất, liên tục từ đầu chuỗi; mỗi lần xóa lưu lại mốc hash
           để phần còn lại vẫn kiểm chứng được, và việc xóa cũng được ghi vào nhật ký. Nên lưu bản sao nhật ký ở nơi khác trước khi bật.</span>
       </label>
@@ -32,7 +32,7 @@
     <fieldset>
       <legend>Lịch sử sync</legend>
       <label>Giữ lượt sync, số liệu sync và cảnh báo đã đóng (ngày)
-        <input type="number" name="syncDays" value="<%= form.syncDays %>" min="30" max="3650" required style="max-width: 200px">
+        <input type="number" name="syncDays" value="<%= form.syncDays %>" min="30" max="3650" required class="mw-200">
         <span class="muted hint">Tối thiểu 30 ngày. Lượt sync thành công gần nhất và lượt full thành công gần nhất luôn được giữ.</span>
       </label>
     </fieldset>
@@ -40,7 +40,7 @@
     <fieldset>
       <legend>Email</legend>
       <label>Giữ email đã gửi / thất bại (ngày)
-        <input type="number" name="mailDays" value="<%= form.mailDays %>" min="1" max="3650" required style="max-width: 200px">
+        <input type="number" name="mailDays" value="<%= form.mailDays %>" min="1" max="3650" required class="mw-200">
         <span class="muted hint">Email đang chờ gửi không bị xóa. Xem email ở tab <a href="/admin/mail">Log email</a>.</span>
       </label>
     </fieldset>

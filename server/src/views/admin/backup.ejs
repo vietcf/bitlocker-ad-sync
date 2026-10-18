@@ -11,6 +11,9 @@
   <% } %>
   <%- include('../partials/error-box', { error }) %>
 
+  <% if (s.running) { %>
+    <div class="notice notice-info" role="status">Đang sao lưu (bắt đầu lúc <strong><%= h.dateTime(s.running) %></strong>). Tải lại trang sau ít phút để xem kết quả.</div>
+  <% } %>
   <% const last = s.lastResult; %>
   <% if (last) { %>
     <div class="notice notice-<%= last.ok ? 'info' : 'error' %>" role="status">
@@ -51,16 +54,16 @@
           <p class="muted small">
             <% if (s.passwordSet) { %><span class="badge badge-good">Đã đặt</span> Nhập mật khẩu mới để thay; các file cũ vẫn dùng mật khẩu cũ.
             <% } else { %><span class="badge badge-bad">Chưa đặt</span> Cần đặt khi bật mã hóa.<% } %>
-            Tối thiểu 16 ký tự; nên là một cụm từ dài. Hệ thống không hiện lại mật khẩu và không ghi nó vào file:
+            Chỉ nhập được khi tích "Mã hóa" ở khung bên cạnh. Tối thiểu 16 ký tự; nên là một cụm từ dài. Hệ thống không hiện lại mật khẩu và không ghi nó vào file:
             <strong>lưu mật khẩu ở kho mật khẩu của công ty</strong>, mất là không mở được file.</p>
-          <label>Mật khẩu mới <input type="password" name="password" minlength="16" required autocomplete="new-password"></label>
-          <label>Nhập lại <input type="password" name="confirm" minlength="16" required autocomplete="new-password"></label>
-          <div class="actions"><button type="submit" class="secondary">Lưu mật khẩu</button></div>
+          <label>Mật khẩu mới <input type="password" name="password" minlength="16" required autocomplete="new-password" data-needs-encrypt <%= form.encrypt ? "" : "disabled" %>></label>
+          <label>Nhập lại <input type="password" name="confirm" minlength="16" required autocomplete="new-password" data-needs-encrypt <%= form.encrypt ? "" : "disabled" %>></label>
+          <div class="actions"><button type="submit" class="secondary" data-needs-encrypt <%= form.encrypt ? "" : "disabled" %>>Lưu mật khẩu</button></div>
         </fieldset>
       </form>
       <form method="post" action="/admin/backup/run" class="inline-form">
         <%- include('../partials/csrf') %>
-        <button type="submit" <%= s.passwordSet || !s.options.encrypt ? '' : 'disabled' %>>Sao lưu ngay</button>
+        <button type="submit" <%= (s.passwordSet || !s.options.encrypt) && !s.running ? '' : 'disabled' %>>Sao lưu ngay</button>
         <span class="muted small">Chạy ngay theo các lựa chọn đã lưu (ghi nhật ký).</span>
       </form>
     </div>

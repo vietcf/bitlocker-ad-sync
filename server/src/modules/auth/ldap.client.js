@@ -28,8 +28,11 @@ export class DirectoryError extends Error {
  * Tries each URL in turn (several DCs) when one cannot be reached.
  */
 export class LdapAuthenticator {
-  constructor({ urls, domain, baseDn, caFile, timeoutMs = 8000 }) {
-    this.urls = urls;
+  /** servers: host or host:port; protocol: ldap (389, clear text) | starttls (389 + TLS) | ldaps (636) */
+  constructor({ servers, protocol = 'ldap', domain, baseDn, caFile, timeoutMs = 8000 }) {
+    this.protocol = protocol;
+    const scheme = protocol === 'ldaps' ? 'ldaps' : 'ldap';
+    this.urls = servers.map((s) => (/:[0-9]+$/.test(s) ? `${scheme}://${s}` : `${scheme}://${s}:${protocol === 'ldaps' ? 636 : 389}`));
     this.domain = domain; // e.g. corp.local: binds as sam@corp.local (AD's implicit UPN)
     this.baseDn = baseDn; // e.g. DC=corp,DC=local
     this.tlsOptions = { minVersion: 'TLSv1.2', ...(caFile ? { ca: [readFileSync(caFile)] } : {}) };
@@ -39,12 +42,16 @@ export class LdapAuthenticator {
   /** Returns { objectGuid, sam, upn, displayName, mail }; throws DirectoryError. */
   async authenticate(sam, password) {
     // An empty password makes an "unauthenticated bind", which AD reports as SUCCESS.
+    // Same for an empty user name ("@domain" with no password check). Both are refused before any network call.
+    if (typeof sam !== 'string' || sam.trim() === '') throw new DirectoryError('invalid_credentials');
     if (typeof password !== 'string' || password.length === 0) throw new DirectoryError('invalid_credentials');
 
     let lastError = null;
     for (const url of this.urls) {
-      const client = new Client({ url, timeout: this.timeoutMs, connectTimeout: this.timeoutMs, tlsOptions: this.tlsOptions });
+      // tlsOptions only for ldaps: ldapts switches to TLS whenever it is set, even on an ldap:// URL.
+      const client = new Client({ url, timeout: this.timeoutMs, connectTimeout: this.timeoutMs, ...(this.protocol === 'ldaps' ? { tlsOptions: this.tlsOptions } : {}) });
       try {
+        if (this.protocol === 'starttls') await client.startTLS(this.tlsOptions);
         await client.bind(`${sam}@${this.domain}`, password);
         const { searchEntries } = await client.search(this.baseDn, {
           scope: 'sub',

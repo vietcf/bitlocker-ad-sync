@@ -13,7 +13,9 @@ export async function appendLog(tx, hmacKey, input) {
   const prevHash = tail.rows[0]?.hash ?? GENESIS_HASH;
 
   // Millisecond precision so the value read back from timestamptz hashes identically.
-  const entry = { ...input, at: new Date(Math.floor((input.at ?? new Date()).getTime())) };
+  // detail: hashed as the database gives it back (jsonb): a Date becomes its ISO text, undefined keys vanish.
+  const detail = input.detail === undefined || input.detail === null ? null : JSON.parse(JSON.stringify(input.detail));
+  const entry = { ...input, detail, at: new Date(Math.floor((input.at ?? new Date()).getTime())) };
   const hash = chainHash(hmacKey, prevHash, entry);
 
   // No RETURNING: it would also apply the SELECT policy, and a writer may not be allowed
@@ -71,7 +73,7 @@ export const rowToEntry = (r) => ({
  * Log search for the audit screen / API / CSV. `branches` = the reader's log scope.
  * filters: { branchId, user, action, computer, from, to }
  */
-export async function searchLog(tx, branches, filters, { limit, offset }) {
+export async function searchLog(tx, branches, filters, { limit, offset, tz = process.env.APP_TZ ?? 'Asia/Ho_Chi_Minh' }) {
   const params = [];
   const where = [branchFilter('l.branch_id', branches, params)];
   if (filters.branchId) {
@@ -90,13 +92,14 @@ export async function searchLog(tx, branches, filters, { limit, offset }) {
     params.push(`${filters.computer.toLowerCase()}%`);
     where.push(`lower(c.name) LIKE $${params.length}`);
   }
+  // from / to: whole days in the app's time zone, both included.
   if (filters.from) {
-    params.push(filters.from);
-    where.push(`l.at >= $${params.length}`);
+    params.push(filters.from.toISOString().slice(0, 10), tz);
+    where.push(`l.at >= (($${params.length - 1}::date)::timestamp AT TIME ZONE $${params.length})`);
   }
   if (filters.to) {
-    params.push(filters.to);
-    where.push(`l.at < $${params.length}`);
+    params.push(filters.to.toISOString().slice(0, 10), tz);
+    where.push(`l.at < ((($${params.length - 1}::date) + 1)::timestamp AT TIME ZONE $${params.length})`);
   }
   params.push(limit, offset);
   const { rows } = await tx.query(

@@ -1,6 +1,8 @@
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { createReadStream, createWriteStream } from 'node:fs';
 import fs from 'node:fs/promises';
+import { crc32 } from 'node:zlib';
 import path from 'node:path';
 import { z } from 'zod';
 import { withAllBranches } from '../../db/scoped.js';
@@ -9,7 +11,7 @@ import { toCsv } from '../../http/csv.js';
 import { badRequest, forbidden, notFound } from '../../http/errors.js';
 import { checkbox, parse } from '../../http/validate.js';
 import { decryptSecret, encryptSecret } from '../mail/secret.js';
-import { isEncryptedZip, zipAes } from './zip-aes.js';
+import { isEncryptedZip, zipAes, zipAesToFile } from './zip-aes.js';
 
 /** Quan tri > Sao luu (setting backup.options). */
 export const BACKUP_DEFAULTS = {
@@ -61,7 +63,9 @@ export class BackupService {
     this.tz = tz;
     this.log = logger ? logger.child({ component: 'backup' }) : null;
     this.now = now;
-    this.runPgDump = runPgDump ?? ((url) => pgDump(config.PG_DUMP_PATH, url));
+    // runPgDump(url, destFile) -> { size, sha256, crc } (a Buffer is accepted too: tests)
+    this.runPgDump = runPgDump ?? ((url, dest) => pgDumpToFile(config.PG_DUMP_PATH, url, dest));
+    this.current = null; // { startedAt, promise } while a backup runs
   }
 
   #check(scope) {
@@ -115,6 +119,7 @@ export class BackupService {
       databaseConfigured: this.databaseConfigured,
       dir: this.dir,
       lastResult: await this.#getRaw(LAST_RESULT_KEY),
+      running: this.current ? this.current.startedAt.toISOString() : null,
       files: await this.listFiles(),
     };
   }
@@ -193,17 +198,37 @@ export class BackupService {
     return this.run({ trigger: 'schedule' });
   }
 
-  /** "Sao luu ngay" (Admin HQ). */
-  async runNow(scope, client = {}) {
+  /** "Sao luu ngay" (Admin HQ): starts in the background and returns at once (a big dump takes minutes). */
+  runNow(scope, client = {}) {
     this.#check(scope);
-    return this.run({ trigger: 'manual', actor: { ...this.audit.actor(scope, client) } });
+    if (this.current) throw badRequest('backup_running', 'A backup is already running.');
+    this.run({ trigger: 'manual', actor: { ...this.audit.actor(scope, client) } })
+      .catch((err) => this.log?.error({ err }, 'backup crashed'));
+    return { started: true };
+  }
+
+  /** Resolves when no backup is running (tests). */
+  whenIdle() {
+    return this.current ? this.current.promise.then(() => undefined, () => undefined) : Promise.resolve();
+  }
+
+  /** One backup at a time: a second request while one runs is refused. */
+  run(opts = {}) {
+    if (this.current) {
+      return Promise.resolve({ ok: false, skipped: 'running', files: [], errors: [{ kind: 'all', error: 'A backup is already running.' }] });
+    }
+    const promise = this.#execute(opts);
+    this.current = { startedAt: this.now(), promise };
+    const clear = () => { if (this.current?.promise === promise) this.current = null; };
+    promise.then(clear, clear);
+    return promise;
   }
 
   /**
    * Makes the backups chosen in the options. Returns { ok, files: [{ kind, name, size }], errors: [{ kind, error }] }.
    * Every run is logged (backup_run); a failure raises the backup_failed alert, a full success clears it.
    */
-  async run({ trigger = 'manual', actor = SYSTEM } = {}) {
+  async #execute({ trigger = 'manual', actor = SYSTEM } = {}) {
     const o = await this.options();
     const password = o.encrypt ? await this.#password() : null;
     const startedAt = this.now();
@@ -220,10 +245,21 @@ export class BackupService {
       for (const kind of kinds) {
         try {
           if (kind === 'database' && !this.databaseConfigured) throw new Error('BACKUP_DATABASE_URL is not set: no database backup.');
-          const { archive, counts } = kind === 'keys' ? await this.buildKeysArchive(password, trigger) : await this.buildDatabaseArchive(password, trigger);
+          const built = kind === 'keys' ? await this.buildKeysArchive(password, trigger) : await this.buildDatabaseArchive(password, trigger);
           const name = `${PREFIX[kind]}-${stamp}.zip`;
-          await writeAtomic(path.join(this.dir, name), archive);
-          files.push({ kind, name, size: archive.length, sha256: sha256(archive), ...counts });
+          const final = path.join(this.dir, name);
+          let size;
+          let hash;
+          if (built.archiveFile) {
+            await fs.rename(built.archiveFile, final);
+            size = (await fs.stat(final)).size;
+            hash = await sha256File(final);
+          } else {
+            await writeAtomic(final, built.archive);
+            size = built.archive.length;
+            hash = sha256(built.archive);
+          }
+          files.push({ kind, name, size, sha256: hash, ...built.counts });
         } catch (err) {
           errors.push({ kind, error: String(err.message ?? err).slice(0, 500) });
         }
@@ -294,26 +330,54 @@ export class BackupService {
     return { archive: this.#archive('bitlocker-keys-backup/1', content, counts, trigger, KEYS_README, password), counts };
   }
 
-  /** pg_dump (custom format) of the whole database in an AES-256 zip. */
+  /**
+   * pg_dump (custom format) of the whole database in an AES-256 zip. The dump goes to a temporary file
+   * and is streamed into the zip: memory stays flat whatever the size of the database.
+   * Returns { archiveFile, counts }; the caller renames archiveFile to its final name.
+   */
   async buildDatabaseArchive(password, trigger = 'manual') {
-    const dump = await this.runPgDump(this.config.BACKUP_DATABASE_URL);
-    const content = [{ name: 'bitlocker.dump', data: dump, compress: false }]; // pg_dump -Fc is compressed already
-    return { archive: this.#archive('bitlocker-db-backup/1', content, { dumpBytes: dump.length }, trigger, DB_README, password), counts: { dumpBytes: dump.length } };
+    await fs.mkdir(this.dir, { recursive: true, mode: 0o700 });
+    const tmpDump = path.join(this.dir, `.bitlocker-${process.pid}.dump.tmp`);
+    const tmpZip = path.join(this.dir, `.bitlocker-${process.pid}.db.zip.tmp`);
+    try {
+      let info = await this.runPgDump(this.config.BACKUP_DATABASE_URL, tmpDump);
+      if (Buffer.isBuffer(info)) {
+        await fs.writeFile(tmpDump, info, { mode: 0o600 });
+        info = { size: info.length, sha256: sha256(info), crc: crc32(info) };
+      }
+      const counts = { dumpBytes: info.size };
+      const manifest = this.#manifest('bitlocker-db-backup/1', [{ name: 'bitlocker.dump', bytes: info.size, sha256: info.sha256 }], counts, trigger, password);
+      await zipAesToFile(tmpZip, [
+        { name: 'README.txt', data: DB_README },
+        { name: 'manifest.json', data: `${JSON.stringify(manifest, null, 2)}\n` },
+        { name: 'bitlocker.dump', file: { path: tmpDump, size: info.size, crc: info.crc } }, // pg_dump -Fc is compressed already
+      ], password, { date: this.now() });
+      return { archiveFile: tmpZip, counts };
+    } catch (err) {
+      await fs.rm(tmpZip, { force: true });
+      throw err;
+    } finally {
+      await fs.rm(tmpDump, { force: true });
+    }
   }
 
-  #archive(format, content, counts, trigger, readme, password) {
-    const manifest = {
+  #manifest(format, files, counts, trigger, password) {
+    return {
       format,
       encrypted: !!password,
       createdAt: this.now().toISOString(),
       timeZone: this.tz,
       trigger,
       ...counts,
-      files: content.map((f) => {
-        const buf = Buffer.isBuffer(f.data) ? f.data : Buffer.from(f.data, 'utf8');
-        return { name: f.name, bytes: buf.length, sha256: sha256(buf) };
-      }),
+      files,
     };
+  }
+
+  #archive(format, content, counts, trigger, readme, password) {
+    const manifest = this.#manifest(format, content.map((f) => {
+      const buf = Buffer.isBuffer(f.data) ? f.data : Buffer.from(f.data, 'utf8');
+      return { name: f.name, bytes: buf.length, sha256: sha256(buf) };
+    }), counts, trigger, password);
     return zipAes([
       { name: 'README.txt', data: readme },
       { name: 'manifest.json', data: `${JSON.stringify(manifest, null, 2)}\n` },
@@ -351,11 +415,13 @@ async function writeAtomic(file, buf) {
   await fs.rename(tmp, file);
 }
 
-/**
- * Runs pg_dump --format=custom for the database URL and returns its output. The password goes to
- * pg_dump through PGPASSWORD (not the command line), errors carry pg_dump's message only.
- */
-export function pgDump(bin, url, { timeoutMs = 30 * 60_000 } = {}) {
+async function sha256File(file) {
+  const h = createHash('sha256');
+  for await (const chunk of createReadStream(file, { highWaterMark: 1 << 20 })) h.update(chunk);
+  return h.digest('hex');
+}
+
+function pgEnv(url) {
   const u = new URL(url);
   const env = {
     ...process.env,
@@ -367,22 +433,50 @@ export function pgDump(bin, url, { timeoutMs = 30 * 60_000 } = {}) {
   };
   const sslmode = u.searchParams.get('sslmode');
   if (sslmode) env.PGSSLMODE = sslmode;
+  return env;
+}
+
+/**
+ * Runs pg_dump --format=custom for the database URL, writing its output to dest as it comes (never held in
+ * memory). Returns { size, sha256, crc } of the dump. The password goes to pg_dump through PGPASSWORD (not the
+ * command line), errors carry pg_dump's message only.
+ */
+export function pgDumpToFile(bin, url, dest, { timeoutMs = 30 * 60_000 } = {}) {
+  const env = pgEnv(url);
   return new Promise((resolve, reject) => {
     const child = spawn(bin, ['--format=custom', '--no-password', '--lock-wait-timeout=60000'], { env, stdio: ['ignore', 'pipe', 'pipe'] });
-    const out = [];
+    const out = createWriteStream(dest, { mode: 0o600 });
+    const hash = createHash('sha256');
+    let size = 0;
+    let crc = 0;
     let err = '';
-    const timer = setTimeout(() => child.kill('SIGTERM'), timeoutMs);
-    child.stdout.on('data', (c) => out.push(c));
-    child.stderr.on('data', (c) => { err += c.toString(); });
-    child.on('error', (e) => {
+    let code = null;
+    let exited = false;
+    let written = false;
+    let failed = false;
+    let timer = null;
+    const fail = (e) => {
+      if (failed) return;
+      failed = true;
       clearTimeout(timer);
-      reject(new Error(e.code === 'ENOENT' ? `pg_dump not found (${bin}). Install the PostgreSQL 17 client or set PG_DUMP_PATH.` : e.message));
-    });
-    child.on('close', (code) => {
+      child.kill('SIGTERM');
+      out.destroy();
+      reject(e);
+    };
+    const settle = () => {
+      if (failed || !exited || !written) return;
       clearTimeout(timer);
-      if (code === 0) resolve(Buffer.concat(out));
-      else reject(new Error(`pg_dump exited with code ${code}: ${err.trim().split('\n').slice(-3).join(' ')}`));
-    });
+      if (code === 0) resolve({ size, sha256: hash.digest('hex'), crc });
+      else fail(new Error(`pg_dump exited with code ${code}: ${err.trim().split('\n').slice(-3).join(' ')}`));
+    };
+    timer = setTimeout(() => child.kill('SIGTERM'), timeoutMs);
+    child.stdout.on('data', (c) => { hash.update(c); crc = crc32(c, crc); size += c.length; });
+    child.stdout.pipe(out);
+    child.stderr.on('data', (c) => { if (err.length < 4000) err += c.toString(); });
+    out.on('error', fail);
+    out.on('close', () => { written = true; settle(); });
+    child.on('error', (e) => fail(new Error(e.code === 'ENOENT' ? `pg_dump not found (${bin}). Install the PostgreSQL 17 client or set PG_DUMP_PATH.` : e.message)));
+    child.on('close', (c) => { code = c; exited = true; settle(); });
   });
 }
 

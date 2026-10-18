@@ -146,6 +146,7 @@ tr.warn-row td { background: var(--warn-bg); }
 .filter-fields > label { display: block; font-weight: 600; font-size: 13px; margin: 0; flex: 0 1 200px; min-width: 150px; }
 .filter-fields fieldset.date-range { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; border: 0; padding: 0; margin: 0; flex: 1 1 420px; }
 .date-range legend { float: left; width: 100%; padding: 0; margin-bottom: 4px; font-weight: 600; font-size: 13px; }
+.filter-fields > label.grow { flex: 1 1 320px; }
 .filter-fields select, .filter-fields input { font-size: 14px; height: 38px; padding: 6px 10px; }
 .date-range select, .date-range input { width: auto; margin: 0; }
 .date-range select { flex: 0 1 200px; }
@@ -321,3 +322,19 @@ tr.row-total td { font-weight: 600; }
 .status-title { font-weight: 600; margin-bottom: 4px; }
 
 .run-summary { margin-top: 4px; font-size: 13px; }
+
+/* thay cho style= inline (CSP style-src self) */
+.mw-140 { max-width: 140px; }
+.mw-200 { max-width: 200px; }
+.mt-14 { margin-top: 14px; }
+.mt-16 { margin-top: 16px; }
+
+/* o bi khoa (vi du mat khau sao luu khi chua tich ma hoa): mo di */
+input:disabled, textarea:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
+label:has(input:disabled) { opacity: .6; }
+button:disabled { cursor: not-allowed; }
+
+/* nut chon nhanh ky bao cao: cai dang chon duoc to noi */
+.quick a { padding: 2px 10px; border-radius: 999px; text-decoration: none; }
+.quick a:hover { background: var(--info-bg); }
+.quick a[aria-current="true"] { background: var(--accent); color: var(--accent-fg); font-weight: 600; }

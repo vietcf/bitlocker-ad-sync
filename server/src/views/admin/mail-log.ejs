@@ -16,15 +16,21 @@
     email nhưng chưa có địa chỉ email được liệt kê ở cột Người nhận (dòng "Không có email"); email không gửi được
     cho ai được ghi là <strong>Không gửi (thiếu email)</strong>, kèm lý do. Thêm email ở tab <a href="/admin/users">Người dùng</a>.</p>
 
-  <form method="get" action="/admin/mail" class="filters">
+  <form method="get" action="/admin/mail" class="filter-bar" data-autosubmit>
+    <div class="filter-fields">
     <label>Trạng thái
       <select name="status">
         <option value="">Tất cả</option>
         <% Object.entries(STATUS).forEach(([k, [label]]) => { %><option value="<%= k %>" <%= log.filters.status === k ? 'selected' : '' %>><%= label %></option><% }) %>
       </select>
     </label>
-    <label>Tìm theo tiêu đề / người nhận / tên người dùng <input name="q" value="<%= log.filters.q %>" maxlength="100"></label>
-    <button type="submit" class="secondary">Lọc</button>
+    <label class="grow">Tìm theo tiêu đề / người nhận / tên người dùng <input name="q" value="<%= log.filters.q %>" maxlength="100"></label>
+    </div>
+  <div class="filter-actions">
+    <span class="spacer"></span>
+    <a href="/admin/mail" class="small">Xóa lọc</a>
+    <button type="submit" class="small">Lọc</button>
+  </div>
   </form>
 
   <table>

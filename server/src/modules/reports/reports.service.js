@@ -3,15 +3,15 @@ import { withScope } from '../../db/scoped.js';
 import { branchesFor } from '../../domain/scope.js';
 import { isWithinWorkingHours } from '../../domain/time.js';
 import { badRequest, forbidden } from '../../http/errors.js';
-import { parse } from '../../http/validate.js';
+import { isoDay, parse } from '../../http/validate.js';
 import { toXlsx } from '../../http/xlsx.js';
 import { REASON_LABELS } from '../keys/keys.service.js';
-import { branchList, computersWithKey, computersWithoutKey, earliestDay, existingBranches, inventoryByBranch, revealsInPeriod, revealStats } from './reports.repo.js';
+import { branchList, computersLeftInPeriod, computersWithKey, computersWithoutKey, earliestDay, existingBranches, inventoryByBranch, revealsInPeriod, revealStats } from './reports.repo.js';
 
 const MAX_DAYS = 366;
 /** A computer recorded within this many days may still be waiting for BitLocker / the GPO: "new". */
 export const NO_KEY_NEW_DAYS = 7;
-const day = z.preprocess((v) => (v === '' ? undefined : v), z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'invalid_date').optional());
+const day = z.preprocess((v) => (v === '' ? undefined : v), isoDay.optional());
 
 /** Query of the report page / API / Excel export. */
 export const reportQuery = z.object({
@@ -97,6 +97,8 @@ export class ReportsService {
           noKey: await computersWithoutKey(tx, branches),
           // Computers that have keys, with their key counts: for the Excel file of one branch only.
           withKey: withKeyList && (f.branchId || list.length <= 1) ? await computersWithKey(tx, branches) : null,
+          // Computers that left the monitored scope in the period (Excel only).
+          left: withKeyList ? await computersLeftInPeriod(tx, branches, period) : null,
         };
       });
     f.from ??= f.to;
@@ -207,7 +209,7 @@ export class ReportsService {
       noKeyNewDays: NO_KEY_NEW_DAYS,
       // List computers only when the report covers one branch; across branches, the summary only.
       noKeyDetail: Boolean(f.branchId) || data.list.length <= 1,
-      ...(withKeyList ? { withKey: data.withKey } : {}),
+      ...(withKeyList ? { withKey: data.withKey, left: data.left ?? [] } : {}),
     };
   }
 
@@ -344,5 +346,20 @@ function workbook(r, scope) {
     ],
   };
 
-  return [overview, branchSheet, revealSheet, userSheet, ...(r.noKeyDetail && withKeySheet ? [withKeySheet] : []), r.noKeyDetail ? noKeySheet : noKeySummarySheet];
+  // May roi pham vi giam sat trong ky (so tren sheet Tong quan / Theo chi nhanh)
+  const leftSheet = {
+    name: 'Máy rời phạm vi',
+    widths: [12, 24, 28, 18, 30, 10, 18, 18, 60],
+    freeze: 1,
+    filterRow: 1,
+    rows: [
+      [H('Chi nhánh'), H('Máy'), H('Hệ điều hành'), H('Serial'), H('Email người dùng'), H('Số key (vẫn lưu)'), H('Rời phạm vi lúc'), H('Lần cuối sync thấy'), H('DN')],
+      ...(r.left ?? []).map((c) => [c.branch_code ?? 'N/A', c.name, c.os, c.device_serial, c.owner_email, c.keys,
+        { v: new Date(c.deleted_in_ad_at), s: 'datetime' },
+        c.last_seen_at ? { v: new Date(c.last_seen_at), s: 'datetime' } : null, c.distinguished_name]),
+      [T('Tổng'), TI((r.left ?? []).length), T(''), T(''), T(''), TI((r.left ?? []).reduce((n, c) => n + c.keys, 0)), T(''), T(''), T('')],
+    ],
+  };
+
+  return [overview, branchSheet, revealSheet, userSheet, ...(r.noKeyDetail && withKeySheet ? [withKeySheet] : []), r.noKeyDetail ? noKeySheet : noKeySummarySheet, leftSheet];
 }

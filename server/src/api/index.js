@@ -1,6 +1,7 @@
 import express, { Router } from 'express';
 import { AppError } from '../http/errors.js';
 import { requireJsonBody, verifyCsrf } from '../http/csrf.js';
+import { rejectNul } from '../http/validate.js';
 import { loadUser, requireCapability, requireUser } from '../modules/auth/auth.middleware.js';
 import { authApi, meApi } from '../modules/auth/auth.api.js';
 import { computersApi } from '../modules/computers/computers.api.js';
@@ -17,7 +18,7 @@ import { apiDocs } from '../http/api-docs.js';
  */
 export function createApiRouter({ services, config, sessions }) {
   const api = Router();
-  api.use(sessions, express.json({ limit: '100kb' }), requireJsonBody);
+  api.use(sessions, express.json({ limit: '100kb' }), requireJsonBody, rejectNul);
   api.use(loadUser({ auth: services.auth, config, settings: services.settings }));
   // Sign-in has no token yet; JSON-only bodies already block cross-site form posts.
   api.use((req, res, next) => (req.path === '/auth/login' ? next() : verifyCsrf(req, res, next)));
@@ -32,6 +33,8 @@ export function createApiRouter({ services, config, sessions }) {
   api.use('/dashboard', dashboardApi(services));
   // Mounted at the root (it serves /computers and /keys/search), so no capability gate here:
   // a gate on '/' would also block every route below. The service checks the capability.
+  // The capability is checked before any input is read, so a role without it always gets 403.
+  api.use(['/computers', '/keys/search'], requireCapability('keys'));
   api.use('/', computersApi(services));
   api.use('/keys', requireCapability('keys'), keysApi(services));
   api.use('/audit', requireCapability('logs'), auditApi(services));

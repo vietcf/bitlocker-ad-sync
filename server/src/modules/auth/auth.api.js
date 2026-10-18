@@ -28,7 +28,7 @@ export function authApi({ auth }, { requireUser }) {
 
   r.post('/login', async (req, res) => {
     const { username, password } = parse(loginBody, req.body);
-    const user = await auth.login(username, password, clientInfo(req));
+    const user = await auth.login(username, password, clientInfo(req), { localOnly: true });
     if (user.secondFactor) {
       // Not signed in yet: POST /api/auth/2fa with the code (after GET /api/auth/2fa/setup for 'setup').
       await startPendingSecondFactor(req, user);

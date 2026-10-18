@@ -1,4 +1,5 @@
 import { hashPassword } from './password.js';
+import { badRequest } from '../../http/errors.js';
 
 // Users of this app and their per-branch roles. Every person is created here by an admin;
 // they then sign in with their Active Directory password over LDAPS (auth_source 'ldap',
@@ -158,17 +159,35 @@ export async function setPassword(db, id, passwordHash, { mustChange }) {
  * Creates a user with grants [{ branchId, role }]. Returns the new id.
  * LDAP users have no password here and never a forced password change.
  */
-export async function createUser(db, { username, displayName, email = null, authSource = 'local', passwordHash = null, mustChange = true, totpRequired = false, grants = [] }) {
+export async function createUser(db, { username, displayName, email = null, authSource = 'local', passwordHash = null, mustChange = true, totpRequired = false, grants = [], isRoot = false }) {
   const { rows } = await db.query(
-    `INSERT INTO app_user (username, display_name, email, auth_source, password_hash, must_change_password, totp_required)
-     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-    [username, displayName, email, authSource, authSource === 'ldap' ? null : passwordHash, authSource === 'ldap' ? false : mustChange, totpRequired],
+    `INSERT INTO app_user (username, display_name, email, auth_source, password_hash, must_change_password, totp_required, is_root)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+    [username, displayName, email, authSource, authSource === 'ldap' ? null : passwordHash, authSource === 'ldap' ? false : mustChange, totpRequired, isRoot],
   );
   await replaceGrants(db, rows[0].id, grants);
   return rows[0].id;
 }
 
+/**
+ * Admin HQ stands alone (it already covers every branch), and a branch carries one role per user.
+ * Different branches may carry different roles.
+ */
+export function assertGrantsConsistent(grants) {
+  const hasAdmin = grants.some((g) => g.role === 'admin');
+  if (hasAdmin && grants.some((g) => g.role !== 'admin')) {
+    throw badRequest('admin_exclusive', 'Admin HQ already covers every branch: it cannot be combined with other roles.');
+  }
+  const seen = new Set();
+  for (const g of grants) {
+    if (g.branchId === null) continue;
+    if (seen.has(g.branchId)) throw badRequest('one_role_per_branch', 'A user can have only one role on each branch.', { branchId: g.branchId });
+    seen.add(g.branchId);
+  }
+}
+
 export async function replaceGrants(db, userId, grants) {
+  assertGrantsConsistent(grants);
   await db.query('DELETE FROM user_grant WHERE user_id = $1', [userId]);
   for (const g of grants) {
     await db.query(
@@ -181,7 +200,7 @@ export async function replaceGrants(db, userId, grants) {
 const USER_COLUMNS = `u.id, u.username, u.display_name, u.email, u.auth_source, u.is_active, u.must_change_password, u.last_login_at,
   u.ad_object_guid, u.ad_linked_at, (u.locked_until IS NOT NULL AND u.locked_until > now()) AS is_locked,
   (u.locked_until = 'infinity') AS lock_permanent,
-  u.totp_required, u.totp_enrolled_at`;
+  u.totp_required, u.totp_enrolled_at, u.is_root`;
 
 export async function listUsers(db) {
   const { rows } = await db.query(
@@ -212,6 +231,24 @@ export async function updateUser(db, id, { displayName, email, isActive }) {
   await db.query('UPDATE app_user SET display_name = $2, email = $3, is_active = $4 WHERE id = $1', [id, displayName, email, isActive]);
 }
 
+/** True when the audit log has any entry made by this user (by id or by name). */
+export async function userHasLogEntries(db, id, username) {
+  const { rows } = await db.query(
+    `SELECT EXISTS (SELECT 1 FROM access_log WHERE user_sid = $1 OR lower(user_upn) = lower($2)) AS has`,
+    [userSid(id), username],
+  );
+  return rows[0].has;
+}
+
+export async function deleteUserRow(db, id) {
+  await db.query('DELETE FROM app_user WHERE id = $1', [id]);
+}
+
+/** Fills an AD user's display name from AD's "displayName", only while it is still empty. */
+export async function fillDisplayNameIfEmpty(db, id, name) {
+  await db.query("UPDATE app_user SET display_name = $2 WHERE id = $1 AND display_name = ''", [id, name.slice(0, 256)]);
+}
+
 /** Fills an AD user's e-mail from AD's "mail" attribute, only while it is still empty. */
 export async function fillEmailIfEmpty(db, id, email) {
   await db.query('UPDATE app_user SET email = $2 WHERE id = $1 AND email IS NULL', [id, email.toLowerCase()]);
@@ -230,6 +267,12 @@ export async function setAuthSource(db, id, authSource, passwordHash = null) {
 
 export async function unlockUser(db, id) {
   await db.query('UPDATE app_user SET failed_attempts = 0, locked_until = NULL WHERE id = $1', [id]);
+}
+
+/** Whether an admin goc exists (a user flagged is_root). */
+export async function rootExists(db) {
+  const { rows } = await db.query('SELECT 1 FROM app_user WHERE is_root LIMIT 1');
+  return rows.length > 0;
 }
 
 /** Number of active users that hold the admin role (to refuse removing the last one). */
@@ -267,6 +310,7 @@ export async function ensureDefaultAdmin(pool) {
       authSource: 'local',
       passwordHash: await hashPassword(DEFAULT_ADMIN.password),
       mustChange: true,
+      isRoot: true,
       grants: [{ branchId: null, role: 'admin' }],
     });
     await client.query('COMMIT');

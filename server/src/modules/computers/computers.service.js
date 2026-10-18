@@ -106,7 +106,7 @@ export class ComputersService {
 
   /**
    * Browse every computer in the caller's scope (no search term, so nothing is logged).
-   * filters: { branchId (id or 'na'), status: 'all' | 'no_key', includeDeleted }
+   * filters: { branchId (id or 'na'), status: 'all' | 'no_key' | 'has_key', includeDeleted }
    * Returns { rows, total, page, pages, branches, seesUnmapped } for the filter list
    * (only an all-branch scope sees computers in no branch).
    */

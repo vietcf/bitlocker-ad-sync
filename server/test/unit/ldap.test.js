@@ -21,15 +21,66 @@ describe('normalizeUsername', () => {
 
 describe('LdapAuthenticator', () => {
   it('refuses an empty password before contacting AD (AD treats it as an anonymous bind)', async () => {
-    const ldap = new LdapAuthenticator({ urls: ['ldaps://192.0.2.1:636'], domain: 'corp.local', baseDn: 'DC=corp,DC=local', timeoutMs: 50 });
+    const ldap = new LdapAuthenticator({ servers: ['192.0.2.1'], protocol: 'ldaps', domain: 'corp.local', baseDn: 'DC=corp,DC=local', timeoutMs: 50 });
     await expect(ldap.authenticate('nguyenvana', '')).rejects.toMatchObject({ code: 'invalid_credentials' });
   });
 
   it('reports "unavailable" when no DC answers', async () => {
     // 192.0.2.0/24 is reserved for documentation: nothing listens there.
-    const ldap = new LdapAuthenticator({ urls: ['ldaps://192.0.2.1:636'], domain: 'corp.local', baseDn: 'DC=corp,DC=local', timeoutMs: 300 });
+    const ldap = new LdapAuthenticator({ servers: ['192.0.2.1'], protocol: 'ldaps', domain: 'corp.local', baseDn: 'DC=corp,DC=local', timeoutMs: 300 });
     const err = await ldap.authenticate('nguyenvana', 'x').catch((e) => e);
     expect(err).toBeInstanceOf(DirectoryError);
     expect(err.code).toBe('unavailable');
+  });
+});
+
+describe('LdapAuthenticator empty credentials', () => {
+  it('refuses empty or non-string passwords and empty user names without any network call', async () => {
+    // Servers are unreachable on purpose: reaching them would give "unavailable", not "invalid_credentials".
+    const ldap = new LdapAuthenticator({ servers: ['192.0.2.1'], domain: 'corp.local', baseDn: 'DC=corp,DC=local', timeoutMs: 50 });
+    for (const [sam, pw] of [['user1', ''], ['user1', undefined], ['user1', null], ['', 'x'], ['  ', 'x'], [undefined, 'x']]) {
+      await expect(ldap.authenticate(sam, pw)).rejects.toMatchObject({ code: 'invalid_credentials' });
+    }
+  });
+});
+
+describe('LDAP_SERVERS config', () => {
+  const base = {
+    NODE_ENV: 'development', DATABASE_URL: 'postgres://x', SESSION_SECRET: 'x'.repeat(32), LOG_HMAC_KEY: 'a'.repeat(64),
+    LDAP_DOMAIN: 'corp.local', LDAP_BASE_DN: 'DC=corp,DC=local',
+  };
+  it('defaults to plain ldap and flags it; ldaps and starttls are encrypted', async () => {
+    const { loadConfig, ldapIsPlain } = await import('../../src/config.js');
+    expect(loadConfig({ ...base, LDAP_SERVERS: 'dc1,dc2:3268' }).LDAP_SERVERS).toEqual(['dc1', 'dc2:3268']);
+    expect(ldapIsPlain(loadConfig({ ...base, LDAP_SERVERS: 'dc1' }))).toBe(true);
+    expect(ldapIsPlain(loadConfig({ ...base, LDAP_SERVERS: 'dc1', LDAP_PROTOCOL: 'ldaps' }))).toBe(false);
+    expect(ldapIsPlain(loadConfig({ ...base, LDAP_SERVERS: 'dc1', LDAP_PROTOCOL: 'starttls' }))).toBe(false);
+    expect(ldapIsPlain(loadConfig(base))).toBe(false);
+  });
+  it('rejects URLs and unknown protocols', async () => {
+    const { loadConfig } = await import('../../src/config.js');
+    expect(() => loadConfig({ ...base, LDAP_SERVERS: 'ldaps://dc1' })).toThrow();
+    expect(() => loadConfig({ ...base, LDAP_SERVERS: 'dc1', LDAP_PROTOCOL: 'http' })).toThrow();
+  });
+  it('builds URLs with the default port of each protocol', () => {
+    const mk = (protocol) => new LdapAuthenticator({ servers: ['dc1', 'dc2:3268'], protocol, domain: 'corp.local', baseDn: 'DC=corp' }).urls;
+    expect(mk('ldap')).toEqual(['ldap://dc1:389', 'ldap://dc2:3268']);
+    expect(mk('starttls')).toEqual(['ldap://dc1:389', 'ldap://dc2:3268']);
+    expect(mk('ldaps')).toEqual(['ldaps://dc1:636', 'ldaps://dc2:3268']);
+  });
+});
+
+describe('LdapAuthenticator on a plain port', () => {
+  it('speaks plain LDAP (not TLS) for protocol "ldap"', async () => {
+    const net = await import('node:net');
+    let first = null;
+    const srv = net.createServer((sock) => {
+      sock.once('data', (d) => { first = d[0]; sock.destroy(); });
+    });
+    await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+    const ldap = new LdapAuthenticator({ servers: [`127.0.0.1:${srv.address().port}`], protocol: 'ldap', domain: 'corp.local', baseDn: 'DC=corp', timeoutMs: 1500 });
+    await ldap.authenticate('user1', 'pw').catch(() => undefined);
+    srv.close();
+    expect(first).toBe(0x30); // an LDAP message (SEQUENCE); a TLS ClientHello would start with 0x16
   });
 });

@@ -38,8 +38,10 @@ const schema = z
     DB_POOL_MAX: z.coerce.number().int().default(10),
 
     // Sign-in with the AD password (authentication only; roles are managed in this app).
-    // LDAP_URL: one or more DCs, comma-separated, tried in order: ldaps://dc01.corp.local:636,ldaps://dc02...
-    LDAP_URL: csv,
+    // LDAP_SERVERS: one or more DCs (host or host:port), comma-separated, tried in order.
+    LDAP_SERVERS: csv,
+    // ldap = port 389 without encryption (default); starttls = port 389 upgraded to TLS; ldaps = port 636 with TLS.
+    LDAP_PROTOCOL: z.enum(['ldap', 'ldaps', 'starttls']).default('ldap'),
     // AD DNS domain: users bind as <sAMAccountName>@<LDAP_DOMAIN>.
     LDAP_DOMAIN: z.string().optional(),
     // Where to look up the signed-in user's own entry (objectGUID): DC=corp,DC=local
@@ -81,18 +83,16 @@ const schema = z
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
   })
   .superRefine((c, ctx) => {
-    if (c.LDAP_URL.length) {
+    if (c.LDAP_SERVERS.length) {
       for (const k of ['LDAP_DOMAIN', 'LDAP_BASE_DN']) {
-        if (!c[k]) ctx.addIssue({ code: 'custom', path: [k], message: `${k} is required when LDAP_URL is set` });
+        if (!c[k]) ctx.addIssue({ code: 'custom', path: [k], message: `${k} is required when LDAP_SERVERS is set` });
       }
-      // Users type their AD password into this app: it must only ever travel over TLS.
-      const plain = c.LDAP_URL.filter((u) => !u.toLowerCase().startsWith('ldaps://'));
-      if (plain.length && c.NODE_ENV === 'production') {
-        ctx.addIssue({ code: 'custom', path: ['LDAP_URL'], message: 'only ldaps:// is allowed in production' });
+      if (c.LDAP_SERVERS.some((x) => x.includes('://'))) {
+        ctx.addIssue({ code: 'custom', path: ['LDAP_SERVERS'], message: 'LDAP_SERVERS takes host or host:port, not a URL (set LDAP_PROTOCOL instead)' });
       }
     }
-    if (!c.LDAP_URL.length && !c.LOCAL_LOGIN_ENABLED) {
-      ctx.addIssue({ code: 'custom', path: ['LOCAL_LOGIN_ENABLED'], message: 'no sign-in method left: set LDAP_URL or enable local login' });
+    if (!c.LDAP_SERVERS.length && !c.LOCAL_LOGIN_ENABLED) {
+      ctx.addIssue({ code: 'custom', path: ['LOCAL_LOGIN_ENABLED'], message: 'no sign-in method left: set LDAP_SERVERS or enable local login' });
     }
     if (c.NODE_ENV === 'production') {
       // The worker always talks TLS in production (here, or at the reverse proxy: INGEST_TRUST_PROXY),
@@ -125,5 +125,8 @@ export function loadConfig(env = process.env) {
   return parsed.data;
 }
 
+/** True when LDAP sign-in is sent without encryption (password in clear text). */
+export const ldapIsPlain = (config) => config.LDAP_SERVERS.length > 0 && config.LDAP_PROTOCOL === 'ldap';
+
 /** True when LDAP sign-in is configured. */
-export const ldapEnabled = (config) => config.LDAP_URL.length > 0;
+export const ldapEnabled = (config) => config.LDAP_SERVERS.length > 0;

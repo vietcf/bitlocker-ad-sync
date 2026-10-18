@@ -24,7 +24,7 @@
     <% } %>
   </nav>
   <div class="account">
-    <span class="who" title="<%= me.upn %>"><%= me.displayName %></span>
+    <span class="who" title="<%= me.upn %>"><%= me.displayName || me.upn %></span>
     <% if (me.authSource === 'local') { %><a href="/change-password">Đổi mật khẩu</a><% } %>
     <form method="post" action="/logout" class="inline">
       <%- include('csrf') %>

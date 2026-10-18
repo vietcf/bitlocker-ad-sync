@@ -37,7 +37,7 @@ export function fakeDirectory(accounts = {}) {
       if (this.down) throw new DirectoryError('unavailable');
       const a = Object.entries(this.accounts).find(([k]) => k.toLowerCase() === sam.toLowerCase())?.[1];
       if (!password || !a || a.password !== password) throw new DirectoryError('invalid_credentials');
-      return { objectGuid: a.objectGuid, sam, upn: `${sam}@corp.local`, displayName: sam, mail: a.mail ?? null };
+      return { objectGuid: a.objectGuid, sam, upn: `${sam}@corp.local`, displayName: a.displayName ?? sam, mail: a.mail ?? null };
     },
   };
 }

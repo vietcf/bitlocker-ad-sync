@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { checkbox, id, page, parse } from '../../http/validate.js';
+import { checkbox, id, isoDay, page, parse } from '../../http/validate.js';
 import { clientInfo, noStore } from '../../http/security.js';
 import { sendCsv } from '../../http/csv.js';
 
-const day = z.preprocess((v) => (v === '' ? undefined : v), z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'invalid_date').optional());
+const day = z.preprocess((v) => (v === '' ? undefined : v), isoDay.optional());
 
 /** Query string of the computer list / search (shared by the page and the API). */
 export const computerQuery = z.object({
@@ -15,7 +15,7 @@ export const computerQuery = z.object({
     (v) => (v === '' ? undefined : typeof v === 'string' ? v.toLowerCase() : v),
     z.union([z.literal('na'), z.coerce.number().int().positive()]).optional(),
   ),
-  status: z.preprocess((v) => (v === '' ? undefined : v), z.enum(['all', 'no_key']).default('all')),
+  status: z.preprocess((v) => (v === '' ? undefined : v), z.enum(['all', 'no_key', 'has_key']).default('all')),
   includeDeleted: checkbox,
   // Appeared between from and to (YYYY-MM-DD, inclusive, in APP_TZ), by the date recorded in this
   // system ("seen", default) or the creation date in AD ("ad").

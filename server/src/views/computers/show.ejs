@@ -4,7 +4,7 @@
   <div class="title-row">
     <h1><%= computer.name %></h1>
     <% if (computer.deleted_in_ad_at) { %>
-      <span class="badge badge-muted">Không còn trong phạm vi giám sát từ <%= h.date(computer.deleted_in_ad_at) %></span>
+      <span class="badge badge-muted" title="Máy này không còn nằm trong phạm vi worker giám sát (bị xóa trên AD, chuyển ra ngoài các OU đã cấu hình, hoặc lượt đồng bộ đầy đủ không thấy). Dữ liệu và key vẫn được giữ; máy xuất hiện lại thì tự bỏ nhãn.">Không còn trong phạm vi giám sát từ <%= h.date(computer.deleted_in_ad_at) %></span>
     <% } else { %>
       <span class="badge badge-good">Đang được giám sát</span>
     <% } %>
@@ -66,7 +66,7 @@
           <td><code><strong><%= k.key_id_prefix %></strong><%= k.key_id.toUpperCase().slice(8) %></code></td>
           <td><%= h.dateTime(k.ad_created_at) %></td>
           <td><%= h.dateTime(k.first_synced_at) %></td>
-          <td><span class="badge badge-<%= st.tone %>"><%= st.label %></span></td>
+          <td><span class="badge badge-<%= st.tone %>"><%= st.label %></span><% if (computer.deleted_in_ad_at) { %> <span class="badge badge-muted" title="Máy này hiện không nằm trong phạm vi worker giám sát. Key vẫn được lưu.">Máy ngoài phạm vi</span><% } %></td>
           <td><%= k.last_revealed_at ? h.dateTime(k.last_revealed_at) : '—' %></td>
           <td class="row-actions">
             <a class="button small" href="/computers/<%= computer.id %>/keys/<%= k.key_id %>/reveal">Hiện key</a>

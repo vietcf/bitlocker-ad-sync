@@ -8,6 +8,7 @@ import { DirectoryError } from './ldap.client.js';
 import {
   bindAdGuid,
   fillEmailIfEmpty,
+  fillDisplayNameIfEmpty,
   findForLogin,
   findForLoginById,
   getPasswordHash,
@@ -65,7 +66,8 @@ export function normalizeUsername(input, domain) {
  */
 export class AuthService {
   /** ldap: LdapAuthenticator or null; options: { domain, localLoginEnabled } */
-  constructor({ pool, audit, ldap = null, options = {}, secretKey = null, settings = null }) {
+  constructor({ pool, audit, ldap = null, options = {}, secretKey = null, settings = null, logger = null }) {
+    this.logger = logger;
     this.settings = settings;
     this.secretKey = secretKey;
     this.pool = pool;
@@ -89,7 +91,7 @@ export class AuthService {
    * the sign-in completes with completeSecondFactor() (after a first setup for 'setup').
    * Unknown users and wrong passwords fail with the same message.
    */
-  async login(rawUsername, password, client) {
+  async login(rawUsername, password, client, { localOnly = false } = {}) {
     const lock = await loadLockoutPolicy(this.settings);
     const username = normalizeUsername(rawUsername, this.options.domain);
     const user = await findForLogin(this.pool, username);
@@ -110,6 +112,14 @@ export class AuthService {
       return fail('unknown_user');
     }
 
+    // The API is for scripts: AD passwords must not be kept in scripts, so only local accounts sign in there.
+    // Refused before any password check or AD contact.
+    if (localOnly && user.auth_source !== 'local') {
+      await burnPasswordCheck(password);
+      return fail('api_local_only', new AppError(403, 'api_requires_local',
+        'The API accepts local accounts only. Use a local account for scripts; AD users sign in on the web.'));
+    }
+
     if (user.auth_source === 'local') {
       if (!this.options.localLoginEnabled) {
         await burnPasswordCheck(password);
@@ -128,6 +138,8 @@ export class AuthService {
         account = await this.ldap.authenticate(user.username, password);
       } catch (err) {
         if (err instanceof DirectoryError && err.code === 'unavailable') {
+          // The real cause (TLS, DNS, timeout, search failure...) never goes to the browser, so keep it in the log.
+          this.logger?.warn({ username: user.username, cause: err.message }, 'AD sign-in failed: directory unavailable');
           return fail('directory_unavailable', new AppError(503, 'directory_unavailable',
             'Cannot reach the AD server. Try again later.'));
         }
@@ -141,6 +153,10 @@ export class AuthService {
       }
       if (user.is_active && !user.is_locked && !user.ad_object_guid) await bindAdGuid(this.pool, user.id, account.objectGuid);
       if (account.mail) await fillEmailIfEmpty(this.pool, user.id, account.mail);
+      if (!user.display_name && account.displayName) {
+        await fillDisplayNameIfEmpty(this.pool, user.id, account.displayName);
+        user.display_name = account.displayName;
+      }
     }
 
     // Correct password: only now say why it still cannot sign in.

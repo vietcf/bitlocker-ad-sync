@@ -97,7 +97,9 @@ describe('report', () => {
     expect((await it.agent.get('/api/reports/summary')).status).toBe(403);
   });
 
-  it('exports an Excel workbook with five sheets, no key values, and logs the export', async () => {
+  it('exports an Excel workbook with six sheets, no key values, and logs the export', async () => {
+    await asOwner(`INSERT INTO computer (object_guid, name, distinguished_name, branch_id, deleted_in_ad_at) VALUES
+      ('00000000-0000-0000-0000-0000000000f1', 'HN-OLD-0009', 'CN=HN-OLD-0009,OU=Computers,OU=HN,DC=corp,DC=local', 1, now())`);
     const { agent } = await webLogin(app, 'auditor');
     const res = await agent.get('/reports/export.xlsx').buffer(true).parse((r, cb) => {
       const chunks = [];
@@ -125,7 +127,11 @@ describe('report', () => {
     // One branch: the computers that have keys (with their key count) come before the computers without a key.
     const oneFiles = unzip(one.body);
     const names = [...oneFiles['xl/workbook.xml'].matchAll(/<sheet name="([^"]+)"/g)].map((m) => m[1]);
-    expect(names).toEqual(['Tổng quan', 'Theo chi nhánh', 'Xem key theo CN', 'Người xem key', 'Máy đã có key', 'Máy chưa có key']);
+    expect(names).toEqual(['Tổng quan', 'Theo chi nhánh', 'Xem key theo CN', 'Người xem key', 'Máy đã có key', 'Máy chưa có key', 'Máy rời phạm vi']);
+    // The computers that left the monitored scope in the period: this branch only, with the key count.
+    expect(oneFiles['xl/worksheets/sheet7.xml']).toContain('HN-OLD-0009');
+    expect(oneFiles['xl/worksheets/sheet7.xml']).not.toContain('HN-LT-0001');
+    expect(files['xl/worksheets/sheet6.xml']).toContain('HN-OLD-0009'); // all branches: also listed
     expect(oneFiles['xl/worksheets/sheet5.xml']).toContain('HN-LT-0001'); // has a key
     expect(oneFiles['xl/worksheets/sheet5.xml']).not.toContain('HN-PC-NEW'); // none
     expect(oneFiles['xl/worksheets/sheet5.xml']).not.toContain('HCM-LT-0001'); // another branch

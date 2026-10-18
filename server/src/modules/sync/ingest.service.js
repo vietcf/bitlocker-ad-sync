@@ -34,9 +34,13 @@ import {
   takeSyncRequest,
   updateComputer,
   upsertHeartbeat,
+  touchRun,
+  abortOrphanRuns,
 } from './sync.repo.js';
 
 export const MAX_BATCH = 500;
+/** Worker im lang qua lau trong luot sync = da crash: giai phong luot de luot moi chay duoc. */
+export const ORPHAN_RUN_MINUTES = 30;
 const RECOVERY_PASSWORD = /^\d{6}(-\d{6}){7}$/;
 
 /**
@@ -191,6 +195,8 @@ export class IngestService {
   async openRun(raw) {
     const input = parse(openInput, raw);
     const opened = await withAllBranches(this.pool, async (tx) => {
+      const orphans = await abortOrphanRuns(tx, ORPHAN_RUN_MINUTES);
+      if (orphans.length) this.log?.warn({ runs: orphans.map(Number) }, 'sync run released: the worker was silent too long');
       const last = await lastSuccessfulRun(tx);
       let mode = input.mode;
       let sinceUsn = 0;
@@ -218,6 +224,7 @@ export class IngestService {
     const run = await getRunForUpdate(tx, id);
     if (!run) throw notFound('Run not found.');
     if (run.status !== 'running') throw conflict('run_closed', 'This sync run is already closed.');
+    await touchRun(tx, id);
     return run;
   }
 

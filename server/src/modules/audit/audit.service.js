@@ -43,7 +43,8 @@ import { PAGE_SIZES, pageSize } from '../settings/page-size.js';
 const CSV_MAX_ROWS = 50_000;
 
 export class AuditService {
-  constructor({ pool, hmacKey, settings = null, eventLog = null }) {
+  constructor({ pool, hmacKey, settings = null, eventLog = null, tz = process.env.APP_TZ ?? 'Asia/Ho_Chi_Minh' }) {
+    this.tz = tz;
     this.pool = pool;
     this.hmacKey = hmacKey;
     this.settings = settings;
@@ -114,7 +115,7 @@ export class AuditService {
     if (branches !== 'all' && branches.length === 0) throw forbidden();
     const limit = await pageSize(this.settings, PAGE_SIZES.audit);
     const offset = (pageNo - 1) * limit;
-    const result = await withScope(this.pool, branches, (tx) => searchLog(tx, branches, filters, { limit, offset }));
+    const result = await withScope(this.pool, branches, (tx) => searchLog(tx, branches, filters, { limit, offset, tz: this.tz }));
     return { ...result, page: pageNo, pageSize: limit, pages: Math.max(1, Math.ceil(result.total / limit)) };
   }
 
@@ -124,8 +125,9 @@ export class AuditService {
     if (branches !== 'all' && branches.length === 0) throw forbidden();
     if (this.settings && !(await this.settings.feature('feature.audit_export'))) throw featureDisabled();
     const { rows } = await withScope(this.pool, branches, async (tx) => {
-      const r = await searchLog(tx, branches, filters, { limit: CSV_MAX_ROWS, offset: 0 });
-      await this.append(tx, { ...this.actor(scope, client), action: 'export_log', detail: { filters, rows: r.rows.length } });
+      const r = await searchLog(tx, branches, filters, { limit: CSV_MAX_ROWS, offset: 0, tz: this.tz });
+      const day = (d) => (d ? d.toISOString().slice(0, 10) : d);
+      await this.append(tx, { ...this.actor(scope, client), action: 'export_log', detail: { filters: { ...filters, from: day(filters.from), to: day(filters.to) }, rows: r.rows.length } });
       return r;
     });
     const header = ['time_utc', 'user', 'action', 'branch', 'computer', 'key_id', 'reason', 'note', 'ticket', 'client_ip'];
