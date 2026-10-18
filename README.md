@@ -151,7 +151,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
 - `SESSION_SECRET`: ký cookie phiên.
-- `LOG_HMAC_KEY`: khóa HMAC cho chuỗi hash nhật ký. **Sao lưu an toàn**: mất khóa thì không kiểm chứng được nhật ký cũ và không khôi phục được dữ liệu mã hóa. Không lưu trong DB.
+- `LOG_HMAC_KEY`: khóa HMAC cho chuỗi hash nhật ký. **Sao lưu an toàn**: mất khóa thì nhật ký cũ không kiểm chứng được và mật khẩu SMTP, mật khẩu sao lưu, khóa 2 bước không đọc được (app vẫn chạy; cách xử lý ở mục 6.8). Không lưu trong DB.
 - `INGEST_API_KEY`: API key của worker.
 
 ### 3.4. File `server/.env`
@@ -948,8 +948,35 @@ Thêm vào `server/.env`: `BACKUP_DATABASE_URL=postgres://blk_backup:<mk>@<db-ho
 **Tra key khi hệ thống không chạy.** Giải nén `bitlocker-keys-*.zip` bằng 7-Zip vào thư mục chỉ mình bạn đọc được, mở `recovery_keys.csv` bằng Excel
 (Data > From Text/CSV, UTF-8), lọc cột `key_id_first8` theo 8 ký tự trên màn hình BitLocker, đọc `recovery_password`. Xong thì **xóa** file giải nén.
 
-**Khôi phục database.** (1) PostgreSQL 17 với các tài khoản mục 3.2, DB `blk` **rỗng**. (2) `7z x -p bitlocker-db-....zip`. (3) `pg_restore -U postgres -d blk --exit-on-error bitlocker.dump`.
-(4) Dùng **đúng `LOG_HMAC_KEY` cũ** (mật khẩu SMTP, khóa 2 bước, mật khẩu sao lưu mã hóa bằng khóa suy ra từ nó; nhật ký ký bằng nó), khởi động app, thử đăng nhập và chạy một lượt full. (5) Xóa `bitlocker.dump`.
+**Khôi phục database (một lệnh).** Cần DB `blk` (trong Docker hay ngoài đều được) và hai tài khoản `blk_owner`, `app_node` (mục 3.2). Chép file `bitlocker-db-....zip` vào `./backups`, rồi:
+
+```bash
+docker compose run --rm --no-deps server node src/cli/restore.js backups/bitlocker-db-20261018-013000.zip
+```
+
+Lệnh hỏi mật khẩu của file, kiểm tra SHA-256, nạp dữ liệu, chạy migration và báo kết quả. DB đã có dữ liệu thì từ chối trừ khi thêm `--force`. Tùy chọn:
+
+| Tùy chọn | Dùng khi |
+| --- | --- |
+| `--force` | Thay toàn bộ dữ liệu đang có (hỏi gõ lại tên DB; thêm `--yes` để bỏ hỏi) |
+| `--new-log-key` | `LOG_HMAC_KEY` khác bản lúc sao lưu: đặt lại mốc chuỗi nhật ký (xem dưới) |
+| `--reset-2fa` | Tắt xác thực 2 bước cho mọi user (khi 2 bước không đọc được hoặc mất điện thoại) |
+| `--reset-admin` | Cấp mật khẩu một lần mới cho admin gốc (in một lần, phải đổi khi đăng nhập) |
+
+Xong thì khởi động app, đăng nhập và chạy một lượt full. Mật khẩu file lấy từ ô nhập, hoặc biến `RESTORE_ZIP_PASSWORD`. Cần `pg_restore` 17 (đã có trong image). File zip lớn hơn 1,5 GB: giải nén bằng 7-Zip rồi `pg_restore --no-owner -d blk bitlocker.dump`.
+
+**`LOG_HMAC_KEY` không có hoặc khác bản cũ thì sao?** App vẫn chạy bình thường, dữ liệu máy và key còn nguyên. Chỉ ba thứ bị ảnh hưởng, lệnh khôi phục báo cụ thể:
+
+| Việc | Cách xử lý |
+| --- | --- |
+| Nhật ký báo "chuỗi gãy" | Chạy lại với `--new-log-key` (hoặc xem "Sửa chuỗi nhật ký gãy" dưới) |
+| Mật khẩu SMTP, mật khẩu sao lưu | Nhập lại ở Quản trị |
+| 2 bước của user | `--reset-2fa`, hoặc `users.js disable-2fa <user>` (mục 6.9) |
+
+**Sửa chuỗi nhật ký gãy.** Cảnh báo "chuỗi hash nhật ký gãy" nghĩa là có dòng không khớp chữ ký. Kiểm tra: `docker compose exec server node src/cli/audit.js verify` (in số dòng đã kiểm và dòng gãy đầu tiên).
+
+- **Nguyên nhân là đổi `LOG_HMAC_KEY`** (khôi phục sang máy chủ mới, mất khóa): các dòng cũ không còn kiểm chứng được bằng khóa mới, dữ liệu vẫn còn. Đặt mốc mới: `docker compose exec server node src/cli/audit.js reanchor --yes`. Các dòng cũ giữ nguyên nhưng không còn được kiểm tra; dòng mới chain từ mốc này. Lần đặt mốc được ghi vào nhật ký.
+- **Khóa không đổi mà vẫn gãy**: có thể ai đó đã sửa nhật ký trực tiếp trong DB. **Không đặt mốc**; giữ nguyên hiện trạng, so với bản sao lưu gần nhất và điều tra trước.
 
 **Sao lưu tay** trước khi nâng cấp: `pg_dump -U blk_backup -h <db-host> -d blk --format=custom -f bitlocker.dump`, rồi `7z a -tzip -mem=AES256 -p x.zip bitlocker.dump` và `shred -u bitlocker.dump`.
 
@@ -1148,6 +1175,7 @@ Giờ đọc AD của **worker** (delta 15 phút, full 01:00, heartbeat 5 phút)
 | Lượt sync lỗi `ldap_search_base_failed` | Một OU trong `SearchBases` không tồn tại, bị đổi tên/di chuyển, hoặc tài khoản worker không có quyền đọc | Log worker ghi tên OU. Chạy `check` để xem OU nào `FAIL`, sửa `SearchBases` hoặc cấp quyền (mục 4.1) |
 | Trang Tổng quan báo dữ liệu có thể đã cũ | Worker dừng, lỗi, hoặc lượt sync bị giữ lại | Xem Quản trị > Sync AD và log worker; ngưỡng ở Quản trị > Ngưỡng cảnh báo |
 | Quên mật khẩu, mất điện thoại 2 bước, web hỏng | | CLI trên máy chủ: `reset-password`, `reset-2fa`, `disable-2fa`, `unlock` (mục 6.9) |
+| Cảnh báo "chuỗi hash nhật ký gãy" | Đổi `LOG_HMAC_KEY` (máy mới, khôi phục), hoặc nhật ký bị sửa trong DB | `audit.js verify`; nếu chỉ do đổi khóa thì `audit.js reanchor --yes` (mục 6.8) |
 | Sao lưu lỗi hoặc "Đang sao lưu" mãi | `pg_dump` lỗi, hết đĩa, sai `BACKUP_DATABASE_URL` | Xem "Lần chạy gần nhất" ở Quản trị > Sao lưu và log server (mục 6.8) |
 | Không nhận được email | Chưa bật mail server, sai SMTP, hoặc người nhận chưa có email | Quản trị > Mail server > **Gửi thử** để xem lỗi; Quản trị > Log email xem trạng thái và lỗi từng mail; kiểm tra email của user ở Quản trị > Người dùng |
 | App không khởi động, log nhắc `mail-templates.yaml` | File mẫu email hỏng hoặc thiếu mẫu | Sửa theo thông báo (tên mẫu thiếu), hoặc lấy lại file mẫu gốc trong repo (mục 6.6) |

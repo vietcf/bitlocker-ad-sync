@@ -145,6 +145,24 @@ export class AuditService {
   }
 
   /**
+   * Starts the chain again after the last row: used when LOG_HMAC_KEY changed (restore on a new server), so old rows
+   * can no longer be verified with the current key. They stay in the log; rows written from now on chain from here.
+   * Never use it to hide a break whose cause is unknown. Returns { upToId } (null when the log is empty).
+   */
+  async reanchor(by) {
+    // Row-Level Security hides the log from a session without a scope: read it as "all branches".
+    return withScope(this.pool, 'all', async (tx) => {
+      const last = (await tx.query('SELECT id, hash FROM access_log ORDER BY id DESC LIMIT 1')).rows[0];
+      if (!last) return { upToId: null };
+      await tx.query(
+        'INSERT INTO access_log_purge (purged_by, before_at, up_to_id, rows, last_hash) VALUES ($1, now(), $2, 0, $3)',
+        [by, last.id, last.hash],
+      );
+      return { upToId: Number(last.id) };
+    });
+  }
+
+  /**
    * Verifies the whole hash chain. Returns { ok, checked, brokenAtId?, problem? }.
    * After a retention purge the chain starts at the last checkpoint (access_log_purge): the first
    * remaining row must point to the hash of the last deleted one.
