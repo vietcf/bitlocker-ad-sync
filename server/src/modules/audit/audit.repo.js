@@ -5,6 +5,7 @@ import { GENESIS_HASH, chainHash } from './chain.js';
  * Appends one row to access_log inside the caller's transaction.
  * A transaction-scoped advisory lock serialises writers so two requests can never
  * chain onto the same tail. If the caller rolls back, the row (and its link) disappears with it.
+ * Returns the id of the new row.
  */
 export async function appendLog(tx, hmacKey, input) {
   await tx.query(`SELECT pg_advisory_xact_lock(hashtext('access_log_chain'))`);
@@ -40,6 +41,10 @@ export async function appendLog(tx, hmacKey, input) {
       hash,
     ],
   );
+  // The id of the row just written: we still hold the chain lock, so it is the tail (the function runs as the
+  // owner, so no SELECT policy and no privilege on the sequence is needed).
+  const written = await tx.query('SELECT id FROM access_log_tail()');
+  return { id: Number(written.rows[0].id), at: entry.at };
 }
 
 /** Maps a DB row to the entry shape used by the hash chain. */

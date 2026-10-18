@@ -2,7 +2,7 @@
 // repeats update it and re-notify at most every REMIND_HOURS (or once per calendar day with
 // { daily: true }); when the condition clears the alert is resolved and a "recovered" message is
 // sent (unless { announce: false }). The watchdog records its conditions without mail and sends one
-// "sync_offline" alert instead (jobs/watchdog.js).
+// "worker_offline" / "sync_problem" summary alerts instead (jobs/watchdog.js).
 
 export const REMIND_HOURS = 4;
 
@@ -10,7 +10,8 @@ export const REMIND_HOURS = 4;
 const dayOf = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: process.env.APP_TZ ?? 'Asia/Ho_Chi_Minh' }).format(d);
 
 export class AlertsService {
-  constructor({ pool, notifier, templates }) {
+  constructor({ pool, notifier, templates, eventLog = null }) {
+    this.eventLog = eventLog;
     this.pool = pool;
     this.notifier = notifier;
     this.templates = templates;
@@ -30,6 +31,7 @@ export class AlertsService {
     await this.pool.query('UPDATE sync_alert SET last_notified_at = now() WHERE id = $1', [alert.id]);
     const mail = this.templates.render(type, vars, { severity });
     await this.notifier.send({ type, severity, subject: mail.subject, text: mail.body });
+    this.eventLog?.emit('alert', { event: 'notified', alert_id: Number(alert.id), type, severity, subject: mail.subject });
     return true;
   }
 
@@ -55,9 +57,12 @@ export class AlertsService {
       `INSERT INTO sync_alert (type, severity, detail) VALUES ($1, $2, $3)
        ON CONFLICT (type) WHERE resolved_at IS NULL
        DO UPDATE SET detail = EXCLUDED.detail, severity = EXCLUDED.severity
-       RETURNING id, last_notified_at`,
+       RETURNING id, last_notified_at, (xmax = 0) AS inserted, opened_at`,
       [type, severity, JSON.stringify({ subject, text, ...detail })],
     );
+    if (rows[0].inserted) {
+      this.eventLog?.emit('alert', { event: 'opened', time: rows[0].opened_at, alert_id: Number(rows[0].id), type, severity, subject, text });
+    }
     return { alert: rows[0], subject };
   }
 
@@ -69,10 +74,11 @@ export class AlertsService {
   async clear(type, vars = {}, { announce = true } = {}) {
     const { rows } = await this.pool.query(
       `UPDATE sync_alert SET resolved_at = now() WHERE type = $1 AND resolved_at IS NULL
-       RETURNING detail->>'subject' AS subject`,
+       RETURNING id, severity, resolved_at, detail->>'subject' AS subject`,
       [type],
     );
     if (!rows[0]) return false;
+    this.eventLog?.emit('alert', { event: 'resolved', time: rows[0].resolved_at, alert_id: Number(rows[0].id), type, severity: rows[0].severity, subject: rows[0].subject });
     if (!announce) return true;
     const name = this.templates.has(`${type}_recovered`) ? `${type}_recovered` : 'recovered';
     const mail = this.templates.render(name, { ...vars, alertType: type, alertSubject: rows[0].subject }, { severity: 'info' });

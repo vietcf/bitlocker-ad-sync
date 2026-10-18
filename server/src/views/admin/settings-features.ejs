@@ -27,6 +27,20 @@
         <label class="check"><input type="radio" name="export.keys" value="<%= v %>" <%= values['export.keys'] === v ? 'checked' : '' %>> <span><%= label %></span></label>
       <% }) %>
     </fieldset>
+    <fieldset>
+      <legend>Hiển thị: số dòng mỗi trang</legend>
+      <p class="muted small">Số bản ghi hiện trên một trang của từng danh sách, từ <%= pageSizeLimits[0] %> đến <%= pageSizeLimits[1] %>. Áp dụng ngay.</p>
+      <div class="thr-list">
+        <div class="thr-row thr-head"><span>Danh sách</span><span>Số dòng mỗi trang</span><span>Mặc định</span></div>
+        <% Object.values(pageSizes).forEach((p) => { %>
+          <div class="thr-row">
+            <label for="<%= p.key %>"><%= p.label %></label>
+            <span class="nowrap"><input id="<%= p.key %>" name="<%= p.key %>" value="<%= values[p.key] %>" type="number" min="<%= pageSizeLimits[0] %>" max="<%= pageSizeLimits[1] %>" required class="thr-input"> dòng</span>
+            <span class="muted"><%= p.default %> dòng</span>
+          </div>
+        <% }) %>
+      </div>
+    </fieldset>
     <div class="actions"><button type="submit">Lưu</button></div>
   </form>
 </section>

@@ -5,7 +5,7 @@ của app. Đặc tả API nằm ở `server/openapi/ingest.openapi.yaml`; Swagg
 `https://<server>:8443/docs`.
 
 Worker không quyết định lưu gì. Các việc sau đều do server làm: map máy vào chi nhánh, tính trạng
-thái key theo từng ổ đĩa, gắn nhãn "Không còn trong AD", kiểm tra bất thường.
+thái key theo từng ổ đĩa, gắn nhãn "Không còn trong phạm vi giám sát", kiểm tra bất thường.
 
 Hướng dẫn cài đặt từng bước cho production nằm trong [README chính](../README.md#4-cài-sync-worker-trên-windows).
 
@@ -13,7 +13,7 @@ Hướng dẫn cài đặt từng bước cho production nằm trong [README ch�
 | --- | --- |
 | Mỗi 5 phút | Gửi heartbeat. Nếu Admin HQ đã yêu cầu sync trên web, chạy ngay |
 | Mỗi 15 phút | Delta sync: chỉ đọc object có `uSNChanged` lớn hơn USN của lượt trước |
-| 01:00 hằng đêm (và lần đầu khởi động) | Full sync: đọc tất cả. Máy không thấy sẽ được server gắn nhãn "Không còn trong AD"; không có gì bị xóa |
+| 01:00 hằng đêm (và lần đầu khởi động) | Full sync: đọc tất cả. Máy không thấy sẽ được server gắn nhãn "Không còn trong phạm vi giám sát"; không có gì bị xóa |
 
 Mỗi key đọc từ AD gồm các thuộc tính `msFVE-RecoveryGuid` (Key ID), `msFVE-VolumeGuid` (ổ đĩa),
 `msFVE-RecoveryPassword`, `whenCreated` và `distinguishedName`. Máy được nhận diện bằng `objectGUID`.
@@ -42,7 +42,7 @@ scripts/update-worker.ps1     cập nhật lên bản mới, giữ nguyên appse
 | `Ldap:Protocol` | `Ldaps` (636, mặc định) · `StartTls` (389 + TLS) · `Ldap` (389, không TLS) |
 | `Ldap:Auth` | `Negotiate` (mặc định: tài khoản chạy service/gMSA, hoặc `Username` + `Password`) · `Basic` (simple bind bằng `Username` + `Password`) |
 | `Ldap:Username` / `Ldap:Password` | `CORP\svc-blk` hoặc `svc-blk@corp.local`; mật khẩu dạng `dpapi:...` (xem bên dưới) |
-| `Ldap:BaseDn`, `Ldap:SearchBases` | DN của domain; danh sách OU cần đọc (để trống = cả `BaseDn`). Các OU được đọc **lần lượt** trong cùng một lượt sync; OU phải nằm trong `BaseDn`; OU trùng hoặc OU con của OU đã có được bỏ qua. Một OU không đọc được (không tồn tại, thiếu quyền) làm cả lượt dừng với mã `ldap_search_base_failed`, để lượt full không coi máy trong OU đó là "Không còn trong AD" |
+| `Ldap:BaseDn`, `Ldap:SearchBases` | DN của domain; danh sách OU cần đọc (để trống = cả `BaseDn`). Các OU được đọc **lần lượt** trong cùng một lượt sync; OU phải nằm trong `BaseDn`; OU trùng hoặc OU con của OU đã có được bỏ qua. Một OU không đọc được (không tồn tại, thiếu quyền) làm cả lượt dừng với mã `ldap_search_base_failed`, để lượt full không coi máy trong OU đó là "Không còn trong phạm vi giám sát" |
 | `Ldap:AllowInsecure` | `Ldap` + `Basic` gửi mật khẩu và mọi key dạng rõ, nên worker từ chối chạy trừ khi đặt `true` (chỉ dùng cho lab). `Ldap` + `Negotiate` được chấp nhận vì Kerberos signing + sealing mã hóa phiên |
 | `Ingest:BaseUrl` | `https://blk.corp.local:8443/api/ingest` (chỉ localhost mới được dùng http) |
 | `Ingest:ApiKey` | API key (`dpapi:...`): cách xác thực duy nhất của worker, gửi qua HTTPS |

@@ -4,13 +4,13 @@
   <div class="title-row">
     <h1><%= computer.name %></h1>
     <% if (computer.deleted_in_ad_at) { %>
-      <span class="badge badge-muted">Không còn trong AD từ <%= h.date(computer.deleted_in_ad_at) %></span>
+      <span class="badge badge-muted">Không còn trong phạm vi giám sát từ <%= h.date(computer.deleted_in_ad_at) %></span>
     <% } else { %>
-      <span class="badge badge-good">Còn trong AD</span>
+      <span class="badge badge-good">Đang được giám sát</span>
     <% } %>
   </div>
   <dl class="facts">
-    <dt>GUID trên AD</dt><dd><code class="wrap"><%= computer.object_guid %></code> <span class="muted small">(objectGUID: định danh duy nhất của máy trong AD, không đổi khi đổi tên hay chuyển OU)</span></dd>
+    <dt>GUID trên AD</dt><dd><code class="wrap"><%= computer.object_guid %></code> <span class="muted small">(objectGUID: định danh duy nhất của máy trong phạm vi giám sát, không đổi khi đổi tên hay chuyển OU)</span></dd>
     <dt>Chi nhánh</dt><dd><%= computer.branch_code ? `${computer.branch_code} · ${computer.branch_name}` : 'N/A (chưa thuộc chi nhánh nào)' %></dd>
     <dt>OU</dt><dd><code class="wrap"><%= computer.distinguished_name %></code></dd>
     <dt>DNS</dt><dd><%= computer.dns_name ?? '—' %></dd>
@@ -48,7 +48,7 @@
     <div class="notice notice-warn">
       Key ID <code><%= kid(d.key_id) %>…</code>
       <% if (isOwner) { %>cũng nằm dưới máy <% if (d.other_name) { %><a href="/computers/<%= d.other_id %>"><%= d.other_name %></a> <span class="guid"><%= d.other_guid %></span><% } else { %>một máy ở chi nhánh khác<% } %><% } else { %>của máy <% if (d.owner_name) { %><a href="/computers/<%= d.owner_id %>"><%= d.owner_name %></a> <span class="guid"><%= d.owner_guid %></span><% } else { %>một máy ở chi nhánh khác<% } %> cũng nằm dưới máy này<% } %>
-      (cả hai còn trong AD<%= d.same_password ? '' : ', mật khẩu khác nhau' %>). Key vẫn giữ ở máy <%= d.owner_name ?? 'đang giữ' %>; xem Quản trị > Sync AD.
+      (cả hai còn trong phạm vi giám sát<%= d.same_password ? '' : ', mật khẩu khác nhau' %>). Key vẫn giữ ở máy <%= d.owner_name ?? 'đang giữ' %>; xem Quản trị > Sync AD.
     </div>
   <% }) %>
   <% if (keys.length === 0) { %>

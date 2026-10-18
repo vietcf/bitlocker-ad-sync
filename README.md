@@ -9,12 +9,13 @@ có chuỗi hash, không sửa hay xóa được.
 | `server/` | Ứng dụng Node.js (Express, JavaScript thuần): trang web (EJS), JSON API, ingest API cho worker, job nền |
 | `worker/` | Sync worker .NET (Windows Service): đọc AD qua LDAP(S) rồi đẩy dữ liệu lên ingest API |
 | `worker-go/` | Sync worker Go (Linux, systemd): cùng chức năng và giao thức với bản .NET. Chọn **một** trong hai |
+| `docker-compose.yml`, `docker-compose.prod.yml` | Dev (secret dev, có `--watch`) và production (mọi cấu hình ở `server/.env`, DB trong Docker tùy chọn bằng `--profile db`) |
 
 Mục lục:
 
 1. [Kiến trúc tóm tắt](#1-kiến-trúc-tóm-tắt)
-2. [Chạy thử trên máy dev (Docker)](#2-chạy-thử-trên-máy-dev-docker)
-3. [Cài đặt production](#3-cài-đặt-production)
+2. [Cài đặt dev](#2-cài-đặt-dev)
+3. [Cài đặt production](#3-cài-đặt-production) (docker-compose hoặc không; DB trong Docker hoặc ngoài)
 4. [Cài sync worker trên Windows](#4-cài-sync-worker-trên-windows) (bản .NET) **hoặc**
    [4B. Cài sync worker trên Linux](#4b-cài-sync-worker-trên-linux-bản-go) (bản Go)
 5. [Cấu hình lần đầu trong ứng dụng](#5-cấu-hình-lần-đầu-trong-ứng-dụng)
@@ -36,11 +37,11 @@ Mục lục:
 ```
 
 - **Worker** chỉ đọc AD và gửi dữ liệu lên. Mọi quyết định nằm ở server: máy thuộc chi nhánh nào,
-  key nào còn hiệu lực, máy nào không còn trong AD, lượt sync nào bất thường.
+  key nào còn hiệu lực, máy nào không còn trong phạm vi giám sát, lượt sync nào bất thường.
 - **Máy** được nhận diện bằng `objectGUID` của AD, nên đổi tên hay chuyển OU vẫn là cùng một máy.
   **Key** được nhận diện bằng Key ID (`msFVE-RecoveryGuid`). Một máy có thể có nhiều ổ được mã hóa,
   mỗi ổ một hoặc nhiều key (`msFVE-VolumeGuid` cho biết key thuộc ổ nào).
-- **Không có gì bị xóa.** Máy không còn trong AD chỉ được gắn nhãn "Không còn trong AD" và key vẫn
+- **Không có gì bị xóa.** Máy không còn trong phạm vi giám sát chỉ được gắn nhãn "Không còn trong phạm vi giám sát" và key vẫn
   được giữ để mở ổ cứng cũ.
 - **Phân quyền** nằm trong app, không lấy từ group AD. Người dùng đăng nhập bằng tài khoản AD (kiểm
   tra mật khẩu qua LDAPS) hoặc tài khoản local.
@@ -50,13 +51,13 @@ Mục lục:
 
 ---
 
-## 2. Chạy thử trên máy dev (Docker)
+## 2. Cài đặt dev
+
+Chạy thử trên máy cá nhân bằng Docker. Dữ liệu và secret là giá trị dev, không dùng cho production (mục 3).
 
 ### 2.1. Yêu cầu
 
-- Docker Desktop (Windows/macOS) hoặc Docker Engine + Compose v2.24 trở lên (Linux).
-- Node.js 24, chỉ khi muốn chạy test ngoài Docker.
-- .NET SDK 10, chỉ khi muốn chạy worker.
+Docker Desktop (Windows/macOS) hoặc Docker Engine + Compose v2.24 trở lên (Linux). Node.js 24 chỉ cần khi chạy test ngoài Docker; .NET SDK 10 chỉ cần khi chạy worker.
 
 ### 2.2. Khởi động
 
@@ -66,107 +67,67 @@ bash cert/generate-self-signed.sh      # lần đầu: chứng chỉ tự ký ch
 docker compose up --build --watch
 ```
 
-Compose dựng bốn service:
+Compose dựng `db` (PostgreSQL 17, có DB `blk` và `blk_test`; lần đầu tạo hai tài khoản `blk_owner`, `app_node`), `migrate` (chạy migration rồi thoát), `server` (app, không mở cổng ra ngoài; `--watch` tự cập nhật khi sửa `server/src`, `public`, `openapi`) và `nginx` (HTTPS cho web 443 và ingest 8443, cổng 80 chuyển sang HTTPS).
 
-| Service | Việc |
-| --- | --- |
-| `db` | PostgreSQL 17, có database `blk` (dev) và `blk_test` (test). Lần đầu tạo volume, script `server/db/init/01-roles.sh` tạo hai tài khoản DB: `blk_owner` sở hữu schema, `app_node` dùng khi chạy app |
-| `migrate` | Chạy các file trong `server/db/migrations` theo thứ tự rồi thoát |
-| `nginx` | Reverse proxy HTTPS, một chứng chỉ (`cert/server.crt`) cho cả web (443) và ingest API (8443); cổng 80 chuyển sang HTTPS |
-| `server` | App Node.js, chỉ nhận kết nối từ nginx (không mở cổng ra ngoài). Với `--watch`, mỗi khi sửa `server/src`, `server/public` hoặc `server/openapi`, container tự cập nhật và khởi động lại; sửa `server/templates` (mẫu email) thì chỉ chép vào, không cần khởi động lại |
+- https://localhost: web và `/api`. https://localhost/api/docs: Swagger API người dùng (đăng nhập web trước).
+- https://localhost:8443/api/ingest: ingest API cho worker. https://localhost:8443/docs: Swagger ingest (cần API key).
+- `localhost:5432`: PostgreSQL, tài khoản dev `postgres` / `dev_postgres_pw`.
 
-Địa chỉ:
-
-- https://localhost: giao diện web và `/api` (http://localhost tự chuyển sang HTTPS).
-- https://localhost:8443/api/ingest: ingest API cho worker (HTTPS + API key).
-- https://localhost/api/docs: Swagger của toàn bộ API người dùng (phải đăng nhập web trước).
-- https://localhost:8443/docs: Swagger của ingest API (cần API key).
-
-Chứng chỉ dev là tự ký, nên trình duyệt báo "không an toàn" cho tới khi bạn tin CA dev
-(`cert/ca.crt`, mục 3.6). Cổng 443/80 đã bị chương trình khác dùng thì đổi: `HTTPS_PORT=8444 HTTP_PORT=8080
-docker compose up -d`. Mặc định chỉ máy này truy cập được; cho máy khác vào: `BIND_ADDR=0.0.0.0`.
-- `localhost:5432`: PostgreSQL. Tài khoản dev: `postgres` / `dev_postgres_pw`.
+Trình duyệt báo "không an toàn" vì chứng chỉ tự ký, tới khi bạn tin `cert/ca.crt` (mục 3.6). Cổng 443/80 bị chiếm thì đổi: `HTTPS_PORT=8444 HTTP_PORT=8080 docker compose up -d`. Mặc định chỉ máy này truy cập được; cho máy khác vào: `BIND_ADDR=0.0.0.0`.
 
 ### 2.3. Đăng nhập lần đầu
 
-Lần đầu chạy, khi DB chưa có user nào, app tạo tài khoản local **`admin` / `admin`** có quyền Admin
-HQ. App bắt đổi mật khẩu ngay lần đăng nhập đầu tiên (mặc định tối thiểu 12 ký tự; đổi được ở Quản trị > Bảo mật).
-
-Quên mật khẩu admin thì đặt lại:
+Khi DB chưa có user, app tạo tài khoản local **`admin` / `admin`** (Admin HQ) và bắt đổi mật khẩu ngay lần đăng nhập đầu (mặc định tối thiểu 12 ký tự). Quên mật khẩu hoặc bị khóa:
 
 ```bash
 docker compose exec server node src/cli/users.js reset-password admin
+docker compose exec server node src/cli/users.js unlock admin
 ```
 
-### 2.4. Cấu hình cho dev (tùy chọn)
+### 2.4. Cấu hình và lệnh hay dùng
 
-Các thiết lập như LDAP, API key của worker hay cảnh báo nằm trong `server/.env`:
+LDAP, API key worker, cảnh báo... đặt trong `server/.env` (DB, cổng, secret dev đã có sẵn trong `docker-compose.yml`). Sau khi sửa `.env` phải tạo lại container:
 
 ```bash
 cp server/.env.example server/.env
-```
-
-Các biến về DB, cổng, `SESSION_SECRET` và `LOG_HMAC_KEY` đã có sẵn giá trị dev trong
-`docker-compose.yml`, không cần sửa. Sau khi sửa `server/.env`, tạo lại container (watch không
-theo dõi file `.env`):
-
-```bash
 docker compose up -d --force-recreate server
+
+docker compose exec server node src/db/seed-dev.js   # dữ liệu giả: 3 chi nhánh, ~20 máy
+docker compose run --rm migrate                      # áp dụng migration mới
+docker compose logs -f server                        # xem log
+docker compose down -v                               # xóa sạch, kể cả database
 ```
 
-### 2.5. Dữ liệu mẫu và các lệnh hay dùng
-
-```bash
-# Dữ liệu giả: 3 chi nhánh, khoảng 20 máy, key giả
-docker compose exec server node src/db/seed-dev.js
-
-# Áp dụng migration mới
-docker compose run --rm migrate
-
-# Xem log của server
-docker compose logs -f server
-
-# Xóa sạch, kể cả database
-docker compose down -v
-```
-
-### 2.6. Chạy test
+### 2.5. Chạy test
 
 ```bash
 docker compose up -d db
-cd server
-npm install
-npm test            # toàn bộ test
-npm run test:unit   # không cần DB
-npm run test:int    # dùng database blk_test
-```
-
-Worker:
-
-```bash
-cd worker
-dotnet test
+cd server && npm install
+npm test            # toàn bộ; npm run test:unit (không cần DB); npm run test:int (DB blk_test)
+cd ../worker && dotnet test
 ```
 
 ---
 
 ## 3. Cài đặt production
 
-### 3.1. Chuẩn bị
+### 3.1. Chọn cách cài
 
-| Thành phần | Yêu cầu |
-| --- | --- |
-| Máy chủ app | Linux có Docker (hoặc Node.js 24), mở cổng 443 cho người dùng và 8443 cho worker |
-| PostgreSQL | Bản 17, nên đặt trên máy riêng, bật TLS, sao lưu hằng ngày |
-| Reverse proxy | Container nginx đi kèm (`nginx/nginx.conf`), giữ chứng chỉ HTTPS cho cả web (443) và ingest (8443) |
-| Chứng chỉ | Một chứng chỉ server có tên máy chủ app trong SAN, dùng chung cho hai cổng (mục 3.6) |
-| AD | Ít nhất một DC có LDAPS (cổng 636) với chứng chỉ hợp lệ. Một gMSA cho worker |
-| Máy chủ worker | Windows Server, member server trong domain, có .NET 10 runtime (hoặc dùng bản publish self-contained) |
-| SMTP / Teams | Không bắt buộc. Mail server cấu hình trong app (Quản trị > Mail server); Teams qua webhook trong `.env` |
+| Chọn | Phương án | Khi nào |
+| --- | --- | --- |
+| **App** | **A. docker-compose** (`docker-compose.prod.yml`) | Khuyên dùng: một lệnh dựng app, migration và nginx |
+| | B. `docker run` | Không có Compose |
+| | C. Không Docker | Chạy Node.js bằng systemd/pm2; vẫn cần nginx hoặc proxy HTTPS khác |
+| **Database** | **1. Trong Docker** (chỉ với phương án A) | Máy nhỏ, đã có quy trình sao lưu volume |
+| | 2. PostgreSQL ngoài | Khuyên dùng: máy riêng, bật TLS, sao lưu hằng ngày |
 
-### 3.2. Tạo database
+Yêu cầu chung: Linux có Docker (phương án C: Node.js 24), mở cổng 443 cho người dùng và 8443 cho worker; PostgreSQL 17; một chứng chỉ server có tên máy chủ trong SAN (mục 3.6); AD có LDAPS (cổng 636); máy worker Windows hoặc Linux (mục 4, 4B). SMTP/Teams không bắt buộc (mail cấu hình trong app, Teams qua webhook trong `.env`).
 
-Đăng nhập PostgreSQL bằng tài khoản superuser rồi chạy (thay hai mật khẩu):
+### 3.2. Database
+
+**Trong Docker (A + 1):** không cần làm gì thêm. Đặt 4 mật khẩu trong `server/.env` (mục 3.4); lần đầu tạo volume, `server/db/init/01-roles.sh` tự tạo DB `blk` và các tài khoản `blk_owner`, `app_node`, `blk_backup`.
+
+**PostgreSQL ngoài:** đăng nhập superuser, chạy (thay hai mật khẩu):
 
 ```sql
 CREATE ROLE blk_owner LOGIN NOSUPERUSER NOCREATEROLE NOBYPASSRLS PASSWORD '<mật-khẩu-owner>';
@@ -178,128 +139,117 @@ REVOKE ALL ON SCHEMA public FROM PUBLIC;
 GRANT USAGE ON SCHEMA public TO app_node;
 ```
 
-- `blk_owner` sở hữu bảng và chỉ dùng khi chạy migration.
-- `app_node` là tài khoản duy nhất app dùng khi chạy. Tài khoản này không sở hữu bảng nên luôn bị
-  Row-Level Security giới hạn theo chi nhánh. **Không** cấp SUPERUSER hay BYPASSRLS cho tài khoản nào.
+`blk_owner` sở hữu bảng, chỉ dùng khi chạy migration. `app_node` là tài khoản duy nhất app dùng khi chạy, không sở hữu bảng nên luôn bị Row-Level Security giới hạn theo chi nhánh. **Không** cấp SUPERUSER hay BYPASSRLS cho hai tài khoản này. Tài khoản sao lưu `blk_backup`: mục 6.8.
 
 ### 3.3. Tạo secret
 
-Chạy trên máy có Node.js:
+Chạy ba lần, mỗi lần ra một chuỗi hex 64 ký tự:
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-Chạy ba lần để có:
+- `SESSION_SECRET`: ký cookie phiên.
+- `LOG_HMAC_KEY`: khóa HMAC cho chuỗi hash nhật ký. **Sao lưu an toàn**: mất khóa thì không kiểm chứng được nhật ký cũ và không khôi phục được dữ liệu mã hóa. Không lưu trong DB.
+- `INGEST_API_KEY`: API key của worker.
 
-- `SESSION_SECRET`: ký cookie phiên đăng nhập.
-- `LOG_HMAC_KEY`: khóa HMAC cho chuỗi hash của nhật ký (đúng 64 ký tự hex). **Phải sao lưu
-  khóa này an toàn.** Mất khóa thì không kiểm chứng được nhật ký cũ. Không lưu khóa trong DB.
-- `INGEST_API_KEY`: API key của worker, cách xác thực duy nhất của worker.
+### 3.4. File `server/.env`
 
-### 3.4. File cấu hình `server/.env` cho production
+```bash
+cp server/.env.example server/.env && chmod 600 server/.env
+```
 
 ```ini
 NODE_ENV=production
 LOG_LEVEL=info
-
-# Cả hai cổng là HTTP nội bộ; container nginx đứng trước lo HTTPS (mục 3.5, 3.6)
 USER_HOST=0.0.0.0
 USER_PORT=3000
 INGEST_HOST=0.0.0.0
 INGEST_PORT=8443
-# Tin đúng 1 lớp proxy (nginx): IP người dùng / worker lấy từ X-Forwarded-For do nginx ghi đè
-TRUST_PROXY=1
+TRUST_PROXY=1            # tin đúng 1 lớp proxy (nginx)
 INGEST_TRUST_PROXY=1
 COOKIE_SECURE=true
 
-# Xác thực worker: HTTPS + API key (cùng giá trị đặt trong cấu hình worker) + IP được phép
-INGEST_API_KEY=<chuỗi hex 64 ký tự>
+# Worker: HTTPS + API key (cùng giá trị trong cấu hình worker) + IP được phép
+INGEST_API_KEY=<hex 64>
 INGEST_ALLOWED_IPS=10.0.5.21
 
-# Database
+# Database. PostgreSQL ngoài: đổi host, bật DB_SSL. DB trong Docker: host "db", DB_SSL=false
 DATABASE_URL=postgres://app_node:<mật-khẩu-app>@db.corp.local:5432/blk
 MIGRATION_DATABASE_URL=postgres://blk_owner:<mật-khẩu-owner>@db.corp.local:5432/blk
 DB_SSL=true
+# Chỉ khi DB trong Docker (A + 1): mật khẩu để tạo tài khoản lần đầu
+# POSTGRES_PASSWORD=...  BLK_OWNER_PASSWORD=...  APP_NODE_PASSWORD=...  BLK_BACKUP_PASSWORD=...
 
-# Đăng nhập bằng AD (production chỉ cho phép ldaps://)
+# Đăng nhập AD (production chỉ cho ldaps://)
 LDAP_URL=ldaps://dc01.corp.local:636,ldaps://dc02.corp.local:636
 LDAP_DOMAIN=corp.local
 LDAP_BASE_DN=DC=corp,DC=local
-# Chỉ cần nếu máy chủ app chưa tin CA đã cấp chứng chỉ LDAPS của DC
-LDAP_CA_FILE=/app/certs/corp-root-ca.pem
-# Giữ bật để còn tài khoản admin local khi AD gặp sự cố
-LOCAL_LOGIN_ENABLED=true
+# LDAP_CA_FILE=/app/certs/corp-root-ca.pem   # nếu máy chủ chưa tin CA của DC
+LOCAL_LOGIN_ENABLED=true                     # giữ để còn admin local khi AD lỗi
 
-SESSION_SECRET=<chuỗi hex 64 ký tự>
+SESSION_SECRET=<hex 64>
+LOG_HMAC_KEY=<hex 64>
 SESSION_IDLE_MINUTES=15
 SESSION_MAX_HOURS=8
-LOG_HMAC_KEY=<chuỗi hex 64 ký tự>
 
-# Cảnh báo. Mail server thường cấu hình trong app (Quản trị > Mail server); SMTP_URL chỉ dùng
-# khi ở đó đang tắt. NOTIFY_TO luôn nhận email cảnh báo. Không cấu hình gì thì cảnh báo chỉ vào log.
-# SMTP_URL=smtp://relay.corp.local:25
+# Sao lưu (mục 6.8): BACKUP_DATABASE_URL dùng tài khoản blk_backup
+BACKUP_DIR=/app/backups
+# BACKUP_DATABASE_URL=postgres://blk_backup:<mk>@db.corp.local:5432/blk
+
+# Cảnh báo (mail server thường cấu hình trong app, Quản trị > Mail server)
 NOTIFY_FROM=bitlocker-keys@corp.local
 NOTIFY_TO=it-hq@corp.local,security@corp.local
 # TEAMS_WEBHOOK_URL=https://...
-# File mẫu email đặt ngoài image (mục 6.6), ví dụ khi mount từ /etc/blk:
-# MAIL_TEMPLATES_FILE=/app/config/mail-templates.yaml
+# MAIL_TEMPLATES_FILE=/app/config/mail-templates.yaml   # mẫu email ngoài image (mục 6.6)
 
 JOBS_ENABLED=true
 APP_TZ=Asia/Ho_Chi_Minh
 ```
 
-Khi `NODE_ENV=production`, app **từ chối khởi động** và in tên biến bị lỗi (không in giá trị) nếu:
+Khi `NODE_ENV=production`, app **từ chối khởi động** và in tên biến lỗi (không in giá trị) nếu: ingest không có HTTPS (thiếu `INGEST_TRUST_PROXY` và cả `INGEST_TLS_CERT`/`INGEST_TLS_KEY`); thiếu `INGEST_API_KEY`; `INGEST_ALLOWED_IPS` trống; `LDAP_URL` không phải `ldaps://`; `SESSION_SECRET` còn giá trị dev.
 
-- không có HTTPS cho ingest API: thiếu `INGEST_TRUST_PROXY` (HTTPS ở nginx) mà cũng không có `INGEST_TLS_CERT` / `INGEST_TLS_KEY` (HTTPS ngay tại app);
-- thiếu `INGEST_API_KEY`;
-- `INGEST_ALLOWED_IPS` để trống;
-- `LDAP_URL` có địa chỉ không phải `ldaps://`;
-- `SESSION_SECRET` còn giá trị dev.
+### 3.5. Chạy
 
-Phân quyền file: `chmod 600 server/.env`, chỉ tài khoản chạy app được đọc.
+Trước hết có chứng chỉ trong `cert/` (mục 3.6). Tường lửa: 443 cho người dùng; 8443 chỉ cho IP máy worker. Trên Linux, Docker giữ IP thật của client nên whitelist IP worker hoạt động đúng.
 
-### 3.5. Build và chạy server bằng Docker
+**A. docker-compose** (dựng app + migration + nginx; thêm DB nếu chọn DB trong Docker):
 
 ```bash
-cd bitlocker-management/server
-docker build -t blk-server:1.0 .
+# DB ngoài
+docker compose -f docker-compose.prod.yml up -d --build
+# DB trong Docker
+docker compose -f docker-compose.prod.yml --profile db --env-file server/.env up -d --build
+```
 
-# Chạy migration (dùng MIGRATION_DATABASE_URL)
-docker run --rm --env-file .env blk-server:1.0 node src/db/migrate.js
+Sao lưu nằm ở `./backups` (cấp quyền ghi cho uid 1000, mục 6.8). Log: `docker compose -f docker-compose.prod.yml logs -f server`.
 
-# Mạng riêng cho app và nginx
+**B. `docker run`** (DB ngoài):
+
+```bash
+cd server && docker build -t blk-server:1.0 .
+docker run --rm --env-file .env blk-server:1.0 node src/db/migrate.js      # migration
 docker network create blk
-
-# Chạy app: không mở cổng ra ngoài, chỉ nginx gọi tới (tên "server" trong mạng blk)
 docker run -d --name blk-server --network blk --network-alias server --restart unless-stopped \
   --log-driver local --log-opt max-size=50m --log-opt max-file=20 \
-  --env-file .env \
-  blk-server:1.0
-
-# Chạy nginx: HTTPS 443 (web) và 8443 (ingest), cùng một chứng chỉ trong /opt/blk/cert
+  -v /opt/blk/backups:/app/backups --env-file .env blk-server:1.0
 docker run -d --name blk-nginx --network blk --restart unless-stopped \
   --log-driver local --log-opt max-size=50m --log-opt max-file=20 \
   -p 443:443 -p 8443:8443 -p 80:80 \
-  -v /opt/blk/nginx/nginx.conf:/etc/nginx/nginx.conf:ro \
-  -v /opt/blk/cert:/etc/nginx/cert:ro \
+  -v /opt/blk/nginx/nginx.conf:/etc/nginx/nginx.conf:ro -v /opt/blk/cert:/etc/nginx/cert:ro \
   nginx:1.28.0-alpine
 ```
 
-- `/opt/blk/nginx/nginx.conf`: chép từ `nginx/nginx.conf` của repo. `/opt/blk/cert`: `server.crt` và `server.key` (mục 3.6).
-- Tường lửa: cổng 443 cho người dùng; cổng 8443 chỉ cho IP của máy worker (thêm một lớp ngoài `INGEST_ALLOWED_IPS`).
-- Trên máy chủ Linux, Docker giữ nguyên IP thật của client nên whitelist IP worker hoạt động đúng. (Docker Desktop
-  trên Windows / macOS thấy mọi client là IP gateway, ví dụ `172.18.0.1`, chỉ dùng cho dev.)
-- Kiểm tra: `curl -k https://localhost/healthz` trả về HTTP 200 với `"dbOk": true` khi app kết nối được DB. `degraded: true` nghĩa là chưa có lượt sync thành công trong 60 phút qua.
+`/opt/blk/nginx/nginx.conf` chép từ `nginx/nginx.conf` của repo; `/opt/blk/cert` chứa `server.crt`, `server.key`.
 
-Không dùng Docker thì cài Node.js 24 rồi chạy:
+**C. Không Docker** (Node.js 24; cần nginx hoặc proxy HTTPS tự dựng, cấu hình mẫu ở `nginx/nginx.conf`):
 
 ```bash
-cd server
-npm ci --omit=dev
-npm run migrate
-npm start            # nên chạy bằng systemd hoặc pm2 để tự khởi động lại
+cd server && npm ci --omit=dev && npm run migrate
+npm start            # chạy bằng systemd hoặc pm2 để tự khởi động lại
 ```
+
+Kiểm tra: `curl -k https://localhost/healthz` trả HTTP 200 với `"dbOk": true`; `degraded: true` nghĩa là chưa có lượt sync thành công trong 60 phút qua. Rồi đăng nhập và làm tiếp mục 5.
 
 ### 3.6. HTTPS và chứng chỉ
 
@@ -390,14 +340,19 @@ Lỗi thường gặp:
 
 ### 3.7. Cập nhật phiên bản
 
-```bash
-docker build -t blk-server:1.1 .
-docker run --rm --env-file .env blk-server:1.1 node src/db/migrate.js
-docker rm -f blk-server
-docker run -d --name blk-server ... blk-server:1.1     # cùng tham số như mục 3.5
-```
+Sao lưu DB trước (mục 6.8). Migration chỉ thêm, không sửa file cũ.
 
-Migration chỉ thêm, không sửa file cũ. Nên sao lưu DB trước khi cập nhật.
+```bash
+# A. docker-compose (thêm --profile db --env-file server/.env nếu DB trong Docker)
+docker compose -f docker-compose.prod.yml up -d --build
+
+# B. docker run: build bản mới, migrate, tạo lại container
+docker build -t blk-server:1.1 server && docker run --rm --env-file server/.env blk-server:1.1 node src/db/migrate.js
+docker rm -f blk-server && docker run -d --name blk-server ... blk-server:1.1     # tham số như mục 3.5
+
+# C. không Docker
+cd server && npm ci --omit=dev && npm run migrate && systemctl restart blk
+```
 
 ---
 
@@ -506,9 +461,9 @@ các OU đó, ví dụ:
   OU đã có trong danh sách được bỏ qua (không đọc hai lần).
 - Nếu một OU không đọc được (không tồn tại, thiếu quyền, referral), **cả lượt dừng lại** với mã lỗi
   `ldap_search_base_failed` và tên OU trong log. Worker không bỏ qua OU đó, vì nếu bỏ qua thì lượt full
-  sẽ coi mọi máy trong OU là "Không còn trong AD".
+  sẽ coi mọi máy trong OU là "Không còn trong phạm vi giám sát".
 - Máy nằm ngoài mọi OU trong danh sách thì worker không thấy; sau lượt full chúng bị gắn nhãn "Không
-  còn trong AD". Thêm OU mới vào `SearchBases` thì các máy đó tự trở lại.
+  còn trong phạm vi giám sát". Thêm OU mới vào `SearchBases` thì các máy đó tự trở lại.
 
 Bảng chọn kết nối LDAP:
 
@@ -540,100 +495,55 @@ Chạy thử một lượt full (không cần cài service):
 
 ### 4.6. Cài Windows Service
 
-Worker đọc AD bằng một trong ba cách. Chọn một cách, sửa `appsettings.json` cho khớp, rồi chạy
-script cài đặt trong PowerShell với quyền Administrator.
+Chọn một trong ba cách đọc AD, sửa `appsettings.json` cho khớp, rồi chạy `scripts\install-service.ps1` (đã có trong gói worker) trong PowerShell với quyền Administrator.
 
 | Cách | Service chạy bằng | `Ldap:Auth` | `Ldap:Username` / `Ldap:Password` | Mật khẩu nằm ở đâu |
 | --- | --- | --- | --- | --- |
-| **A. gMSA** (khuyến nghị) | `CORP\gmsa-blk$` | `Negotiate` | để trống | AD tự quản lý và tự đổi, không ai biết |
+| **A. gMSA** (khuyến nghị) | `CORP\gmsa-blk$` | `Negotiate` | để trống | AD tự quản lý và đổi |
 | **B. Tài khoản domain chạy service** | `CORP\svc-blk` | `Negotiate` | để trống | Windows lưu khi cài service |
-| **C. User + mật khẩu trong file cấu hình** | `NT SERVICE\BitlockerSync` (tài khoản ảo) | `Negotiate` hoặc `Basic` | `CORP\svc-blk` / `dpapi:...` | `appsettings.json`, đã mã hóa DPAPI |
+| **C. User + mật khẩu trong file cấu hình** | `NT SERVICE\BitlockerSync` (tài khoản ảo) | `Negotiate` hoặc `Basic` | `CORP\svc-blk` / `dpapi:...` | `appsettings.json`, mã hóa DPAPI |
 
-**Cách A: gMSA**
+**Cách A (gMSA)** và **cách B (tài khoản domain)**:
 
 ```powershell
-C:\BitlockerSync\scripts\install-service.ps1 -Account 'CORP\gmsa-blk$' -InstallDir C:\BitlockerSync
+C:\BitlockerSync\scripts\install-service.ps1 -Account 'CORP\gmsa-blk$' -InstallDir C:\BitlockerSync   # A
+C:\BitlockerSync\scripts\install-service.ps1 -Account 'CORP\svc-blk'   -InstallDir C:\BitlockerSync   # B (script hỏi mật khẩu)
 Start-Service BitlockerSync
 ```
 
-**Cách B: service chạy bằng tài khoản domain thường**
+Cách B cần lưu ý:
 
-Service đăng nhập Windows bằng chính tài khoản `svc-blk`, và worker dùng tài khoản đó để đọc AD.
+- Tài khoản cần quyền **Log on as a service**. `Start-Service` báo lỗi 1069 thì cấp tại `secpol.msc` > User Rights Assignment (nếu GPO quản lý quyền này thì thêm vào GPO, vì thêm ở máy sẽ bị GPO ghi đè).
+- Đổi mật khẩu `svc-blk` trên AD thì chạy lại script (hoặc `services.msc` > BitlockerSync > Log On) rồi khởi động lại service; quên thì watchdog cảnh báo "Sync worker không gửi heartbeat".
+- Đặt mật khẩu dài ngẫu nhiên, bỏ quyền đăng nhập tương tác (Deny log on locally / through Remote Desktop).
 
-```powershell
-C:\BitlockerSync\scripts\install-service.ps1 -Account 'CORP\svc-blk' -InstallDir C:\BitlockerSync
-# Script hỏi mật khẩu của CORP\svc-blk (cửa sổ nhập mật khẩu của Windows)
-Start-Service BitlockerSync
-```
+**Cách C (user + mật khẩu trong `appsettings.json`)**: service chạy bằng tài khoản ảo, không cần mật khẩu; worker bind LDAP bằng user và mật khẩu trong file. Cũng là cách duy nhất khi máy worker **không join domain**.
 
-Lưu ý:
-
-- Tài khoản cần quyền **Log on as a service** trên máy worker. Nếu `Start-Service` báo lỗi 1069
-  ("logon failure"), cấp quyền này tại `secpol.msc` > Local Policies > User Rights Assignment >
-  Log on as a service. Nếu GPO của domain quản lý quyền này, phải thêm tài khoản vào GPO, vì thêm ở
-  máy sẽ bị GPO ghi đè.
-- Khi đổi mật khẩu `svc-blk` trên AD, phải chạy lại script (hoặc vào `services.msc` > BitlockerSync >
-  Log On) để cập nhật mật khẩu, rồi khởi động lại service. Nếu quên, service không chạy được và
-  watchdog sẽ cảnh báo "Sync worker không gửi heartbeat".
-- Nên đặt cho `svc-blk` một mật khẩu dài, ngẫu nhiên. Có thể bật "Password never expires" nếu chính
-  sách cho phép; nếu không, ghi lịch đổi mật khẩu cùng với bước cập nhật service.
-- Bỏ quyền đăng nhập tương tác của `svc-blk` (Deny log on locally / through Remote Desktop).
-
-**Cách C: user + mật khẩu ghi trong `appsettings.json`**
-
-Service chạy bằng tài khoản ảo của chính nó, không cần mật khẩu. Worker bind LDAP bằng user và mật
-khẩu trong file cấu hình. Đây cũng là cách duy nhất khi máy worker **không join domain**.
-
-1. Mã hóa mật khẩu của `svc-blk` trên chính máy worker:
-
-   ```powershell
-   cd C:\BitlockerSync
-   .\BitlockerSync.Worker.exe protect
-   # nhập mật khẩu -> nhận chuỗi dpapi:...
-   ```
-
+1. Mã hóa mật khẩu trên chính máy worker: `cd C:\BitlockerSync` rồi `.\BitlockerSync.Worker.exe protect` (nhập mật khẩu, nhận chuỗi `dpapi:...`).
 2. Sửa `appsettings.json`:
 
    ```jsonc
    "Ldap": {
      "Protocol": "Ldaps",
-     "Auth": "Negotiate",            // hoặc "Basic" (simple bind); Basic bắt buộc dùng Ldaps hoặc StartTls
+     "Auth": "Negotiate",            // hoặc "Basic" (simple bind, bắt buộc Ldaps hoặc StartTls)
      "Username": "CORP\\svc-blk",    // hoặc "svc-blk@corp.local"; trong JSON phải viết \\
      "Password": "dpapi:AQAAANCMnd8B...",
      ...
    }
    ```
 
-3. Cài service:
+3. Cài service: `C:\BitlockerSync\scripts\install-service.ps1 -Account 'NT SERVICE\BitlockerSync' -InstallDir C:\BitlockerSync`, rồi `Start-Service BitlockerSync`.
 
-   ```powershell
-   C:\BitlockerSync\scripts\install-service.ps1 -Account 'NT SERVICE\BitlockerSync' -InstallDir C:\BitlockerSync
-   Start-Service BitlockerSync
-   ```
-
-Lưu ý:
-
-- Chuỗi `dpapi:` chỉ giải mã được trên đúng máy đã mã hóa, nhưng mọi tiến trình trên máy đó đều giải
-  mã được. Vì vậy script khóa quyền `appsettings.json`: chỉ Administrators, SYSTEM và tài khoản
-  service được đọc. Chép file cấu hình sang máy khác thì phải chạy lại `protect` trên máy mới.
-- Khi đổi mật khẩu `svc-blk` trên AD: chạy lại `protect`, dán chuỗi mới vào `Ldap:Password`, rồi
-  `Restart-Service BitlockerSync`.
-- Nếu máy worker không join domain: dùng `Ldaps` và đặt `Ldap:Servers` là tên DC mà máy phân giải
-  được. Máy worker phải tin CA đã cấp chứng chỉ LDAPS của DC (import vào
-  `LocalMachine\Trusted Root Certification Authorities`).
+- Chuỗi `dpapi:` chỉ giải mã được trên đúng máy đã mã hóa nhưng mọi tiến trình trên máy đó đều giải mã được, nên script khóa quyền `appsettings.json` (chỉ Administrators, SYSTEM và tài khoản service). Chép cấu hình sang máy khác thì chạy lại `protect`.
+- Đổi mật khẩu `svc-blk` trên AD: chạy lại `protect`, dán chuỗi mới vào `Ldap:Password`, `Restart-Service BitlockerSync`.
+- Máy không join domain: dùng `Ldaps`, đặt `Ldap:Servers` là tên DC phân giải được, và import CA đã cấp chứng chỉ LDAPS của DC vào `LocalMachine\Trusted Root Certification Authorities`.
 
 **Sau khi cài (cả ba cách)**
 
-- Script cấp quyền ghi thư mục trạng thái `C:\ProgramData\BitlockerSync` cho tài khoản service, rồi
-  chạy `check` **bằng tài khoản Administrator đang dùng**. Với cách A và B, quyền đọc AD của service
-  có thể khác kết quả `check`. Hãy xem log sau lượt full đầu tiên: nếu có key không đọc được mật
-  khẩu, kiểm tra lại quyền ở mục 4.1.
-- Muốn đổi cách chạy (ví dụ từ B sang A), chạy lại script với `-Account` mới; script cập nhật service
-  đang có.
-- Log ghi vào Event Viewer > Windows Logs > Application, source `BitlockerSync`. Log không bao giờ
-  chứa key.
-- Lịch chạy: heartbeat mỗi 5 phút, delta mỗi 15 phút, full lúc 01:00 và ngay lần đầu khởi động.
-  Admin HQ cũng có thể bấm yêu cầu sync ở Quản trị > Sync AD; worker chạy ở lần heartbeat kế tiếp.
+- Script cấp quyền ghi `C:\ProgramData\BitlockerSync` cho tài khoản service rồi chạy `check` bằng tài khoản Administrator đang dùng; với cách A, B quyền đọc AD của service có thể khác kết quả `check`. Xem log sau lượt full đầu: có key không đọc được mật khẩu thì kiểm tra quyền ở mục 4.1.
+- Đổi cách chạy (ví dụ B sang A): chạy lại script với `-Account` mới, script cập nhật service đang có.
+- Log ở Event Viewer > Windows Logs > Application, source `BitlockerSync` (không bao giờ chứa key).
+- Lịch: heartbeat mỗi 5 phút, delta mỗi 15 phút, full lúc 01:00 và ngay lần đầu khởi động. Admin HQ cũng bấm yêu cầu sync ở Quản trị > Đồng bộ AD; worker chạy ở lần heartbeat kế tiếp.
 
 ### 4.7. Cập nhật worker lên phiên bản mới
 
@@ -968,6 +878,27 @@ sudo systemctl daemon-reload && sudo userdel blk-sync
 
 ## 6. Vận hành hằng ngày
 
+### 6.0. Delta và full sync: cái nào phát hiện gì
+
+**Phạm vi giám sát** là các OU khai báo trong `Ldap.SearchBases` của worker: worker chỉ nhìn máy nằm trong đó. Máy **"Không còn trong phạm vi giám sát"** là máy lượt full
+không còn thấy, vì **bị xóa khỏi AD** hoặc **bị chuyển ra ngoài các `SearchBases`**. Hệ thống không phân biệt được hai trường hợp này (cả hai đều biến mất khỏi kết quả
+tìm), nên không ghi "đã bị xóa khỏi AD". Dữ liệu và key của máy luôn được giữ; máy xuất hiện lại trong phạm vi thì tự trở lại bình thường.
+
+Worker chạy **delta** mỗi 15 phút (chỉ đọc object có `uSNChanged` mới) và **full** một lần mỗi đêm (giờ `FullAt`, mặc định
+01:00; chạy thêm một lần ngay khi worker khởi động lần đầu). Hai loại thấy những thay đổi khác nhau:
+
+| Thay đổi trên AD | Delta (mỗi 15 phút) | Full (ban đêm) |
+| --- | --- | --- |
+| Máy mới, đổi tên, sửa thuộc tính, key mới | Thấy | Thấy |
+| Máy chuyển OU, **vẫn trong các `SearchBases`** (ví dụ từ OU chi nhánh A sang B) | Thấy: đổi chi nhánh, ghi `computer_moved` | Thấy |
+| Máy bị **xóa** khỏi AD | **Không thấy** (AD xóa object, delta không đọc được) | Thấy: máy không còn trong kết quả, gắn nhãn "Không còn trong phạm vi giám sát" |
+| Máy chuyển **ra ngoài** `SearchBases` | **Không thấy** (biến mất khỏi phạm vi tìm) | Thấy: như bị xóa |
+
+Vì vậy máy bị xóa hoặc chuyển ra khỏi phạm vi chỉ được cập nhật **sau lượt full ban đêm**, tối đa khoảng một ngày. Đây là chủ ý:
+full chỉ chạy ban đêm để không tải AD trong giờ làm việc. Cần cập nhật ngay thì Admin HQ bấm **Full** ở Quản trị > Đồng bộ AD > Tình trạng
+sync (yêu cầu sync từ web, worker làm ở lần heartbeat tới, tối đa 5 phút). Máy chưa bị gắn nhãn thì vẫn hiện còn trong phạm vi giám sát
+và vẫn xem được key; key của máy đã xóa vẫn được giữ (không bao giờ xóa).
+
 ### 6.1. Lượt sync bị giữ lại (cách ly)
 
 Các ngưỡng dưới đây (và ngưỡng của watchdog ở mục 6.2) chỉnh được tại **Quản trị > Ngưỡng cảnh báo**.
@@ -983,13 +914,22 @@ này, gửi cảnh báo và chờ Admin HQ quyết định:
 | Lượt full thấy ít máy hơn hẳn so với DB | dưới 95% |
 | Lượt full thấy ít key hơn hẳn so với DB | dưới 95% |
 | Một chi nhánh giảm mạnh so với mức thường | giảm hơn 20% và hơn 10 máy |
-| Lượt full không thấy nhiều máy (các máy này sẽ bị gắn nhãn "Không còn trong AD") | quá 5% |
+| Lượt full không thấy nhiều máy (các máy này sẽ bị gắn nhãn "Không còn trong phạm vi giám sát") | quá 5% |
 | Đọc được key nhưng mật khẩu rỗng (tài khoản sync mất quyền) | từ 1 key |
 
-Xử lý tại Quản trị > Sync AD:
+Xử lý tại Quản trị > Đồng bộ AD > Tình trạng sync: bấm **Xem chi tiết và quyết định** ở lượt bị giữ để mở trang
+**xem trước** (cũng có qua `GET /api/admin/sync-runs/{id}`), gồm:
+
+- Lý do bị giữ lại; số máy / key lượt này thấy so với hệ thống, theo từng chi nhánh (chênh lệch tô đỏ).
+- **Nếu chấp nhận**: số máy sẽ bị gắn nhãn "Không còn trong phạm vi giám sát" theo chi nhánh (kèm số key của chúng) và danh sách
+  máy (tên, objectGUID, DN, lần thấy cuối); mốc USN sẽ được lưu.
+- **Lượt này đã lưu**: máy mới và key mới (Key ID đầy đủ) mà lượt đã ghi nhận, giữ nguyên dù quyết định thế nào.
+
+Nút Chấp nhận / Bác bỏ chỉ nằm ở trang này (có hỏi xác nhận):
+
 
 - **Chấp nhận** khi thay đổi là thật, ví dụ vừa xóa hàng loạt máy cũ trong AD. Khi đó app gắn nhãn
-  "Không còn trong AD" và lưu mốc USN.
+  "Không còn trong phạm vi giám sát" và lưu mốc USN.
 - **Bác bỏ** khi dữ liệu sai, ví dụ DC lỗi hoặc tài khoản mất quyền. Khi đó không áp dụng gì và lượt
   full sau đọc lại từ đầu.
 
@@ -997,16 +937,22 @@ Key mới đọc được trong lượt bị giữ vẫn được lưu ngay, vì
 
 ### 6.2. Cảnh báo
 
-Watchdog chạy mỗi 5 phút và kiểm tra các điều kiện: worker không gửi heartbeat, quá lâu không có lượt
-sync thành công, worker không đọc được AD, chứng chỉ LDAPS sắp hết hạn, DC ngừng replicate, máy mới
-không lưu key lên AD...
+Watchdog chạy mỗi 5 phút (đổi ở Quản trị > Ngưỡng cảnh báo, mục 6.16) và phân biệt **hai loại sự cố khác nhau**, mỗi loại một trạng thái và **một** email:
 
-- Gặp **ít nhất một** điều kiện: đồng bộ AD được đánh dấu **Offline** và gửi **một** email/Teams
-  "Đồng bộ AD đang Offline (N sự cố)" liệt kê các điều kiện đang gặp (không gửi mail riêng cho từng điều kiện).
-- Còn Offline: gửi nhắc lại **tối đa 1 lần mỗi ngày** (theo ngày lịch, APP_TZ), dù watchdog vẫn chạy mỗi 5 phút.
-- Hết mọi điều kiện: tự về **Online**, **không gửi gì nữa** (không có mail "đã khôi phục").
-- Trạng thái Online / Offline và từng cảnh báo đang mở xem ở **Quản trị > Sync AD**; trang Tổng quan
-  của Admin HQ hiện "Đồng bộ AD đang Offline từ …".
+| | Worker (agent) Offline | Đồng bộ AD có sự cố |
+| --- | --- | --- |
+| Nghĩa là | Worker không gửi heartbeat quá ngưỡng (mặc định 15 phút): worker chết, máy worker tắt, mất mạng tới app, sai API key / IP whitelist / chứng chỉ | Worker **vẫn chạy** nhưng AD hoặc việc đồng bộ có vấn đề |
+| Điều kiện | Không có heartbeat | Worker không đọc được AD (**DC offline**, sai quyền, lỗi TLS), lâu không có lượt sync thành công, lượt sync bị treo, canary cũ, USN của DC đứng yên, chứng chỉ LDAPS sắp hết hạn, máy mới không lưu key lên AD, tỉ lệ máy chưa có key tăng |
+| Email | "Worker đồng bộ AD đang Offline" (mẫu `worker_offline`) | "Đồng bộ AD có sự cố (N)" liệt kê các điều kiện (mẫu `sync_problem`) |
+
+- Khi **worker Offline**, trạng thái AD là **chưa xác định**: các điều kiện cần worker chạy (lâu không sync, canary,
+  USN, LDAP) **không báo thêm**, vì chỉ là hệ quả của việc worker chết. Nhờ vậy một mất kết nối của worker không
+  bị đọc nhầm thành "AD hỏng", và ngược lại AD / DC lỗi không bị đọc nhầm thành "worker chết".
+- Mỗi loại: gửi khi bắt đầu, nhắc lại **tối đa 1 lần mỗi ngày** (theo ngày lịch, APP_TZ) dù watchdog chạy mỗi 5 phút,
+  và **không gửi gì nữa** khi hết sự cố (không có mail "đã khôi phục").
+- Xem ở **Quản trị > Đồng bộ AD > Tình trạng sync**: hai ô **Worker (agent)** (● Online xanh / ● Offline đỏ) và **Đồng bộ AD**
+  (● Bình thường / ● Có sự cố / chưa xác định), bên dưới là từng cảnh báo đang mở. Trang Tổng quan của Admin HQ và báo cáo
+  email hằng ngày hiện cùng hai trạng thái.
 
 Chuỗi hash của nhật ký bị gãy (kiểm tra mỗi ngày) và lượt sync báo lỗi vẫn gửi cảnh báo riêng như cũ.
 
@@ -1032,7 +978,7 @@ nhánh của người xem:
 
 | Biểu đồ | Ai thấy | Cách tính |
 | --- | --- | --- |
-| Số máy trên hệ thống, 30 ngày | Mọi người dùng | Máy được tính từ ngày hệ thống ghi nhận đến khi bị gắn nhãn "Không còn trong AD" (theo chi nhánh hiện tại của máy) |
+| Số máy trên hệ thống, 30 ngày | Mọi người dùng | Máy được tính từ ngày hệ thống ghi nhận đến khi bị gắn nhãn "Không còn trong phạm vi giám sát" (theo chi nhánh hiện tại của máy) |
 | Số key trên hệ thống, 30 ngày | Mọi người dùng | Key được tính từ ngày ghi nhận (key không bao giờ bị xóa) |
 | Lượt hiện key mỗi ngày, 14 ngày | Trưởng IT, Admin HQ, Auditor | Số dòng `reveal` trong nhật ký truy cập |
 
@@ -1045,77 +991,31 @@ trang Tìm máy. Số liệu đầy đủ (số máy, có key, chưa có key, s�
 **Xem bảng số liệu** ngay dưới biểu đồ. Mặc định hiện 10 chi nhánh nhiều máy nhất; bấm **Xem tất cả** để hiện đủ. Báo cáo đầy đủ theo kỳ ở
 trang Báo cáo (mục 6.11).
 
-### 6.3. Trang Quản trị: mail, thông báo, tính năng, ngưỡng, lưu trữ
+### 6.3. Trang Quản trị
 
-Mọi cấu hình của Admin HQ nằm trong menu **Quản trị**, gom thành 4 nhóm (hàng nút trên cùng); bấm một nhóm thì
-hàng dưới hiện các tab của nhóm đó:
+Mọi cấu hình của Admin HQ nằm trong menu **Quản trị**, gom thành 4 nhóm; bấm một nhóm thì hàng dưới hiện các tab:
 
-| Nhóm | Tab |
-| --- | --- |
-| Người dùng & chi nhánh | Chi nhánh & OU, Người dùng |
-| Đồng bộ AD | Tình trạng sync (Sync AD: mỗi worker có nhãn **Online** xanh khi có heartbeat trong ngưỡng watchdog, mặc định 15 phút, **Offline** đỏ khi quá), Ngưỡng cảnh báo |
-| Email | Thông báo, Mail server, Log email |
-| Hệ thống | Bảo mật, Sao lưu, Tính năng, Lưu trữ |
+| Nhóm | Tab | Nội dung |
+| --- | --- | --- |
+| Người dùng & chi nhánh | Chi nhánh & OU | Thêm/sửa/xóa chi nhánh và OU gốc (lưu là quét lại máy theo OU ngay; xóa thì máy về N/A, gõ mã để xác nhận). Máy ngoài mọi OU là N/A |
+| | Người dùng | Tài khoản, email, cách đăng nhập, quyền |
+| Đồng bộ AD | Tình trạng sync | Hai ô **Worker** Online / Offline (Online = có heartbeat trong ngưỡng, mặc định 15 phút) và **Đồng bộ AD** Bình thường / Có sự cố (mục 6.2); yêu cầu sync, chấp nhận / bác bỏ lượt bị giữ lại |
+| | Ngưỡng cảnh báo | Ngưỡng giữ lại lượt sync (6.1) và watchdog (6.2). Mỗi ô có khoảng cho phép và mặc định; ngoài khoảng bị từ chối. Ngưỡng trong khung viền xanh phải vượt cùng lúc (VÀ), còn lại độc lập (HOẶC). Có hiệu lực trong 30 giây, ghi nhật ký `settings_thresholds` |
+| Email | Thông báo | Bật/tắt email cảnh báo (Admin HQ và địa chỉ thêm); email khi có **máy mới** / **key mới** (gửi người dùng chi nhánh và/hoặc Admin HQ); **báo cáo hằng ngày** (mục 6.11) |
+| | Mail server | SMTP: địa chỉ, cổng, STARTTLS/SSL/không mã hóa, tài khoản, địa chỉ gửi, địa chỉ web của app; nút **Gửi thử** |
+| | Log email | Mọi email hệ thống tạo ra (chờ gửi / đã gửi / thất bại / không gửi), ghi **đã gửi cho ai** và **ai lẽ ra nhận nhưng chưa có email**; lọc, tìm, xem nội dung, gửi lại mail thất bại |
+| Hệ thống | Bảo mật | Khóa tài khoản khi đăng nhập sai, chính sách mật khẩu, thời gian phiên (mục 6.14) |
+| | Sao lưu | Mục 6.8 |
+| | Tính năng | **Số dòng mỗi trang** (Tìm máy 25, Nhật ký 50, Log email 50, Báo cáo chi nhánh 20; 5–200); bật/tắt yêu cầu sync từ web, xuất CSV nhật ký / danh sách máy, cảnh báo xem key ngoài giờ, bắt buộc số ticket; ai được **xuất kèm recovery key**: tắt (mặc định) / chỉ Admin HQ / IT, Trưởng IT và Admin HQ |
+| | Lưu trữ | Số ngày giữ nhật ký, lịch sử sync, email (mục 6.7) |
 
-Nội dung từng tab:
+**Cách gửi mail**
 
-| Tab | Nội dung |
-| --- | --- |
-| Chi nhánh & OU | Thêm/sửa/xóa chi nhánh và OU gốc (lưu là quét lại máy theo OU ngay; xóa thì máy về N/A, có bước gõ mã để xác nhận); máy ngoài mọi OU hiển thị là N/A |
-| Người dùng | Tài khoản, email, cách đăng nhập, quyền |
-| Sync AD | Tình trạng sync, yêu cầu sync, chấp nhận/bác bỏ lượt bị giữ lại |
-| Ngưỡng cảnh báo | Ngưỡng giữ lại lượt sync (mục 6.1) và ngưỡng watchdog (mục 6.2). Mỗi ô có khoảng cho phép và giá trị mặc định bên cạnh; giá trị ngoài khoảng bị từ chối. Các ngưỡng phải vượt cùng lúc (VÀ) được gom trong một khung viền xanh; các ngưỡng còn lại độc lập (HOẶC). Thay đổi có hiệu lực trong vòng 30 giây và được ghi nhật ký (`admin_change`, `settings_thresholds`) |
-| Mail server | SMTP: địa chỉ, cổng, STARTTLS/SSL/không mã hóa, tài khoản xác thực, địa chỉ gửi, địa chỉ web của app; nút **Gửi thử** |
-| Thông báo | Bật/tắt email cảnh báo (gửi Admin HQ và các địa chỉ thêm); email khi có **máy mới** / **key mới**, gửi cho người dùng của chi nhánh và/hoặc Admin HQ; **báo cáo hằng ngày** (bật/tắt, giờ gửi, kỳ số liệu, người nhận, nút **Gửi thử báo cáo ngay**) |
-| Log email | Mọi email hệ thống tạo ra: chờ gửi / đã gửi / thất bại / không gửi (thiếu email). Mỗi email ghi **đã gửi cho ai** và **ai lẽ ra nhận nhưng chưa có email**; lọc, tìm theo tiêu đề / email / tên người dùng, xem nội dung, gửi lại mail thất bại |
-| Bảo mật | **Chính sách mật khẩu** tài khoản nội bộ (độ dài tối thiểu, độ phức tạp); thời gian **tự đăng xuất khi không hoạt động** (5–480 phút) và **thời gian tối đa của phiên** (1–24 giờ); mặc định lấy từ `SESSION_IDLE_MINUTES` / `SESSION_MAX_HOURS` (mục 6.14) |
-| Tính năng | Bật/tắt: yêu cầu sync từ web, xuất CSV nhật ký, xuất CSV danh sách máy, cảnh báo khi xem key ngoài giờ làm việc, bắt buộc số ticket. Chọn ai được **xuất kèm recovery key**: tắt (mặc định) / chỉ Admin HQ / IT, Trưởng IT và Admin HQ |
-| Sao lưu | Sao lưu máy + recovery key (CSV) và database (pg_dump) ra file .zip mã hóa AES-256: lịch hằng ngày, mật khẩu mã hóa, số bản giữ lại, **Sao lưu ngay**, tải file (mục 6.8) |
-| Lưu trữ | Số ngày giữ **nhật ký truy cập** (mặc định giữ mãi, tối thiểu 365), **lịch sử sync** (mặc định 180, tối thiểu 30) và **email** (mặc định 90); nút **Dọn dẹp ngay** |
-
-Cách gửi mail:
-
-- Mọi email được ghi vào bảng `mail_outbox` trước. Job `mail-outbox` chạy mỗi phút để gửi. Lỗi tạm
-  thời được thử lại sau 1, 5, 15, 60 và 240 phút; sau đó mail bị đánh dấu thất bại và Admin HQ có
-  thể bấm gửi lại.
-- Job `data-retention` chạy lúc 03:00 và xóa dữ liệu quá hạn theo tab Lưu trữ (xem mục 6.7). Mail
-  đang chờ gửi không bị xóa.
-- Mật khẩu SMTP được mã hóa AES-256-GCM bằng khóa suy ra từ `LOG_HMAC_KEY`, và không bao giờ hiển
-  thị lại. Đổi `LOG_HMAC_KEY` thì phải nhập lại mật khẩu SMTP.
-- Nếu tắt mail server trong Quản trị, app dùng `SMTP_URL` trong `.env` (nếu có). Các địa chỉ trong
-  `NOTIFY_TO` luôn nhận email cảnh báo.
-- Email máy mới / key mới: sau mỗi lượt sync, mỗi người nhận **một** email gom các máy/key mới trong
-  phạm vi của họ. Người dùng chi nhánh (vai trò IT, Trưởng IT) chỉ nhận máy thuộc OU chi nhánh mình;
-  Admin HQ nhận tất cả, kể cả máy N/A. Mặc định không gửi cho lượt full sync đầu tiên (lượt này thấy
-  mọi máy là mới). Email chỉ có Key ID, **không bao giờ có recovery key**.
-- Chỉ người dùng đang hoạt động và có email mới nhận được. Người dùng lẽ ra nhận nhưng **chưa có email**
-  vẫn được ghi lại: Log email hiện "Không có email: <tên người dùng>" trên đúng email đó.
-- Email máy mới / key mới: những người nhận cùng một danh sách (ví dụ các Admin HQ, IT cùng chi nhánh) được gộp
-  vào **một** email, nên mỗi dòng log cho thấy đầy đủ gửi cho ai và ai thiếu email.
-- Không ai trong số người nhận có email: email vẫn được lưu với trạng thái **Không gửi (thiếu email)**, kèm lý
-  do và nguyên nội dung, để Admin HQ biết đã bỏ lỡ thông báo nào. Thêm email ở Quản trị > Người dùng; các
-  lượt sync sau sẽ gửi bình thường (email đã lỡ không tự gửi lại).
-- Mail server đang tắt hoặc chưa cấu hình: email nằm ở **Chờ gửi** (ghi chú "SMTP server not configured")
-  và tự gửi khi bật Mail server.
-
-**Báo cáo hằng ngày** (Quản trị > Thông báo > Báo cáo hằng ngày, mặc định tắt):
-
-- Mỗi ngày **một** email (HTML, kèm bản chữ thường) gửi mọi Admin HQ có email (nếu chọn) và các địa chỉ thêm.
-- **Giờ gửi** theo `APP_TZ` (mặc định 07:30). Job `daily-report` kiểm tra mỗi phút; quá giờ mà hôm nay chưa gửi thì gửi
-  (app tắt lúc đến giờ thì gửi bù khi chạy lại). Bật sau giờ gửi của hôm nay thì báo cáo đầu tiên vào ngày mai.
-- **Số liệu của**: *Hôm qua (cả ngày)*, hợp với gửi buổi sáng; hoặc *Hôm nay, tính đến giờ gửi*, hợp với gửi cuối ngày.
-- Nội dung:
-  - **Đồng bộ AD**: Online / Offline (từ lúc nào), từng worker (heartbeat gần nhất, còn chạy hay không, LDAP OK hay lỗi, DC),
-    lượt sync thành công / full gần nhất, số lượt thành công / lỗi / bị giữ lại trong kỳ, lượt chờ duyệt, cảnh báo đang mở,
-    Key ID trùng chưa xem xét.
-  - **Máy** và **key**: tổng hiện tại và tăng / giảm so với ngày trước; máy mới ghi nhận, máy không còn trong AD; key mới
-    ghi nhận, key thuộc máy vừa rời AD (vẫn lưu), key chuyển máy (join lại AD).
-  - **Chi nhánh có thay đổi** (tối đa 15): máy mới, rời AD, key mới.
-  - **Biểu đồ cột số máy và số key 10 ngày gần nhất** (số cuối mỗi ngày, dòng dưới là tăng / giảm). Biểu đồ dựng bằng
-    bảng HTML nên hiện được trên Outlook, Gmail và điện thoại, không cần ảnh đính kèm.
-- Không có recovery key, không liệt kê máy. Tiêu đề và câu mở đầu sửa được ở mẫu `daily_report` (mục 6.6).
-- **Gửi thử báo cáo ngay** tạo báo cáo với cấu hình đã lưu và gửi ngay (không tính là báo cáo theo lịch). Log email có
-  nút **Xem bản HTML** để xem email đúng như trong hộp thư.
+- Mọi email ghi vào bảng `mail_outbox` trước; job `mail-outbox` chạy mỗi phút để gửi. Lỗi tạm thời thử lại sau 1, 5, 15, 60, 240 phút, sau đó đánh dấu thất bại để Admin HQ gửi lại.
+- Mật khẩu SMTP mã hóa AES-256-GCM bằng khóa suy ra từ `LOG_HMAC_KEY`, không hiện lại (đổi `LOG_HMAC_KEY` thì nhập lại). Tắt mail server trong Quản trị thì app dùng `SMTP_URL` trong `.env` (nếu có); `NOTIFY_TO` luôn nhận email cảnh báo.
+- Mail server tắt hoặc chưa cấu hình: email nằm ở **Chờ gửi** và tự gửi khi bật.
+- **Máy mới / key mới**: sau mỗi lượt sync, mỗi người nhận **một** email gom các máy/key mới trong phạm vi của họ (IT, Trưởng IT: máy thuộc OU chi nhánh mình; Admin HQ: tất cả, kể cả N/A). Mặc định không gửi cho lượt full đầu tiên. Email ghi tên máy và Key ID đầy đủ; recovery password **không bao giờ gửi qua email**.
+- Chỉ người dùng đang hoạt động và có email mới nhận. Người lẽ ra nhận nhưng chưa có email được ghi trên đúng email đó ("Không có email: <tên>"). Không ai có email thì email lưu với trạng thái **Không gửi (thiếu email)** kèm nội dung (không tự gửi lại; thêm email ở Quản trị > Người dùng cho các lượt sau).
 
 ### 6.4. Bộ lọc và xuất dữ liệu ở trang Tìm máy
 
@@ -1130,7 +1030,7 @@ Cả hai hiện trong danh sách máy, kết quả tìm kiếm, trang chi tiết
 CSV.
 
 Bộ lọc của danh sách "Máy trong phạm vi của bạn": chi nhánh (kể cả N/A), tình trạng, có tính máy không
-còn trong AD hay không, và **khoảng ngày xuất hiện**: chọn lọc theo ngày *Ghi nhận trên hệ thống*
+còn trong phạm vi giám sát hay không, và **khoảng ngày xuất hiện**: chọn lọc theo ngày *Ghi nhận trên hệ thống*
 (mặc định) hoặc *Tạo trên AD*, rồi nhập từ ngày / đến ngày (tính cả hai đầu, theo giờ `APP_TZ`). Ví dụ
 xem máy mới xuất hiện tuần này: Ghi nhận trên hệ thống, từ thứ Hai đến hôm nay.
 
@@ -1139,7 +1039,7 @@ Danh sách có hai nút xuất. Cả hai xuất **toàn bộ** danh sách theo b
 
 | Nút | Nội dung file CSV | Ai dùng | Ghi nhật ký |
 | --- | --- | --- | --- |
-| **Xuất CSV** | Tên máy, GUID máy (`object_guid`), DNS, chi nhánh, DN, OS, serial máy, email người dùng, số key, ngày key mới nhất, ngày tạo trên AD (`ad_created_utc`), ngày ghi nhận (`first_seen_utc`), còn trong AD hay không. **Không có key** | IT, Trưởng IT, Admin HQ (tắt được ở tab Tính năng) | Một dòng `export_computers` |
+| **Xuất CSV** | Tên máy, GUID máy (`object_guid`), DNS, chi nhánh, DN, OS, serial máy, email người dùng, số key, ngày key mới nhất, ngày tạo trên AD (`ad_created_utc`), ngày ghi nhận (`first_seen_utc`), còn trong phạm vi giám sát hay không. **Không có key** | IT, Trưởng IT, Admin HQ (tắt được ở tab Tính năng) | Một dòng `export_computers` |
 | **Xuất kèm key** | Mỗi dòng một key: máy, GUID máy (`computer_object_guid`), chi nhánh, DN, Key ID, ổ đĩa (volume GUID), serial máy, email người dùng, trạng thái, ngày tạo trên AD (`key_created_utc`), ngày ghi nhận (`key_recorded_utc`), **recovery password** | Theo tab Tính năng: tắt (mặc định) / chỉ Admin HQ / IT, Trưởng IT và Admin HQ | Mỗi key một dòng `reveal` (như hiện key) + một dòng `export_keys`; Admin HQ nhận cảnh báo |
 
 Xuất kèm key đi qua một trang xác nhận: trang này cho biết số key và số máy sẽ xuất, và bắt chọn lý
@@ -1192,9 +1092,10 @@ Chỉ `subject`, `body` (và `parts` của `new_objects`) tạo nên email; các
 | --- | --- |
 | `sync_failed`, `sync_failed_recovered` | Worker báo lượt sync lỗi; lượt sau thành công |
 | `sync_anomaly`, `sync_anomaly_recovered` | Lượt sync bị giữ lại vì số liệu bất thường; Admin HQ chấp nhận / bác bỏ |
-| `sync_offline` | Watchdog: mail duy nhất khi đồng bộ AD Offline, liệt kê các điều kiện; tối đa 1 lần mỗi ngày, hết lỗi thì không gửi |
+| `worker_offline` | Watchdog: worker (agent) không gửi heartbeat; tối đa 1 lần mỗi ngày, hết thì không gửi |
+| `sync_problem` | Watchdog: worker chạy nhưng AD / đồng bộ có sự cố (DC offline, không đọc được AD, lâu không sync...), liệt kê các điều kiện; tối đa 1 lần mỗi ngày, hết thì không gửi |
 | `worker_silent`, `sync_stale`, `full_stale`, `sync_run_aborted`, `ldap_error`, `dc_cert_expiring`, `canary_stale`, `dc_usn_stalled`, `escrow_broken`, `no_key_rising` | Điều kiện của watchdog: không gửi mail riêng; tiêu đề hiện ở Quản trị > Sync AD và trong mail `sync_offline` |
-| `audit_chain_broken`, `audit_chain_broken_recovered` | Kiểm tra chuỗi hash nhật ký (02:00 hằng ngày) |
+| `audit_chain_broken`, `audit_chain_broken_recovered` | Kiểm tra chuỗi hash nhật ký (02:00 hằng ngày, đổi ở Quản trị > Bảo mật) |
 | `recovered` | Thông báo "đã khôi phục" chung cho cảnh báo không có mẫu `<tên>_recovered` riêng (watchdog không dùng) |
 | `reveal_out_of_hours` | Có người hiện key ngoài giờ làm việc |
 | `key_export` | Có người xuất kèm recovery key ra CSV |
@@ -1230,28 +1131,181 @@ thể thêm mẫu, và app sẽ báo thiếu mẫu nếu file của bạn chưa 
 
 ### 6.7. Thời gian lưu trữ
 
-Tab Quản trị > Lưu trữ. Job `data-retention` chạy lúc 03:00 hằng ngày (hoặc bấm **Dọn dẹp ngay**):
+Tab Quản trị > Lưu trữ. Job `data-retention` chạy hằng ngày (mặc định 03:00) hoặc khi bấm **Dọn dẹp ngay**:
 
 | Dữ liệu | Mặc định | Giới hạn | Ghi chú |
 | --- | --- | --- | --- |
-| Nhật ký truy cập (`access_log`) | Giữ mãi | Tối thiểu 365 ngày | Xem bên dưới |
-| Lịch sử sync: lượt sync, số liệu, cảnh báo đã đóng | 180 ngày | Tối thiểu 30 ngày | Luôn giữ lượt sync thành công gần nhất và lượt full thành công gần nhất (delta sync và kiểm tra bất thường cần chúng) |
-| Email đã gửi / thất bại | 90 ngày | 1–3650 ngày | Mail đang chờ gửi không bị xóa |
+| Nhật ký truy cập (`access_log`) | Giữ mãi | Tùy chọn, từ 1 ngày | Xem dưới |
+| Lịch sử sync (lượt sync, số liệu, cảnh báo đã đóng) | 180 ngày | Tối thiểu 30 | Luôn giữ lượt sync thành công và lượt full thành công gần nhất |
+| Email đã gửi / thất bại | 90 ngày | 1–3650 | Mail chờ gửi không bị xóa |
 
 Máy, recovery key và người dùng không bao giờ bị xóa.
 
-Nhật ký truy cập vẫn chỉ ghi thêm (append-only): app không có quyền DELETE, và trigger chặn mọi
-UPDATE, DELETE, TRUNCATE. Khi bật hạn lưu trữ, việc xóa chỉ đi qua hàm `purge_access_log()` trong DB:
+Nhật ký truy cập là append-only: app không có quyền DELETE, trigger chặn UPDATE / DELETE / TRUNCATE. Khi bật hạn lưu trữ, việc xóa chỉ đi qua hàm `purge_access_log()`: chỉ xóa **phần cũ nhất liên tục từ đầu chuỗi**, không xóa dòng mới nhất, và lưu mốc (hash dòng cuối bị xóa, số dòng, người chạy) vào `access_log_purge` để job kiểm tra chuỗi hash (02:00) vẫn kiểm chứng phần còn lại; xóa ngoài app bị phát hiện. Việc xóa được ghi nhật ký (`log_purge`). Nên lưu bản sao nhật ký ở nơi khác (hệ thống thu log, mục 6.15) trước khi bật.
 
-- Hàm chỉ xóa **phần cũ nhất, liên tục từ đầu chuỗi** (không bao giờ xóa ở giữa) và không bao giờ
-  xóa dòng mới nhất.
-- Mỗi lần xóa, hàm lưu một mốc vào bảng `access_log_purge`: hash của dòng cuối bị xóa, số dòng, người
-  chạy.
-- Job kiểm tra chuỗi hash (02:00) bắt đầu từ mốc đó, nên phần còn lại vẫn kiểm chứng được. Ai xóa
-  thêm dòng ngoài app sẽ bị phát hiện.
-- Bản thân việc xóa cũng được ghi vào nhật ký (`log_purge`).
+### 6.8. Sao lưu và khôi phục
 
-Nên đẩy nhật ký sang SIEM trước khi bật hạn lưu trữ.
+Quản trị > **Sao lưu** (Admin HQ) tạo file **.zip** theo lịch hằng ngày hoặc khi bấm **Sao lưu ngay**. Chọn một hoặc cả hai loại:
+
+| Loại | File | Nội dung |
+| --- | --- | --- |
+| Máy và key | `bitlocker-keys-YYYYMMDD-HHMMSS.zip` | `computers.csv` (id, objectGUID, tên, DNS, DN, chi nhánh, OS, serial, email, ngày tạo / sửa trên AD, trạng thái giám sát, số key), `recovery_keys.csv` (Key ID, **mật khẩu khôi phục**, DN key, volume GUID, trạng thái, ngày giờ, máy chứa key), `key_moves.csv`, `manifest.json` (SHA-256), `README.txt`. Tra key khi hệ thống hoặc DB không chạy |
+| Database | `bitlocker-db-YYYYMMDD-HHMMSS.zip` | `bitlocker.dump` (`pg_dump` toàn bộ DB), `manifest.json`. Khôi phục toàn hệ thống |
+
+- **Mã hóa AES-256** (mặc định bật, nên giữ): mở bằng **7-Zip** hoặc WinRAR, File Explorer không mở được. Tắt thì là zip thường, ai có file đọc được mọi key:
+  chỉ tắt khi nơi chứa đã mã hóa và giới hạn quyền (trang hiện cảnh báo đỏ; bảng file có cột Mã hóa).
+- **Mật khẩu** (≥ 16 ký tự, cần khi bật mã hóa): lưu mã hóa, **không hiện lại**, không ghi vào file. **Giữ ở kho mật khẩu**: mất là không mở được file.
+  Đổi mật khẩu thì file cũ vẫn dùng mật khẩu cũ.
+- **Giờ chạy** theo `APP_TZ` (mặc định 01:30), chạy bù nếu app tắt lúc đến giờ. **Giữ N bản mới nhất** mỗi loại (mặc định 14).
+- Ghi nhật ký `backup_run`, `backup_download` (không chứa key). Lượt lỗi gửi cảnh báo "Sao lưu lỗi".
+- File nằm ở `BACKUP_DIR` (Docker: `./backups`), **cùng máy chủ**: cần job chép sang nơi khác hằng ngày.
+
+**Cài sao lưu database (một lần).** Dùng `pg_dump` (có sẵn trong image) với tài khoản **chỉ đọc** `blk_backup` (cần `BYPASSRLS` để dump đủ mọi chi nhánh):
+
+```sql
+CREATE ROLE blk_backup LOGIN NOSUPERUSER NOCREATEROLE BYPASSRLS PASSWORD '<mật-khẩu-backup>';
+\c blk
+GRANT USAGE ON SCHEMA public TO blk_backup;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO blk_backup;
+GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO blk_backup;
+ALTER DEFAULT PRIVILEGES FOR ROLE blk_owner IN SCHEMA public GRANT SELECT ON TABLES TO blk_backup;
+ALTER DEFAULT PRIVILEGES FOR ROLE blk_owner IN SCHEMA public GRANT SELECT ON SEQUENCES TO blk_backup;
+```
+
+Thêm vào `server/.env`: `BACKUP_DATABASE_URL=postgres://blk_backup:<mk>@<db-host>:5432/blk?sslmode=require` và `BACKUP_DIR=/app/backups`
+(ngoài Docker cần `pg_dump` 17, hoặc `PG_DUMP_PATH`). Trên Linux cho uid 1000 quyền ghi `./backups`
+(`sudo chown 1000:1000 backups && sudo chmod 700 backups`). Rồi vào trang Sao lưu: đặt mật khẩu, chọn loại, giờ, bật, bấm **Sao lưu ngay** để thử. **Thử khôi phục định kỳ.**
+
+**Tra key khi hệ thống không chạy.** Giải nén `bitlocker-keys-*.zip` bằng 7-Zip vào thư mục chỉ mình bạn đọc được, mở `recovery_keys.csv` bằng Excel
+(Data > From Text/CSV, UTF-8), lọc cột `key_id_first8` theo 8 ký tự trên màn hình BitLocker, đọc `recovery_password`. Xong thì **xóa** file giải nén.
+
+**Khôi phục database.** (1) PostgreSQL 17 với các tài khoản mục 3.2, DB `blk` **rỗng**. (2) `7z x -p bitlocker-db-....zip`. (3) `pg_restore -U postgres -d blk --exit-on-error bitlocker.dump`.
+(4) Dùng **đúng `LOG_HMAC_KEY` cũ** (mật khẩu SMTP, khóa 2 bước, mật khẩu sao lưu mã hóa bằng khóa suy ra từ nó; nhật ký ký bằng nó), khởi động app, thử đăng nhập và chạy một lượt full. (5) Xóa `bitlocker.dump`.
+
+**Sao lưu tay** trước khi nâng cấp: `pg_dump -U blk_backup -h <db-host> -d blk --format=custom -f bitlocker.dump`, rồi `7z a -tzip -mem=AES256 -p x.zip bitlocker.dump` và `shred -u bitlocker.dump`.
+
+Cất **tách khỏi** file sao lưu: `LOG_HMAC_KEY`, `server/.env`, mật khẩu sao lưu, `cert/` và cấu hình worker.
+
+### 6.9. Quản lý người dùng bằng dòng lệnh
+
+```bash
+docker compose exec server node src/cli/users.js list
+docker compose exec server node src/cli/users.js create nguyenvana "Nguyen Van A" email=nguyenvana@corp.local it:HN
+docker compose exec server node src/cli/users.js create-local backup.admin "Backup admin" email=it-hq@corp.local admin
+docker compose exec server node src/cli/users.js email admin it-hq@corp.local
+docker compose exec server node src/cli/users.js reset-password admin
+docker compose exec server node src/cli/users.js unlock admin     # mở khóa (bị khóa do nhập sai mật khẩu)
+```
+
+Nếu chạy bằng `docker run`, thay `docker compose exec server` bằng `docker exec blk-server`.
+
+### 6.10. Truy vết sync trong log
+
+**Số của lượt sync.** Mỗi lượt có **STT** `runId` (số nguyên tăng dần, khóa nội bộ, worker dùng số này) và **mã hiển thị** `runRef` dạng `YYYYMMDD-NNNN` (ngày chạy theo `APP_TZ` + STT 4 chữ số, ví dụ `20261018-0042`). Giao diện, email và log hiện mã hiển thị; STT có trong tooltip và JSON. Không dùng thời gian làm số chính vì đồng hồ có thể lùi (NTP, khôi phục máy ảo) làm sai thứ tự; STT luôn tăng. Khôi phục DB từ bản sao lưu thì STT quay về giá trị lúc sao lưu, ngày trong mã giúp phân biệt.
+
+Mọi thay đổi do sync tạo ra được ghi vào log ứng dụng (JSON, mỗi dòng một sự kiện, tiếng Anh) với `"component":"sync"` và `runId`, sau khi dữ liệu đã commit. Máy / key không đổi chỉ được đếm trong dòng tổng kết nên lượt full 22k máy không làm ngập log. Log không bao giờ chứa recovery password.
+
+| `msg` | Khi nào |
+| --- | --- |
+| `sync run opened` / `sync run completed` / `sync run failed` | Mở / kết thúc lượt (mode, dc, số máy / key thấy, `highestUsn`, `markedNotInAd` hoặc `errorCode`) |
+| `computer added` | Máy mới |
+| `computer moved to another branch` | DN đổi sang OU chi nhánh khác (cũng ghi `computer_moved` vào Nhật ký) |
+| `computer renamed or moved in AD` | Đổi tên, hoặc đổi OU trong cùng chi nhánh |
+| `computer back in AD` | Máy từng "Không còn trong phạm vi giám sát" xuất hiện lại |
+| `computer not seen by the full run: flagged not in AD` | Máy bị gắn nhãn "Không còn trong phạm vi giám sát" |
+| `key added`, `key volume recorded`, `key superseded ...` | Key mới, bổ sung ổ đĩa, đổi trạng thái |
+| `key without a readable password`, `key with a malformed password` (warn) | Key không lưu được: mật khẩu rỗng (thiếu quyền) hoặc sai định dạng |
+| `key for an unknown computer (sent back as orphan)` | Key của máy chưa có trong DB |
+| `computer batch stored`, `key batch stored` | Tổng kết một lô (received, added, unchanged...) |
+| `sync anomaly` (warn), `sync run quarantined`, `quarantined sync run decided` | Bất thường, lượt bị giữ lại, Admin HQ chấp nhận / bác bỏ (mục 6.1) |
+
+Truy vết: lọc theo `"runId":812`, `"name":"HN-LT-0231"`, `"objectGuid":"..."` hoặc `"keyId":"..."`, ví dụ:
+
+```bash
+docker compose logs server | grep '"component":"sync"' | grep '"runId":812'
+```
+
+#### Log nằm ở đâu, rotate thế nào
+
+App không tự ghi file: mọi log (kể cả sync) in ra **stdout** dạng JSON, môi trường chạy app giữ và xoay vòng.
+
+| Cách chạy | Log nằm ở | Rotate |
+| --- | --- | --- |
+| `docker compose` | `docker compose logs server` | Đã cấu hình sẵn trong file compose (driver `local`, có nén) |
+| `docker run` | `docker logs blk-server` | Đã có `--log-driver local --log-opt max-size=50m --log-opt max-file=20` ở mục 3.5; hoặc đặt cho mọi container trong `/etc/docker/daemon.json` |
+| Node bằng systemd | `journalctl -u blk-server` | journald tự xoay vòng; giới hạn bằng `SystemMaxUse=2G` |
+| Node ghi ra file | File bạn chọn | logrotate với `copytruncate` |
+
+Trên Linux, Docker mặc định dùng `json-file` **không rotate**, log lớn mãi tới khi đầy đĩa: luôn đặt một cấu hình ở trên. Muốn giữ lâu và tìm kiếm, đẩy log JSON về hệ thống tập trung (Loki, ELK / OpenSearch, Graylog, SIEM; mục 6.15). Nhật ký truy cập (ai xem key) nằm trong database, không phải log này.
+
+---
+
+### 6.11. Trang Báo cáo
+
+Dành cho Trưởng IT, Admin HQ và Auditor, trong phạm vi chi nhánh của người xem. Chọn **kỳ báo cáo**
+(mặc định 30 ngày gần nhất, tối đa 366 ngày, có nút nhanh 7 / 30 / 90 ngày), hoặc tích **Toàn bộ thời gian**
+(nút nhanh **Toàn bộ**: từ ngày đầu tiên có dữ liệu đến hôm nay, không giới hạn 366 ngày, bỏ qua ô ngày); có thể
+chọn một chi nhánh. Nút **Xuất Excel** xuất đúng kỳ đang xem, kể cả Toàn bộ thời gian.
+Số máy, số key là số **hiện tại**; máy mới, key mới, máy rời phạm vi giám sát và lượt hiện key tính **trong kỳ**.
+
+| Phần | Nội dung |
+| --- | --- |
+| Tổng quan | Số chi nhánh, máy trong phạm vi giám sát, % máy có key, số key, máy/key mới và máy rời phạm vi giám sát trong kỳ, lượt hiện key (số người, số máy, số lượt ngoài giờ) |
+| Chi tiết theo chi nhánh | **Liệt kê mọi chi nhánh**, kể cả chi nhánh chưa có máy hoặc chưa có key (ghi 0), chia trang theo "Số dòng mỗi trang" (mục 6.3); mỗi chi nhánh: máy, có key, chưa có key, % có key (dưới 90% được tô màu), số key, máy mới, key mới, rời phạm vi giám sát; dòng tổng |
+| Xem key theo chi nhánh | Mỗi chi nhánh: lượt hiện key, số người xem, số máy được xem, ngoài giờ, xuất kèm file, lý do nhiều nhất; bên dưới là bảng người xem key theo chi nhánh |
+| Máy chưa có key | Máy còn trong phạm vi giám sát chưa lưu key (trạng thái hiện tại, không theo kỳ). **Tất cả chi nhánh**: chỉ bảng tổng quan theo chi nhánh (chưa có key, lâu hơn 7 ngày, mới ≤ 7 ngày, link **Xem danh sách** sang trang Tìm máy), xếp chi nhánh nhiều máy lâu chưa có key lên đầu. **Một chi nhánh** (hoặc người xem chỉ có một chi nhánh): danh sách từng máy, máy lâu nhất lên đầu, cột số ngày chưa có key, nhãn "mới". Máy mới ghi nhận ≤ 7 ngày có thể vẫn đang chờ GPO. File Excel theo cùng quy tắc: tất cả chi nhánh thì sheet "Máy chưa có key" chỉ là bảng tổng hợp theo chi nhánh; một chi nhánh thì có danh sách từng máy |
+| Máy đã có key (chỉ trong file Excel của **một chi nhánh**) | Sheet **"Máy đã có key"**, đặt ngay trước sheet "Máy chưa có key": mỗi máy còn được giám sát có ít nhất một key, kèm **số key** của máy (cột "Số key"), ngày tạo key mới nhất, tên, hệ điều hành, serial, email người dùng, DN; dòng cuối là tổng số máy và tổng số key. Không có Key ID hay mật khẩu. File Excel của tất cả chi nhánh không có sheet này |
+
+"Ngoài giờ" chỉ được tính khi đã cấu hình giờ làm việc (cảnh báo xem key ngoài giờ).
+
+Nút **Xuất Excel** tải file `.xlsx` theo đúng kỳ và chi nhánh đang chọn, gồm 5 sheet: *Tổng quan*,
+*Theo chi nhánh*, *Xem key theo CN* (thêm một cột cho mỗi lý do), *Người xem key*, *Máy chưa có key*.
+Mỗi sheet có dòng tiêu đề cố định và bộ lọc; ngày giờ theo `APP_TZ`. File **không bao giờ chứa
+recovery key**. Mỗi lần xuất ghi một dòng `export_report` vào nhật ký.
+
+**Báo cáo hằng ngày bằng email** (Quản trị > Thông báo, mặc định tắt):
+
+- Mỗi ngày **một** email (HTML + bản chữ thường) gửi Admin HQ có email (nếu chọn) và các địa chỉ thêm. **Giờ gửi** theo `APP_TZ` (mặc định 07:30); quá giờ mà hôm nay chưa gửi thì gửi (app tắt lúc đến giờ thì gửi bù). Bật sau giờ gửi thì báo cáo đầu tiên vào ngày mai.
+- **Số liệu của**: *Hôm qua (cả ngày)* hợp gửi buổi sáng; *Hôm nay, tính đến giờ gửi* hợp gửi cuối ngày.
+- Nội dung: trạng thái **Worker** và **Đồng bộ AD** (từng worker: heartbeat, LDAP, DC), lượt sync thành công / lỗi / bị giữ lại, cảnh báo đang mở, Key ID trùng chưa xem xét; tổng **máy** và **key** kèm tăng / giảm; máy / key mới, máy rời phạm vi giám sát, key chuyển máy; tối đa 15 chi nhánh có thay đổi; biểu đồ cột 10 ngày gần nhất (bảng HTML nên hiện được trên Outlook, Gmail, điện thoại). Không có recovery key, không liệt kê máy.
+- Tiêu đề và câu mở đầu sửa ở mẫu `daily_report` (mục 6.6). **Gửi thử báo cáo ngay** gửi tức thì (không tính là báo cáo theo lịch); Log email có nút **Xem bản HTML**.
+
+### 6.12. Định danh máy và key, các tình huống thường gặp
+
+Hệ thống **không định danh theo tên**:
+
+| Đối tượng | Định danh | Ghi chú |
+| --- | --- | --- |
+| Máy | `objectGUID` do AD cấp | Duy nhất, không đổi khi đổi tên hay chuyển OU, không bao giờ cấp lại. Hiện ở trang chi tiết máy, dưới tên máy trong danh sách, trong CSV; dán GUID vào ô Tìm máy để tìm đúng máy |
+| Key | Key ID (`msFVE-RecoveryGuid`) | 8 ký tự đầu là số hiện trên màn hình recovery |
+| Key thuộc máy nào | `objectGUID` của máy cha (worker gửi kèm mỗi key) | Chỉ khi thiếu GUID mới dò theo DN, và ưu tiên máy còn trong phạm vi giám sát, mới thấy gần nhất |
+
+**Không bao giờ xóa** máy hay key: tài khoản ứng dụng trong DB không có quyền DELETE trên hai bảng này. Máy
+không còn trong phạm vi giám sát chỉ đổi trạng thái thành "Không còn trong phạm vi giám sát"; xóa chi nhánh chỉ chuyển máy về N/A.
+
+| Tình huống | Hệ thống làm gì |
+| --- | --- |
+| **Máy đổi tên** (hoặc chuyển OU) | Cùng `objectGUID` nên vẫn là **một máy**: cập nhật tên, DN, chi nhánh (đổi chi nhánh thì ghi nhật ký `computer_moved`). Giữ nguyên key, lịch sử hiện key, serial / email người dùng đã nhập. Không coi là máy mới, không gửi email máy mới. Tìm theo tên cũ sẽ không ra; tìm theo GUID hoặc Key ID vẫn ra |
+| **Máy bị xóa khỏi AD rồi cài lại, join lại cùng tên** | AD tạo **object mới, GUID mới**, nên hệ thống tạo **máy mới** (có thể gửi email "máy mới"). Máy cũ ở lượt full kế tiếp chuyển sang "Không còn trong phạm vi giám sát", **giữ nguyên các key cũ** (vẫn hiện được, ví dụ khi cần mở ổ của ảnh đĩa cũ). Key mới gắn vào máy mới theo GUID. Tìm theo tên sẽ thấy cả hai, máy còn trong phạm vi giám sát đứng trước. Serial / email người dùng của máy cũ không tự chép sang máy mới |
+| Máy cài lại nhưng admin **"Reset account"** thay vì xóa | Vẫn là object cũ, cùng GUID, nên vẫn là máy cũ; key mới thêm vào cùng máy |
+| **Key mới cho cùng một ổ đĩa** (cùng `msFVE-VolumeGuid`) | Thêm key mới (không ghi đè). Key mới thành **Đang dùng**, key cũ của ổ đó thành **Có key mới hơn**; key cũ và mật khẩu cũ vẫn giữ. Ổ khác của máy không bị ảnh hưởng. Có thể gửi email "key mới" |
+| Đẩy lại đúng key cũ (`manage-bde -adbackup` cùng protector) | Cùng Key ID nên không có gì mới: không trùng, không email |
+| **Máy unjoin rồi join lại AD, sau đó đẩy lại key cũ** (ổ không mã hóa lại, Key ID không đổi) | AD tạo object mới (GUID mới) và key cũ nằm dưới object mới. Key **được chuyển sang máy mới** (không xóa, không chép thành 2 key), ghi lịch sử chuyển: **cùng tên, cùng domain** thì chuyển ngay ở lượt sync đó và máy cũ được gắn "Không còn trong phạm vi giám sát" (AD không thể có 2 máy cùng tên); **khác tên** thì tạm ghi là Key ID trùng, lượt full kế tiếp thấy máy cũ rời phạm vi giám sát thì chuyển key và tự đóng, không gửi mail. Trang máy cũ ghi "Key đã chuyển sang máy …", trang máy mới ghi "Key chuyển từ máy cũ …" |
+| **Cùng Key ID dưới 2 máy đều còn trong phạm vi giám sát** (ví dụ clone từ image đã bật BitLocker) | Key **giữ ở máy đang giữ**, ghi nhận Key ID trùng. Sau khi một lượt full xác nhận, gửi **1 mail** "Key ID trùng giữa 2 máy" (mỗi cặp 1 lần, không nhắc lại; không ảnh hưởng trạng thái Worker và Đồng bộ AD). Hiện ở Quản trị > Sync AD (nút **Đã xem xét** để đóng hẳn, ghi nhật ký `key_duplicate_review`) và trên trang cả hai máy. Tự đóng khi một trong hai máy rời phạm vi giám sát |
+| Cùng Key ID nhưng **mật khẩu khác** | Không chuyển, không ghi đè; ghi nhận và cảnh báo như Key ID trùng (cột Mật khẩu: khác nhau) |
+| Key cũ bị xóa trong AD | Hệ thống vẫn giữ key đó (không bao giờ xóa) |
+
+Lưu ý: khi xóa máy khỏi AD, AD xóa luôn các key của máy đó. Xóa **nhiều** máy cùng lúc làm số máy và số key
+mà lượt full thấy giảm mạnh, nên lượt đó bị **giữ lại** chờ Admin HQ duyệt (mục 6.1). Đây là cơ chế an toàn,
+không phải lỗi.
+
+### 6.13. Hiện key và sao chép
+
+Trang hiện key cho thấy 8 nhóm số và tự ẩn sau 60 giây. Nút **Sao chép key** chép cả key (kèm dấu gạch
+ngang, dán thẳng vào màn hình BitLocker được). Khi key tự ẩn hoặc bấm "Ẩn key", trang cố xóa luôn clipboard;
+trình duyệt có thể không cho, nên người dùng nên tự xóa (copy nội dung khác) sau khi dùng xong. Sao chép
+cần HTTPS (hoặc localhost); không được thì trang chọn sẵn key để người dùng nhấn Ctrl+C. Mọi lần hiện key đã
+được ghi nhật ký kèm lý do.
 
 ### 6.14. Xác thực 2 bước, bắt đổi mật khẩu, thời gian phiên
 
@@ -1272,6 +1326,14 @@ Người dùng > Thêm / Sửa, ô **Bắt buộc xác thực 2 bước**. Dùng
   `GET /api/auth/2fa/setup` (lấy `secret`, `otpauthUri`), rồi `POST /api/auth/2fa` `{ code }` (kèm `X-CSRF-Token`).
   Tài khoản dùng cho script thường để tắt xác thực 2 bước.
 
+**Khóa tài khoản khi đăng nhập sai** (Quản trị > Bảo mật, áp dụng ngay):
+
+- **Số lần sai liên tiếp** (3–20, mặc định 5; sai mã 2 bước cũng tính) và **thời gian khóa** (mặc định 15 phút; **0 = khóa tới khi Admin HQ mở**). Có thể tắt hẳn.
+- **Áp dụng cho Admin HQ** (mặc định bật). Bỏ chọn nếu không muốn Admin bị khóa.
+- **Mở khóa**: Admin HQ vào Người dùng > Sửa > **Mở khóa**. Nếu **chính Admin bị khóa** (không còn ai mở được), chạy trên máy chủ app:
+  `docker compose exec server node src/cli/users.js unlock <tên đăng nhập>` (mở khóa và cho đăng nhập lại ngay; bị vô hiệu hóa thì thêm `enable <tên>`).
+  Nên có một tài khoản Admin dự phòng (`create-local`, mục 6.9).
+
 **Chính sách mật khẩu tài khoản nội bộ** (Quản trị > Bảo mật): **độ dài tối thiểu** (8–64, mặc định 12) và
 **độ phức tạp**: chọn bắt buộc có chữ hoa, chữ thường, chữ số, ký tự đặc biệt (không phải chữ hoặc số). Luôn áp dụng
 thêm: không chứa tên đăng nhập, khác mật khẩu hiện tại. Kiểm tra khi người dùng đổi mật khẩu (web và API, lỗi
@@ -1290,253 +1352,41 @@ khẩu vừa đặt lại luôn phải đổi.
 - **Thời gian tối đa của phiên** (mặc định `SESSION_MAX_HOURS`, 8): quá thời gian này kể từ lúc đăng nhập thì phải đăng
   nhập lại, dù vẫn đang dùng.
 
-### 6.8. Sao lưu và khôi phục
+### 6.15. Log ra stdout cho hệ thống thu log (SIEM...)
 
-Quản trị > **Sao lưu** (chỉ Admin HQ) tạo file sao lưu **.zip**, mặc định **mã hóa AES-256**, theo lịch mỗi ngày hoặc
-khi bấm **Sao lưu ngay**. Có hai loại, chọn một hoặc cả hai:
+Ngoài log ứng dụng, app ghi ra **stdout** của container server, mỗi sự kiện **một dòng JSON**, cho **các log đang hiện trên giao diện**. Container thu log của bạn
+(SIEM, Promtail, Filebeat, driver Docker...) đọc stdout rồi chuyển đi: app **không** có cấu hình hay giao diện riêng cho việc này.
 
-| Loại | Tên file | Nội dung | Dùng khi |
+| `log_type` | Giao diện tương ứng | Khi nào | Nội dung |
 | --- | --- | --- | --- |
-| Máy và key | `bitlocker-keys-YYYYMMDD-HHMMSS.zip` | `computers.csv` (id, objectGUID, tên, DNS, DN, chi nhánh, OS, serial, email, ngày tạo / sửa trên AD, ngày ghi nhận, còn trong AD, số key), `recovery_keys.csv` (Key ID, 8 ký tự đầu, **mật khẩu khôi phục**, DN của key trên AD, volume GUID, trạng thái, ngày tạo trên AD, ngày ghi nhận, lần hiện key gần nhất, máy chứa key: id, objectGUID, tên, DN, chi nhánh), `key_moves.csv` (key chuyển máy khi join lại AD), `manifest.json` (số máy, số key, SHA-256 từng file), `README.txt` | Cần tra key khi hệ thống hoặc DB không chạy: chỉ cần 7-Zip và Excel |
-| Database | `bitlocker-db-YYYYMMDD-HHMMSS.zip` | `bitlocker.dump` (pg_dump định dạng custom của toàn bộ DB), `manifest.json`, `README.txt` | Khôi phục toàn bộ hệ thống |
+| `audit` | **Nhật ký truy cập** | Ngay khi dòng nhật ký được lưu | Đủ các trường của bảng (người dùng, hành động, máy, key, chi nhánh, lý do, ticket, IP, chi tiết) và `id` |
+| `audit_chain_check` | | Mỗi lần kiểm tra chuỗi hash | Kết quả, dòng bị gãy (nếu có) |
+| `mail` | **Log email** | Mỗi lần đổi trạng thái (xếp hàng, đã gửi, thử lại, thất bại, không ai nhận) | Người nhận, người thiếu email, tiêu đề, trạng thái, số lần thử, lỗi, nội dung |
+| `sync_run` | **Danh sách lượt sync** | Mở, kết thúc, bị giữ lại, đã quyết định | `run_id`, `run_ref`, mode, DC, USN, số máy / key, trạng thái, lỗi, bất thường |
+| `alert` | **Cảnh báo** | Mở, đã gửi, đã đóng | Loại, mức, tiêu đề, nội dung |
 
-- **Mã hóa** (ô "Mã hóa file sao lưu bằng mật khẩu", mặc định bật, khuyến nghị giữ bật). Tắt thì file là zip thường,
-  mở được bằng mọi công cụ kể cả File Explorer mà **không cần mật khẩu**: ai có file là đọc được mọi recovery key.
-  Chỉ tắt khi thư mục sao lưu và nơi chép file đến đã được mã hóa (BitLocker, kho backup mã hóa) và giới hạn quyền
-  đọc. Trang Sao lưu hiện cảnh báo đỏ khi đang tắt; bảng file có cột **Mã hóa** (AES-256 / Không); nhật ký
-  `backup_run` ghi `encrypted`.
-- **Mật khẩu mã hóa** (cần khi bật mã hóa) do Admin HQ đặt ở trang Sao lưu (tối thiểu 16 ký tự, nên là một cụm từ dài). Hệ thống lưu
-  mật khẩu đã mã hóa (khóa suy ra từ `LOG_HMAC_KEY`), **không bao giờ hiện lại** và không ghi vào file. **Phải lưu
-  mật khẩu ở kho mật khẩu của công ty**: mất mật khẩu thì không mở được file. Đổi mật khẩu: file cũ vẫn mở bằng
-  mật khẩu cũ. Bật mã hóa mà chưa đặt mật khẩu thì không sao lưu.
-- Mở file bằng **7-Zip** hoặc WinRAR (chuẩn WinZip AES-256). File Explorer của Windows không mở được loại mã hóa này.
-- **Giờ chạy** theo `APP_TZ`; job `backup` kiểm tra mỗi phút, mỗi ngày chạy một lần (app tắt lúc đến giờ thì chạy bù
-  khi bật lại). **Giữ lại** N bản mới nhất mỗi loại (mặc định 14), bản cũ hơn tự xóa.
-- Mỗi lượt sao lưu và mỗi lần **tải file** từ trang Sao lưu đều ghi nhật ký (`backup_run`, `backup_download`;
-  không có mật khẩu hay key trong nhật ký). Lượt lỗi gửi cảnh báo **"Sao lưu lỗi"** (mẫu `backup_failed`) và hiện ở
-  trang Sao lưu; lượt thành công sau đó gửi "Đã khôi phục".
-- File ghi vào `BACKUP_DIR` (mặc định `backups` trong thư mục app; Docker: `./backups` trên máy chủ). Đây là bản
-  trên **cùng máy chủ**: phải có job chép thư mục này sang nơi khác (máy chủ backup, NAS, băng từ) hằng ngày.
+Không dòng nào chứa recovery password. Các dòng này không phụ thuộc `LOG_LEVEL`.
 
-#### Cài đặt sao lưu database (một lần)
+**Không ảnh hưởng hệ thống:** ghi **bất đồng bộ** (vào hàng đợi trong bộ nhớ rồi ghi nền, app không chờ), và **chấp nhận mất**: hàng đợi đầy
+thì bỏ bớt dòng mới và ghi một dòng `event_gap` cho biết số dòng bị bỏ. Không lưu trạng thái trong DB, không gửi bù khi app khởi động lại.
+Dòng nhật ký có `id` để hệ thống thu log tự bỏ trùng và đối chiếu. Nginx (access log) và db (log PostgreSQL) cũng ghi stdout của container riêng.
 
-Sao lưu database dùng `pg_dump` (đã có trong image Docker của app) bằng tài khoản **chỉ đọc** `blk_backup`.
-Tài khoản này cần `BYPASSRLS` để bản dump có đủ mọi chi nhánh; nó chỉ có quyền `SELECT`, không ghi được gì.
+### 6.16. Lịch chạy các job
 
-1. Tạo tài khoản bằng superuser PostgreSQL (thay mật khẩu):
+Mỗi job có giờ / chu kỳ **đặt sẵn mặc định**, chỉnh ngay trên trang của job, áp dụng trong vòng một phút, **không cần khởi động lại**. Giờ theo múi giờ của ứng dụng (`APP_TZ`).
 
-   ```sql
-   CREATE ROLE blk_backup LOGIN NOSUPERUSER NOCREATEROLE BYPASSRLS PASSWORD '<mật-khẩu-backup>';
-   \c blk
-   GRANT USAGE ON SCHEMA public TO blk_backup;
-   GRANT SELECT ON ALL TABLES IN SCHEMA public TO blk_backup;
-   GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO blk_backup;
-   ALTER DEFAULT PRIVILEGES FOR ROLE blk_owner IN SCHEMA public GRANT SELECT ON TABLES TO blk_backup;
-   ALTER DEFAULT PRIVILEGES FOR ROLE blk_owner IN SCHEMA public GRANT SELECT ON SEQUENCES TO blk_backup;
-   ```
-
-   (Tạo role trước khi chạy migration 027 thì migration tự cấp các quyền này.)
-2. Thêm vào `server/.env`:
-
-   ```
-   BACKUP_DATABASE_URL=postgres://blk_backup:<mật-khẩu-backup>@<db-host>:5432/blk?sslmode=require
-   BACKUP_DIR=/app/backups
-   ```
-
-   Chạy ngoài Docker thì cần `pg_dump` bản 17 trên máy (hoặc `PG_DUMP_PATH` trỏ tới nó).
-3. Docker: thư mục `./backups` được mount vào `/app/backups`. Trên máy Linux, cho user của container (uid 1000)
-   quyền ghi: `sudo mkdir -p backups && sudo chown 1000:1000 backups && sudo chmod 700 backups`.
-4. Vào Quản trị > Sao lưu: đặt mật khẩu, chọn loại, giờ chạy, số bản giữ lại, bật sao lưu tự động, bấm
-   **Sao lưu ngay** để thử.
-5. Định kỳ (ví dụ mỗi quý) **thử khôi phục** vào một máy thử theo hướng dẫn dưới.
-
-#### Tra key từ file sao lưu (hệ thống không chạy)
-
-1. Mở file `bitlocker-keys-....zip` bằng 7-Zip, nhập mật khẩu sao lưu, giải nén vào **thư mục được mã hóa / chỉ
-   mình bạn đọc được**.
-2. Mở `recovery_keys.csv` bằng Excel (Data > From Text/CSV, UTF-8), lọc cột `key_id_first8` theo 8 ký tự trên màn
-   hình BitLocker, đọc `recovery_password`.
-3. Xong việc thì **xóa** các file đã giải nén (và dọn Thùng rác).
-
-#### Khôi phục database
-
-1. Chuẩn bị PostgreSQL 17 với các tài khoản như mục 3.2 (`blk_owner`, `app_node`, `blk_backup`), DB `blk` **rỗng**.
-2. Giải nén lấy `bitlocker.dump`:
-
-   ```bash
-   7z x -p bitlocker-db-20261016-013000.zip
-   ```
-
-3. Khôi phục bằng superuser (hoặc `blk_owner`):
-
-   ```bash
-   pg_restore -U postgres -d blk --exit-on-error bitlocker.dump
-   ```
-
-4. Dùng **đúng `LOG_HMAC_KEY` cũ** trong `server/.env` (mật khẩu SMTP, khóa xác thực 2 bước, mật khẩu sao lưu được mã
-   hóa bằng khóa suy ra từ nó; nhật ký được ký bằng nó). Khởi động app, kiểm tra: đăng nhập, tìm một máy, Quản
-   trị > Sync AD chạy lượt full.
-5. Xóa `bitlocker.dump` sau khi khôi phục.
-
-#### Sao lưu database bằng tay (không qua app)
-
-Khi cần một bản ngay trên máy chủ DB (ví dụ trước khi nâng cấp):
-
-```bash
-pg_dump -U blk_backup -h <db-host> -d blk --format=custom -f bitlocker.dump
-7z a -tzip -mem=AES256 -p bitlocker-db-manual.zip bitlocker.dump
-shred -u bitlocker.dump
-```
-
-(`7z a -p` hỏi mật khẩu khi gõ, không để lộ trong lịch sử lệnh. Với Docker dev: `docker compose exec db pg_dump -U postgres
--d blk --format=custom > bitlocker.dump`.)
-
-#### Ngoài file sao lưu
-
-- `LOG_HMAC_KEY`, `server/.env` và mật khẩu sao lưu: lưu ở kho secret, **tách khỏi** nơi để file sao lưu.
-- Chứng chỉ HTTPS (`cert/`) và cấu hình worker.
-
-### 6.9. Quản lý người dùng bằng dòng lệnh
-
-```bash
-docker compose exec server node src/cli/users.js list
-docker compose exec server node src/cli/users.js create nguyenvana "Nguyen Van A" email=nguyenvana@corp.local it:HN
-docker compose exec server node src/cli/users.js create-local backup.admin "Backup admin" email=it-hq@corp.local admin
-docker compose exec server node src/cli/users.js email admin it-hq@corp.local
-docker compose exec server node src/cli/users.js reset-password admin
-```
-
-Nếu chạy bằng `docker run`, thay `docker compose exec server` bằng `docker exec blk-server`.
-
-### 6.10. Truy vết sync trong log
-
-Mọi thay đổi do sync tạo ra được ghi vào log ứng dụng (JSON, mỗi dòng một sự kiện, tiếng Anh), có
-`"component":"sync"` và `runId`. Log chỉ được ghi sau khi dữ liệu đã lưu (commit). Máy / key không
-đổi gì chỉ được đếm trong dòng tổng kết, nên một lượt full 22k máy không làm ngập log. Log không bao
-giờ chứa recovery password.
-
-| `msg` | Khi nào | Thông tin kèm |
+| Job | Mặc định | Chỉnh ở |
 | --- | --- | --- |
-| `sync run opened` | Worker mở lượt | mode yêu cầu / thực tế, dc, sinceUsn |
-| `computer added` | Máy mới | computerId, objectGuid, name, dn, branchId |
-| `computer moved to another branch` | DN đổi sang OU của chi nhánh khác (cũng ghi `computer_moved` vào Nhật ký) | fromBranchId, toBranchId, dn |
-| `computer renamed or moved in AD` | Đổi tên, hoặc đổi OU trong cùng chi nhánh | fromName, fromDn, dn |
-| `computer back in AD` | Máy từng "Không còn trong AD" xuất hiện lại | notInAdSince |
-| `computer batch stored` | Tổng kết một lô máy | received, added, moved, changed, backInAd, unchanged, unmapped |
-| `key added` | Key mới | keyId, computerId, computer, volumeGuid, createdInAd |
-| `key volume recorded` | Key cũ được bổ sung ổ đĩa | keyId, volumeGuid |
-| `key superseded by a newer key of the same volume` / `key is the active key of its volume` | Trạng thái key đổi | keyId, computer, volumeGuid, status |
-| `key without a readable password (not stored)` (warn) | Đọc được key nhưng mật khẩu rỗng (thiếu quyền) | keyId, dn |
-| `key with a malformed password (not stored)` (warn) | Mật khẩu sai định dạng | keyId, dn |
-| `key for an unknown computer (sent back as orphan)` | Key của máy chưa có trong DB | keyId, computerDn |
-| `key batch stored` | Tổng kết một lô key | received, added, volumeFilled, unchanged, emptyPassword, malformed, orphans, statusChanged |
-| `sync anomaly` (warn) | Mỗi bất thường khiến lượt bị giữ lại | code, detail |
-| `sync run quarantined (...)` | Lượt bị giữ lại | số máy/key thấy, plannedNotInAd |
-| `computer not seen by the full run: flagged not in AD` | Mỗi máy bị gắn nhãn "Không còn trong AD" (lúc lượt kết thúc, hoặc khi Admin HQ chấp nhận lượt bị giữ lại) | computerId, objectGuid, name, branchId, lastSeenRun |
-| `quarantined sync run decided` | Admin HQ chấp nhận / bác bỏ | decision, by, markedNotInAd |
-| `sync run completed` / `sync run failed` | Kết thúc lượt | computersSeen, computersInDb, keysSeen, keysAdded, highestUsn, markedNotInAd / errorCode |
+| Gửi mail đang chờ (`mail-outbox`) | mỗi **1 phút** (1–60) | Quản trị > Mail server, mục "Gửi mail" |
+| Watchdog | mỗi **5 phút** (1–60) | Quản trị > Ngưỡng cảnh báo, nhóm Watchdog |
+| Kiểm tra chuỗi hash nhật ký | **02:00** hằng ngày | Quản trị > Bảo mật, mục "Kiểm tra nhật ký" |
+| Dọn dữ liệu quá hạn (`data-retention`) | **03:00** hằng ngày | Quản trị > Lưu trữ, mục "Giờ chạy" |
+| Báo cáo email hằng ngày | **07:30** (tắt) | Quản trị > Thông báo (mục 6.3) |
+| Sao lưu | **01:30** (tắt) | Quản trị > Sao lưu (mục 6.8) |
 
-Xem log (dev):
-
-```bash
-docker compose logs server | grep '"component":"sync"'
-```
-
-Lọc một lượt, ví dụ lượt 812:
-
-```bash
-docker compose logs server | grep '"component":"sync"' | grep '"runId":812'
-```
-
-#### Log được ghi ở đâu, rotate thế nào
-
-App không tự ghi file log: mọi log (kể cả log sync) in ra **stdout** dạng JSON, môi trường chạy app
-giữ và xoay vòng log.
-
-| Cách chạy | Log nằm ở | Rotate |
-| --- | --- | --- |
-| `docker compose` (dev) | Docker giữ theo container; xem bằng `docker compose logs server` | Đã cấu hình trong `docker-compose.yml`: driver `local`, 20 MB × 10 file mỗi container, có nén |
-| `docker run` (production) | Như trên (trên Linux: `/var/lib/docker/containers/<id>/`) | Thêm `--log-driver local --log-opt max-size=50m --log-opt max-file=20` (đã có trong lệnh ở mục 3.5). Hoặc đặt cho mọi container trong `/etc/docker/daemon.json` rồi khởi động lại Docker: `{ "log-driver": "local", "log-opts": { "max-size": "50m", "max-file": "20" } }` |
-| Node trực tiếp bằng systemd | journald; xem bằng `journalctl -u blk-server` | journald tự xoay vòng; giới hạn dung lượng bằng `SystemMaxUse=2G` trong `/etc/systemd/journald.conf` |
-| Node trực tiếp, ghi ra file (`npm start >> /var/log/blk/app.log`) | File bạn chọn | Dùng logrotate với `copytruncate`, ví dụ `/etc/logrotate.d/blk`: `/var/log/blk/*.log { daily rotate 30 compress copytruncate missingok }` |
-
-**Lưu ý quan trọng:** trên máy chủ Linux, nếu không cấu hình, Docker dùng driver `json-file` và
-**không rotate**, log sẽ lớn mãi tới khi đầy đĩa. Luôn đặt một trong các cấu hình trên.
-
-Rotate chỉ giữ một lượng log gần đây (ví dụ 50 MB × 20 = 1 GB mỗi container). Muốn giữ lâu và tìm
-kiếm được, đẩy log về hệ thống log tập trung, ví dụ:
-- Grafana Loki + Promtail / Grafana Alloy đọc log container Docker;
-- ELK / OpenSearch, Graylog: dùng logging driver `gelf` hoặc `fluentd` của Docker, hoặc Filebeat;
-- SIEM của công ty qua `syslog`.
-
-Log đã là JSON (có `level`, `time`, `component`, `runId`, `msg`) nên các hệ thống trên tách trường
-được ngay, không cần cấu hình parse. Nhật ký truy cập (ai xem key) nằm trong database chứ không phải
-log này, và có hạn lưu trữ riêng ở Quản trị > Lưu trữ.
-
-Truy vết một máy hoặc một key: lọc theo `"name":"HN-LT-0231"`, `"objectGuid":"..."` hoặc `"keyId":"..."`.
-Ở production, log là stdout của container (hoặc của `npm start`); nên đẩy về hệ thống log tập trung để
-giữ lâu dài và tìm kiếm.
-
----
-
-### 6.11. Trang Báo cáo
-
-Dành cho Trưởng IT, Admin HQ và Auditor, trong phạm vi chi nhánh của người xem. Chọn **kỳ báo cáo**
-(mặc định 30 ngày gần nhất, tối đa 366 ngày, có nút nhanh 7 / 30 / 90 ngày), hoặc tích **Toàn bộ thời gian**
-(nút nhanh **Toàn bộ**: từ ngày đầu tiên có dữ liệu đến hôm nay, không giới hạn 366 ngày, bỏ qua ô ngày); có thể
-chọn một chi nhánh. Nút **Xuất Excel** xuất đúng kỳ đang xem, kể cả Toàn bộ thời gian.
-Số máy, số key là số **hiện tại**; máy mới, key mới, máy rời AD và lượt hiện key tính **trong kỳ**.
-
-| Phần | Nội dung |
-| --- | --- |
-| Tổng quan | Số chi nhánh, máy trong AD, % máy có key, số key, máy/key mới và máy rời AD trong kỳ, lượt hiện key (số người, số máy, số lượt ngoài giờ) |
-| Chi tiết theo chi nhánh | Mỗi chi nhánh: máy, có key, chưa có key, % có key (dưới 90% được tô màu), số key, máy mới, key mới, rời AD; dòng tổng |
-| Xem key theo chi nhánh | Mỗi chi nhánh: lượt hiện key, số người xem, số máy được xem, ngoài giờ, xuất kèm file, lý do nhiều nhất; bên dưới là bảng người xem key theo chi nhánh |
-| Máy chưa có key | Máy còn trong AD chưa lưu key (trạng thái hiện tại, không theo kỳ). **Tất cả chi nhánh**: chỉ bảng tổng quan theo chi nhánh (chưa có key, lâu hơn 7 ngày, mới ≤ 7 ngày, link **Xem danh sách** sang trang Tìm máy), xếp chi nhánh nhiều máy lâu chưa có key lên đầu. **Một chi nhánh** (hoặc người xem chỉ có một chi nhánh): danh sách từng máy, máy lâu nhất lên đầu, cột số ngày chưa có key, nhãn "mới". Máy mới ghi nhận ≤ 7 ngày có thể vẫn đang chờ GPO. File Excel theo cùng quy tắc: tất cả chi nhánh thì sheet "Máy chưa có key" chỉ là bảng tổng hợp theo chi nhánh; một chi nhánh thì có danh sách từng máy |
-
-"Ngoài giờ" chỉ được tính khi đã cấu hình giờ làm việc (cảnh báo xem key ngoài giờ).
-
-Nút **Xuất Excel** tải file `.xlsx` theo đúng kỳ và chi nhánh đang chọn, gồm 5 sheet: *Tổng quan*,
-*Theo chi nhánh*, *Xem key theo CN* (thêm một cột cho mỗi lý do), *Người xem key*, *Máy chưa có key*.
-Mỗi sheet có dòng tiêu đề cố định và bộ lọc; ngày giờ theo `APP_TZ`. File **không bao giờ chứa
-recovery key**. Mỗi lần xuất ghi một dòng `export_report` vào nhật ký.
-
-### 6.12. Định danh máy và key, các tình huống thường gặp
-
-Hệ thống **không định danh theo tên**:
-
-| Đối tượng | Định danh | Ghi chú |
-| --- | --- | --- |
-| Máy | `objectGUID` do AD cấp | Duy nhất, không đổi khi đổi tên hay chuyển OU, không bao giờ cấp lại. Hiện ở trang chi tiết máy, dưới tên máy trong danh sách, trong CSV; dán GUID vào ô Tìm máy để tìm đúng máy |
-| Key | Key ID (`msFVE-RecoveryGuid`) | 8 ký tự đầu là số hiện trên màn hình recovery |
-| Key thuộc máy nào | `objectGUID` của máy cha (worker gửi kèm mỗi key) | Chỉ khi thiếu GUID mới dò theo DN, và ưu tiên máy còn trong AD, mới thấy gần nhất |
-
-**Không bao giờ xóa** máy hay key: tài khoản ứng dụng trong DB không có quyền DELETE trên hai bảng này. Máy
-không còn trong AD chỉ đổi trạng thái thành "Không còn trong AD"; xóa chi nhánh chỉ chuyển máy về N/A.
-
-| Tình huống | Hệ thống làm gì |
-| --- | --- |
-| **Máy đổi tên** (hoặc chuyển OU) | Cùng `objectGUID` nên vẫn là **một máy**: cập nhật tên, DN, chi nhánh (đổi chi nhánh thì ghi nhật ký `computer_moved`). Giữ nguyên key, lịch sử hiện key, serial / email người dùng đã nhập. Không coi là máy mới, không gửi email máy mới. Tìm theo tên cũ sẽ không ra; tìm theo GUID hoặc Key ID vẫn ra |
-| **Máy bị xóa khỏi AD rồi cài lại, join lại cùng tên** | AD tạo **object mới, GUID mới**, nên hệ thống tạo **máy mới** (có thể gửi email "máy mới"). Máy cũ ở lượt full kế tiếp chuyển sang "Không còn trong AD", **giữ nguyên các key cũ** (vẫn hiện được, ví dụ khi cần mở ổ của ảnh đĩa cũ). Key mới gắn vào máy mới theo GUID. Tìm theo tên sẽ thấy cả hai, máy còn trong AD đứng trước. Serial / email người dùng của máy cũ không tự chép sang máy mới |
-| Máy cài lại nhưng admin **"Reset account"** thay vì xóa | Vẫn là object cũ, cùng GUID, nên vẫn là máy cũ; key mới thêm vào cùng máy |
-| **Key mới cho cùng một ổ đĩa** (cùng `msFVE-VolumeGuid`) | Thêm key mới (không ghi đè). Key mới thành **Đang dùng**, key cũ của ổ đó thành **Có key mới hơn**; key cũ và mật khẩu cũ vẫn giữ. Ổ khác của máy không bị ảnh hưởng. Có thể gửi email "key mới" |
-| Đẩy lại đúng key cũ (`manage-bde -adbackup` cùng protector) | Cùng Key ID nên không có gì mới: không trùng, không email |
-| **Máy unjoin rồi join lại AD, sau đó đẩy lại key cũ** (ổ không mã hóa lại, Key ID không đổi) | AD tạo object mới (GUID mới) và key cũ nằm dưới object mới. Key **được chuyển sang máy mới** (không xóa, không chép thành 2 key), ghi lịch sử chuyển: **cùng tên, cùng domain** thì chuyển ngay ở lượt sync đó và máy cũ được gắn "Không còn trong AD" (AD không thể có 2 máy cùng tên); **khác tên** thì tạm ghi là Key ID trùng, lượt full kế tiếp thấy máy cũ rời AD thì chuyển key và tự đóng, không gửi mail. Trang máy cũ ghi "Key đã chuyển sang máy …", trang máy mới ghi "Key chuyển từ máy cũ …" |
-| **Cùng Key ID dưới 2 máy đều còn trong AD** (ví dụ clone từ image đã bật BitLocker) | Key **giữ ở máy đang giữ**, ghi nhận Key ID trùng. Sau khi một lượt full xác nhận, gửi **1 mail** "Key ID trùng giữa 2 máy" (mỗi cặp 1 lần, không nhắc lại; không ảnh hưởng Online / Offline). Hiện ở Quản trị > Sync AD (nút **Đã xem xét** để đóng hẳn, ghi nhật ký `key_duplicate_review`) và trên trang cả hai máy. Tự đóng khi một trong hai máy rời AD |
-| Cùng Key ID nhưng **mật khẩu khác** | Không chuyển, không ghi đè; ghi nhận và cảnh báo như Key ID trùng (cột Mật khẩu: khác nhau) |
-| Key cũ bị xóa trong AD | Hệ thống vẫn giữ key đó (không bao giờ xóa) |
-
-Lưu ý: khi xóa máy khỏi AD, AD xóa luôn các key của máy đó. Xóa **nhiều** máy cùng lúc làm số máy và số key
-mà lượt full thấy giảm mạnh, nên lượt đó bị **giữ lại** chờ Admin HQ duyệt (mục 6.1). Đây là cơ chế an toàn,
-không phải lỗi.
-
-### 6.13. Hiện key và sao chép
-
-Trang hiện key cho thấy 8 nhóm số và tự ẩn sau 60 giây. Nút **Sao chép key** chép cả key (kèm dấu gạch
-ngang, dán thẳng vào màn hình BitLocker được). Khi key tự ẩn hoặc bấm "Ẩn key", trang cố xóa luôn clipboard;
-trình duyệt có thể không cho, nên người dùng nên tự xóa (copy nội dung khác) sau khi dùng xong. Sao chép
-cần HTTPS (hoặc localhost); không được thì trang chọn sẵn key để người dùng nhấn Ctrl+C. Mọi lần hiện key đã
-được ghi nhật ký kèm lý do.
+Giờ đọc AD của **worker** (delta mỗi 15 phút, full ban đêm lúc 01:00, heartbeat mỗi 5 phút) nằm trong **file cấu hình của worker**
+(`Schedule.DeltaEveryMinutes`, `FullAt`, `HeartbeatEveryMinutes`, mục 4); app không đổi các giờ này.
+Giá trị lưu sai (ngoài khoảng cho phép) tự quay về mặc định.
 
 ## 7. Xử lý sự cố
 
@@ -1544,6 +1394,7 @@ cần HTTPS (hoặc localhost); không được thì trang chọn sẵn key đ�
 | --- | --- | --- |
 | App không khởi động, log ghi `Invalid configuration` | Thiếu hoặc sai biến trong `.env` | Đọc tên biến trong log, sửa `.env` (xem mục 3.4) |
 | `/healthz` trả 503 | Không kết nối được DB | Kiểm tra `DATABASE_URL`, tường lửa, `DB_SSL` |
+| Đăng nhập báo tài khoản bị khóa (kể cả Admin) | Nhập sai mật khẩu quá số lần cho phép (Quản trị > Bảo mật) | Chờ hết thời gian khóa, hoặc Admin khác mở khóa; không còn Admin nào thì `docker compose exec server node src/cli/users.js unlock <tên>` (mục 6.14) |
 | Đăng nhập AD báo không kết nối được máy chủ AD | Sai `LDAP_URL`, chặn cổng 636, hoặc app không tin CA của DC | Thử `openssl s_client -connect dc01.corp.local:636`, đặt `LDAP_CA_FILE` |
 | Tài khoản AD "không khớp" | Tài khoản AD bị xóa rồi tạo lại | Admin bấm "Gỡ liên kết AD" cho user đó |
 | Worker nhận 401 | Sai API key | So khớp `INGEST_API_KEY` với `Ingest:ApiKey` (mã hóa lại bằng `protect`) |
@@ -1553,7 +1404,7 @@ cần HTTPS (hoặc localhost); không được thì trang chọn sẵn key đ�
 | Worker Go: `ldap_tls_failed`, connection reset ở 636 | DC chưa có chứng chỉ TLS | Cấp chứng chỉ cho DC, hoặc dùng `Protocol: Ldap` (mặc định, mục 4B.2) |
 | Worker Go: `x509: certificate signed by unknown authority` | Máy Linux không tin CA của DC | Đặt `Ldap.CaFile` hoặc cài CA vào kho hệ thống |
 | Lượt sync bị giữ lại liên tục | Ngưỡng không hợp với thực tế, hoặc DB còn dữ liệu thử | Xem lý do trên tab Quản trị > Sync AD, chấp nhận hoặc bác bỏ |
-| Máy hiện "Không còn trong AD" | Máy bị xóa khỏi AD, hoặc nằm ngoài `SearchBases` của worker | Kiểm tra AD và `SearchBases`. Máy xuất hiện lại trong AD thì nhãn tự mất |
+| Máy hiện "Không còn trong phạm vi giám sát" | Máy bị xóa khỏi AD, hoặc nằm ngoài `SearchBases` của worker | Kiểm tra AD và `SearchBases`. Máy xuất hiện lại trong AD thì nhãn tự mất |
 | Lượt sync lỗi `ldap_search_base_failed` | Một OU trong `SearchBases` không tồn tại, bị đổi tên/di chuyển, hoặc tài khoản worker không có quyền đọc | Log worker ghi tên OU. Chạy `check` để xem OU nào `FAIL`, sửa `SearchBases` hoặc cấp quyền (mục 4.1) |
 | Trang Tổng quan báo dữ liệu có thể đã cũ | Worker dừng, lỗi, hoặc lượt sync bị giữ lại | Xem Quản trị > Sync AD và log worker; ngưỡng ở Quản trị > Ngưỡng cảnh báo |
 | Quên mật khẩu admin | | `node src/cli/users.js reset-password admin` |
@@ -1587,7 +1438,6 @@ cần HTTPS (hoặc localhost); không được thì trang chọn sẵn key đ�
 | `LOCAL_LOGIN_ENABLED` | `true` | Cho phép đăng nhập bằng tài khoản local |
 | `SESSION_SECRET` | | 32 ký tự trở lên |
 | `SESSION_IDLE_MINUTES`, `SESSION_MAX_HOURS` | `15`, `8` | Thời gian chờ và thời gian tối đa của phiên (mặc định; Admin HQ đổi được ở Quản trị > Bảo mật) |
-| `COOKIE_SECURE` | bật trong production | |
 | `LOG_HMAC_KEY` | | 64 ký tự hex |
 | `BACKUP_DIR` | `backups` | Thư mục ghi file sao lưu (mục 6.8) |
 | `BACKUP_DATABASE_URL` | | Tài khoản chỉ đọc `blk_backup` cho `pg_dump`; bỏ trống thì không sao lưu database |
@@ -1599,180 +1449,91 @@ cần HTTPS (hoặc localhost); không được thì trang chọn sẵn key đ�
 
 ### 8.2. API cho người dùng
 
-**Tài liệu Swagger:** `https://<server>/api/docs` (dev: https://localhost/api/docs). Mở sau khi
-đã đăng nhập web; trang dùng luôn phiên đăng nhập đó.
-- Muốn thử các lệnh POST/PUT/DELETE trong "Try it out": gọi `GET /api/me`, chép `csrfToken`, bấm
-  **Authorize** và dán vào ô `csrfHeader`.
-- Spec gốc: `/api/docs/openapi.yaml` hoặc `/api/docs/openapi.json` (file
-  `server/openapi/app.openapi.yaml`). Mỗi thao tác có `operationId`, dùng được để sinh client.
-- Có test đối chiếu: mọi route trong code phải có trong spec và ngược lại, nên thêm API mới mà quên
-  cập nhật spec thì test báo lỗi.
+Danh sách đầy đủ endpoint, tham số và quyền nằm ở **Swagger**: `https://<server>/api/docs` (dev: https://localhost/api/docs), mở sau khi đăng nhập web (dùng luôn phiên đó). Spec gốc: `/api/docs/openapi.yaml` hoặc `.json` (file `server/openapi/app.openapi.yaml`, mỗi thao tác có `operationId` để sinh client). Một test đối chiếu mọi route trong code với spec, nên thêm API mà quên cập nhật spec thì test báo lỗi. Muốn bấm "Try it out" cho POST/PUT/DELETE: gọi `GET /api/me`, chép `csrfToken`, bấm **Authorize** và dán vào `csrfHeader`.
 
-Đăng nhập bằng `POST /api/auth/login` để nhận cookie phiên. Các request POST/PUT/DELETE phải kèm
-header `X-CSRF-Token` (lấy từ `GET /api/me`). Lỗi trả về dạng
-`{ "error": "<mã>", "message": "<tiếng Anh>" }`.
+Lỗi trả về dạng `{ "error": "<mã>", "message": "<tiếng Anh>" }`.
 
-#### Gọi API của app từ script
+#### Gọi API từ script
 
-API của app dùng **cùng cách đăng nhập với web**: không có API key riêng. Script phải đăng nhập, giữ
-cookie phiên rồi gửi kèm ở mỗi request. Các bước:
+API dùng **cùng cách đăng nhập với web**, không có API key riêng: script đăng nhập, giữ cookie phiên rồi gửi kèm mỗi request.
 
-1. **Chọn tài khoản.** Nên tạo một tài khoản riêng cho script (Quản trị > Người dùng), chỉ cấp vai trò
-   và chi nhánh cần thiết, ví dụ `auditor` để đọc nhật ký/báo cáo. Tài khoản AD hay local đều dùng được.
-   Không dùng tài khoản `admin` cá nhân cho script.
-2. **Đăng nhập**: `POST /api/auth/login` với `{ "username": "...", "password": "..." }`. Server trả cookie
-   `blk.sid` và `csrfToken` trong body. Tài khoản local mới tạo phải đổi mật khẩu trước
-   (`mustChangePassword: true`, gọi `POST /api/auth/change-password`).
-3. **Gọi API** kèm cookie. Với POST/PUT/DELETE thêm header `X-CSRF-Token: <csrfToken>` và
-   `Content-Type: application/json` (thiếu thì nhận 403 `csrf_failed` hoặc 415 `json_required`).
-4. **Đăng xuất** khi xong: `POST /api/auth/logout`.
+1. **Tài khoản**: tạo riêng cho script (Quản trị > Người dùng), chỉ cấp vai trò và chi nhánh cần thiết (ví dụ `auditor` để đọc nhật ký / báo cáo). Tài khoản local mới tạo phải đổi mật khẩu trước (`mustChangePassword: true` → `POST /api/auth/change-password`). Không lưu mật khẩu trong script.
+2. **Đăng nhập**: `POST /api/auth/login` `{ "username", "password" }` → cookie `blk.sid` và `csrfToken`. Có 2 bước thì thêm `POST /api/auth/2fa` (mục 6.14).
+3. **Gọi API** kèm cookie; POST/PUT/DELETE thêm `X-CSRF-Token: <csrfToken>` và `Content-Type: application/json` (thiếu thì 403 `csrf_failed` / 415 `json_required`).
+4. **Đăng xuất**: `POST /api/auth/logout`.
 
-Lưu ý:
-
-- Phiên hết hạn sau số phút không dùng và thời gian tối đa ở Quản trị > Bảo mật (mặc định `SESSION_IDLE_MINUTES`
-  15 phút, `SESSION_MAX_HOURS` 8 giờ). Nhận 401 thì đăng nhập lại. Tài khoản bật xác thực 2 bước cần thêm bước
-  `POST /api/auth/2fa` (mục 6.14).
-- Cookie có cờ `Secure` ở production, nên phải gọi qua **HTTPS** (qua reverse proxy).
-- Đăng nhập sai nhiều lần sẽ khóa tài khoản tạm thời, như trên web.
-- Mọi thao tác qua API được ghi nhật ký như trên web: hiện key, xuất CSV, xuất Excel, thay đổi quản trị.
-  Hiện key qua API vẫn bắt chọn lý do.
-- Không lưu mật khẩu trong script: đọc từ biến môi trường hoặc kho bí mật.
-
-Ví dụ với `curl` (Linux, macOS, Git Bash). File `cookies.txt` giữ cookie phiên:
+Phiên hết hạn theo Quản trị > Bảo mật (nhận 401 thì đăng nhập lại); cookie có cờ `Secure` nên phải gọi qua HTTPS; đăng nhập sai nhiều lần thì khóa như trên web. Mọi thao tác (hiện key, xuất CSV / Excel, thay đổi quản trị) đều ghi nhật ký; hiện key vẫn bắt chọn lý do.
 
 ```bash
 BASE=https://blk.corp.local
-# 1. Đăng nhập, lấy csrfToken (mật khẩu lấy từ biến môi trường BLK_PASSWORD)
+# Đăng nhập (mật khẩu lấy từ biến môi trường), giữ cookie trong cookies.txt
 CSRF=$(curl -s -c cookies.txt -H 'Content-Type: application/json' \
-  -d "{\"username\":\"svc-report\",\"password\":\"$BLK_PASSWORD\"}" \
-  "$BASE/api/auth/login" | jq -r .csrfToken)
+  -d "{\"username\":\"svc-report\",\"password\":\"$BLK_PASSWORD\"}" "$BASE/api/auth/login" | jq -r .csrfToken)
 
-# 2. Đọc (GET không cần CSRF)
+# Đọc (GET không cần CSRF)
 curl -s -b cookies.txt "$BASE/api/computers?q=HN-LT" | jq '.rows[] | {name, branch_code}'
-curl -s -b cookies.txt "$BASE/api/reports/summary?from=2026-10-01&to=2026-10-31" | jq .totals
-
-# 3. Tải báo cáo Excel
 curl -s -b cookies.txt -o bao-cao.xlsx "$BASE/api/reports/summary?from=2026-10-01&to=2026-10-31&format=xlsx"
 
-# 4. Ghi (cần X-CSRF-Token), ví dụ cập nhật serial / email của máy 42
+# Ghi (cần X-CSRF-Token): cập nhật serial / email của máy 42
 curl -s -b cookies.txt -X PUT -H 'Content-Type: application/json' -H "X-CSRF-Token: $CSRF" \
-  -d '{"deviceSerial":"5CG1234XYZ","ownerEmail":"nguyenvana@corp.local"}' \
-  "$BASE/api/computers/42/info"
+  -d '{"deviceSerial":"5CG1234XYZ","ownerEmail":"nguyenvana@corp.local"}' "$BASE/api/computers/42/info"
 
-# 5. Đăng xuất
 curl -s -b cookies.txt -X POST -H "X-CSRF-Token: $CSRF" "$BASE/api/auth/logout"
 ```
 
-Ví dụ với PowerShell (`WebSession` tự giữ cookie):
+PowerShell (`WebSession` tự giữ cookie):
 
 ```powershell
 $base = 'https://blk.corp.local'
-$cred = Get-Credential   # nhập tài khoản của script
+$cred = Get-Credential
 $body = @{ username = $cred.UserName; password = $cred.GetNetworkCredential().Password } | ConvertTo-Json
 $login = Invoke-RestMethod "$base/api/auth/login" -Method Post -Body $body -ContentType 'application/json' -SessionVariable s
 $h = @{ 'X-CSRF-Token' = $login.csrfToken }
 
-# Đọc
-(Invoke-RestMethod "$base/api/dashboard" -WebSession $s).totals
-Invoke-WebRequest "$base/api/audit?action=reveal&format=csv" -WebSession $s -OutFile reveal.csv
-
-# Ghi
+(Invoke-RestMethod "$base/api/dashboard" -WebSession $s).totals                                   # đọc
 $info = @{ deviceSerial = '5CG1234XYZ'; ownerEmail = 'nguyenvana@corp.local' } | ConvertTo-Json
-Invoke-RestMethod "$base/api/computers/42/info" -Method Put -WebSession $s -Headers $h -ContentType 'application/json' -Body $info
-
+Invoke-RestMethod "$base/api/computers/42/info" -Method Put -WebSession $s -Headers $h -ContentType 'application/json' -Body $info   # ghi
 Invoke-RestMethod "$base/api/auth/logout" -Method Post -WebSession $s -Headers $h
 ```
 
-Dev: `BASE=https://localhost`. Chứng chỉ tự ký: curl thêm `--cacert cert/ca.crt` (curl dùng OpenSSL) hoặc `-k`
-(chỉ dev); PowerShell 7 thêm `-SkipCertificateCheck`.
-
-| Method | Path | Ai dùng được |
-| --- | --- | --- |
-| POST | `/api/auth/login`, `/api/auth/logout`, `/api/auth/change-password` | mọi người |
-| GET | `/api/me`, `/api/dashboard` | đã đăng nhập |
-| GET | `/api/computers?q=&page=&branchId=&status=&includeDeleted=&dateField=&from=&to=` (`branchId=na`: máy N/A; `dateField=seen` (mặc định) hoặc `ad`, `from`/`to` dạng YYYY-MM-DD), `/api/computers/:id`, `/api/keys/search?keyId=` | it, lead, admin |
-| GET | `/api/computers?format=csv&` + cùng bộ lọc: xuất CSV danh sách máy (không có key) | it, lead, admin |
-| PUT | `/api/computers/:id/info` `{deviceSerial, ownerEmail}`: thông tin bổ sung của máy | it, lead, admin (trong phạm vi) |
-| POST | `/api/keys/export` `{branchId?, status?, includeDeleted?, dateField?, from?, to?, reason, reasonNote?, ticketNo?}`: CSV kèm recovery password | theo tab Tính năng |
-| GET | `/api/keys/reveal-options`; POST `/api/keys/:keyId/reveal` `{reason, reasonNote?, ticketNo?}` | it, lead, admin |
-| GET | `/api/audit?branchId&user&action&computer&from&to&page[&format=csv]` | lead (chi nhánh mình), admin, auditor |
-| GET | `/api/reports/summary?from=&to=&branchId=` (JSON; `&format=xlsx`: file Excel, ghi `export_report`), `/api/reports/no-key`, `/api/reports/reveals?days=` | lead, admin, auditor |
-| * | `/api/admin/branches` (DELETE `/api/admin/branches/:id` `{confirmCode}`, GET `/:id/delete-preview`), `/api/admin/users`, `/api/admin/sync`, `/api/admin/sync-runs` | admin |
-| GET | `/api/admin/settings` (mail server, thông báo, tính năng; mật khẩu SMTP không bao giờ trả về), `/api/admin/settings/thresholds` | admin |
-| PUT | `/api/admin/settings/mail-server`, `/notifications`, `/features`, `/thresholds`, `/retention`; POST `/settings/mail-server/test` `{to}`, `/settings/retention/run` | admin |
-| GET | `/api/admin/mail?status=&q=&page=`, `/api/admin/mail/:id`; POST `/api/admin/mail/:id/retry` | admin |
+Dev: `BASE=https://localhost`; chứng chỉ tự ký thì curl thêm `--cacert cert/ca.crt` (hoặc `-k`), PowerShell 7 thêm `-SkipCertificateCheck`.
 
 ### 8.3. Ingest API (cho worker)
 
-Đặc tả OpenAPI ở `server/openapi/ingest.openapi.yaml`, Swagger UI ở `https://<server>:8443/docs`.
+API **riêng cho sync worker**, cổng riêng (`INGEST_PORT`, mặc định 8443), không có phiên đăng nhập và không endpoint nào trả key ra. Đặc tả: `server/openapi/ingest.openapi.yaml`, Swagger UI `https://<server>:8443/docs`. Bình thường worker tự gọi; chỉ gọi tay để kiểm tra kết nối hoặc khi viết nguồn dữ liệu khác thay worker.
 
-Ingest API là API **riêng cho sync worker**, chạy trên cổng riêng (`INGEST_PORT`, mặc định 8443).
-API này không có phiên đăng nhập và không có endpoint nào trả key ra. Bình thường bạn **không cần gọi
-tay**: worker tự gọi. Chỉ gọi tay khi kiểm tra kết nối, hoặc khi viết một nguồn dữ liệu khác thay
-worker .NET.
+Endpoint (chi tiết trong đặc tả): `GET /sync-runs/last`, `POST /sync-runs`, `POST /computers`, `POST /keys`, `POST /sync-runs/:id/complete`, `POST /heartbeat`, đều dưới `/api/ingest`. Body JSON tối đa 2 MB, mỗi lô tối đa 500 máy hoặc 500 key.
 
-| Method | Path | Việc |
+**Xác thực: ba lớp, đều bắt buộc trên production**
+
+| Lớp | Cấu hình | Lỗi khi sai |
 | --- | --- | --- |
-| GET | `/api/ingest/sync-runs/last` | Lượt gần nhất (để worker chọn delta hay full) |
-| POST | `/api/ingest/sync-runs` | Mở lượt sync |
-| POST | `/api/ingest/computers` | Gửi một lô máy |
-| POST | `/api/ingest/keys` | Gửi một lô key (kèm `volumeGuid`) |
-| POST | `/api/ingest/sync-runs/:id/complete` | Kết thúc lượt; server kiểm tra bất thường |
-| POST | `/api/ingest/heartbeat` | Báo worker còn sống; nhận yêu cầu sync thủ công |
+| HTTPS | nginx cổng 8443 (mục 3.6) | Lỗi TLS; `http://` vào 8443 nhận 400 |
+| IP được phép | `INGEST_ALLOWED_IPS` (IP nginx ghi vào `X-Forwarded-For`, client không giả được) | 403 `forbidden` |
+| API key | `INGEST_API_KEY`, header `Authorization: Bearer <key>` | 401 `bad_api_key` |
 
-#### Xác thực khi gọi ingest API
-
-Worker được kiểm tra bằng **ba lớp**, cả ba đều bắt buộc trên production:
-
-| Lớp | Cấu hình | Bên gọi phải | Lỗi khi sai |
-| --- | --- | --- | --- |
-| HTTPS | nginx (cổng 8443, mục 3.6) | Gọi `https://`, tin chứng chỉ server | Lỗi TLS; gọi `http://` vào 8443 nhận 400 |
-| IP được phép | `INGEST_ALLOWED_IPS` (IP nginx ghi vào `X-Forwarded-For`, client không giả được) | Gọi từ đúng IP trong danh sách | 403 `forbidden` |
-| API key | `INGEST_API_KEY` | Header `Authorization: Bearer <INGEST_API_KEY>` | 401 `bad_api_key` |
-Body là JSON, tối đa 2 MB, mỗi lô tối đa 500 máy hoặc 500 key.
-
-#### Gọi thử ingest API
-
-Kiểm tra kết nối và xác thực bằng các lệnh **chỉ đọc hoặc vô hại**: `GET /sync-runs/last` và
-`POST /heartbeat`. Chạy trên máy worker (đúng IP được phép):
+**Gọi thử** (chỉ đọc hoặc vô hại), chạy trên máy worker (đúng IP được phép):
 
 ```bash
 INGEST=https://blk.corp.local:8443/api/ingest
-# API key qua HTTPS (thêm --cacert corp-ca.crt nếu máy chưa tin CA của chứng chỉ server)
-curl -s -H "Authorization: Bearer $INGEST_API_KEY" "$INGEST/sync-runs/last"
-
-# Heartbeat: worker xuất hiện ở Quản trị > Sync AD; nhận lại syncRequested (delta | full | null)
+curl -s -H "Authorization: Bearer $INGEST_API_KEY" "$INGEST/sync-runs/last"      # thêm --cacert nếu máy chưa tin CA
+# Heartbeat: worker hiện ở Quản trị > Đồng bộ AD; trả về syncRequested (delta | full | null)
 curl -s -H "Authorization: Bearer $INGEST_API_KEY" -H 'Content-Type: application/json' \
   -d '{"workerId":"TEST-CURL","version":"manual","ldapOk":true}' "$INGEST/heartbeat"
 ```
 
-PowerShell trên máy worker:
-
 ```powershell
-$ingest = 'https://blk.corp.local:8443/api/ingest'
-$h = @{ Authorization = "Bearer $env:INGEST_API_KEY" }
-Invoke-RestMethod "$ingest/sync-runs/last" -Headers $h
+Invoke-RestMethod 'https://blk.corp.local:8443/api/ingest/sync-runs/last' -Headers @{ Authorization = "Bearer $env:INGEST_API_KEY" }
 ```
 
-**Gửi dữ liệu thật qua ingest** (khi viết nguồn dữ liệu thay worker): làm đúng trình tự trong đặc tả,
-tóm tắt như sau:
-
-1. `POST /sync-runs` `{ "mode": "delta" | "full", "dcName": "DC01.corp.local" }`, rồi dùng `runId`, `mode`,
-   `sinceUsn` mà server trả về. Server có thể đổi delta thành full.
-2. `POST /computers` từng lô `{ "runId": ..., "items": [...] }`. Gửi **máy trước**.
-3. `POST /keys` từng lô. Key trả về trong `orphans` thì gửi máy cha của nó rồi gửi lại key.
-4. `POST /sync-runs/{runId}/complete` với số đếm và `highestUsn`. Nếu lỗi thì gửi `status: failed` kèm `errorCode`.
+**Gửi dữ liệu thật** (nguồn thay worker), theo trình tự: (1) `POST /sync-runs` `{ "mode": "delta"|"full", "dcName" }`, dùng `runId`, `mode`, `sinceUsn` server trả về (server có thể đổi delta thành full); (2) `POST /computers` từng lô, **máy trước**; (3) `POST /keys` từng lô (key trong `orphans` thì gửi máy cha rồi gửi lại); (4) `POST /sync-runs/{runId}/complete` với số đếm và `highestUsn` (lỗi thì `status: failed` + `errorCode`).
 
 Cẩn thận:
 
-- Một lượt **full** coi mọi máy không được gửi là "Không còn trong AD". Đừng chạy full thử với dữ liệu
-  thiếu trên hệ thống thật. Lượt có số liệu bất thường sẽ bị giữ lại chờ Admin HQ duyệt (mục 6.1).
-- Chỉ một lượt được mở tại một thời điểm (409 `run_in_progress`). Nếu worker thật đang chạy, hãy dừng
-  service trước.
-- Mỗi lô gửi lại được (idempotent). Lỗi 5xx hoặc lỗi mạng thì thử lại với backoff; lỗi 4xx thì sửa dữ liệu.
-- Không ghi log và không lưu recovery password ở phía gọi.
-- Ở dev (docker compose), ingest chạy ở `https://localhost:8443/api/ingest` (chứng chỉ tự ký, CA `cert/ca.crt`)
-  và cần `Authorization: Bearer <INGEST_API_KEY>` lấy trong `server/.env`.
+- Lượt **full** coi mọi máy không được gửi là "Không còn trong phạm vi giám sát": đừng chạy full thử với dữ liệu thiếu trên hệ thống thật (lượt bất thường bị giữ lại chờ duyệt, mục 6.1).
+- Chỉ một lượt mở tại một thời điểm (409 `run_in_progress`): dừng worker thật trước khi gọi tay.
+- Mỗi lô gửi lại được (idempotent): 5xx / lỗi mạng thì thử lại với backoff, 4xx thì sửa dữ liệu. Không ghi log hay lưu recovery password ở phía gọi.
+- Dev: `https://localhost:8443/api/ingest` (CA `cert/ca.crt`), API key trong `server/.env`.
 
 ### 8.4. Cấu trúc code (`server/src`)
 

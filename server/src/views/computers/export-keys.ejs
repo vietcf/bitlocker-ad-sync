@@ -11,7 +11,7 @@
   <dl class="facts">
     <dt>Chi nhánh</dt><dd><%= filters.branchId === 'na' ? 'N/A (chưa thuộc chi nhánh nào)' : filters.branchId ? (branchName ?? filters.branchId) : 'Tất cả trong phạm vi của bạn' %></dd>
     <dt>Tình trạng</dt><dd><%= filters.status === 'no_key' ? 'Chưa có key' : 'Tất cả' %></dd>
-    <dt>Máy không còn trong AD</dt><dd><%= filters.includeDeleted ? 'Có' : 'Không' %></dd>
+    <dt>Máy không còn trong phạm vi giám sát</dt><dd><%= filters.includeDeleted ? 'Có' : 'Không' %></dd>
     <% if (filters.from || filters.to) { %>
       <dt><%= filters.dateField === 'ad' ? 'Tạo trên AD' : 'Ghi nhận trên hệ thống' %></dt>
       <dd><%= filters.from ? `từ ${filters.from}` : '' %> <%= filters.to ? `đến ${filters.to}` : '' %></dd>

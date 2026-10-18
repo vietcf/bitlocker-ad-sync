@@ -15,7 +15,7 @@
       <td><%= c.key_count %></td>
       <td><%= h.date(c.ad_created_at) %></td>
       <td><%= h.date(c.first_seen_at) %></td>
-      <td><% if (c.deleted_in_ad_at) { %><span class="badge badge-muted">Không còn trong AD</span><% } else { %>Còn trong AD<% } %></td>
+      <td><% if (c.deleted_in_ad_at) { %><span class="badge badge-muted">Không còn trong phạm vi giám sát</span><% } else { %>Đang được giám sát<% } %></td>
     </tr>
   <% }) %>
   </tbody>

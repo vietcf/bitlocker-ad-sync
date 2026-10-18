@@ -46,7 +46,7 @@ describe('key export', () => {
     expect(res.status).toBe(200);
     expect(res.headers['cache-control']).toMatch(/no-store/);
     const lines = res.text.replace(/^﻿/, '').trim().split('\r\n');
-    expect(lines[0]).toBe('computer,computer_object_guid,branch,distinguished_name,in_ad,key_id,volume_guid,device_serial,owner_email,status,key_created_utc,key_recorded_utc,recovery_password');
+    expect(lines[0]).toBe('computer,computer_object_guid,branch,distinguished_name,in_scope,key_id,volume_guid,device_serial,owner_email,status,key_created_utc,key_recorded_utc,recovery_password');
     expect(lines).toHaveLength(2);
     expect(lines[1]).toContain('HN-LT-0001');
     expect(lines[1]).toContain(PWD(1));

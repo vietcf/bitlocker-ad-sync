@@ -303,3 +303,21 @@ a.hbar-bad:hover, a.hbar-bad:focus-visible { filter: brightness(1.12); outline-o
 .qr svg { width: 200px; height: 200px; display: block; border-radius: 6px; }
 .totp-secret { display: inline-block; font-size: 15px; letter-spacing: .06em; padding: 4px 8px; background: var(--muted-bg); border-radius: 4px; word-break: break-all; }
 .totp-code { font-size: 22px; letter-spacing: .3em; max-width: 200px; font-variant-numeric: tabular-nums; }
+
+/* Chi tiet luot sync */
+.plain-list { list-style: none; padding: 0; margin: 0; }
+.plain-list li { padding: 3px 0; border-bottom: 1px solid var(--line); }
+.bad-text { color: var(--bad); font-weight: 600; }
+tr.row-total td { font-weight: 600; }
+.actions.decision { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
+
+/* Tinh trang sync: hai o rieng, worker va dong bo AD */
+.status-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+@media (max-width: 760px) { .status-pair { grid-template-columns: 1fr; } }
+.status-box { border: 1px solid var(--line); border-left-width: 4px; border-radius: var(--radius); padding: 10px 14px; background: var(--surface); }
+.status-box.is-ok { border-left-color: var(--good); }
+.status-box.is-bad { border-left-color: var(--bad); }
+.status-box.is-unknown { border-left-color: var(--muted); }
+.status-title { font-weight: 600; margin-bottom: 4px; }
+
+.run-summary { margin-top: 4px; font-size: 13px; }

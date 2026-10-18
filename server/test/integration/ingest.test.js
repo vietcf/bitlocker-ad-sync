@@ -229,6 +229,38 @@ describe('anomaly quarantine', () => {
     expect(sent.some((m) => m.subject.includes('Đã xử lý: '))).toBe(true);
   });
 
+  it('previews what accepting would change before the decision (web and API)', async () => {
+    const all = [...tenComputers('HN', 1), ...tenComputers('HCM', 101)];
+    await runSync({ computers: all, keys: [key(1, 101, 'HCM')] });
+    const bad = await runSync({ computers: [...all.slice(0, 10), computer(500, 'HN')] }); // HCM vanished, one new HN computer
+    await addUser(pool, 'admin.hq', [{ branchId: null, role: 'admin' }]);
+    const { agent, csrf } = await apiLogin(app, 'admin.hq');
+    const p = (await agent.get(`/api/admin/sync-runs/${bad.runId}`)).body;
+    expect(p.waiting).toBe(true);
+    expect(p.planned.total).toBe(10);
+    expect(p.planned.byBranch).toEqual([{ branch_code: 'HCM', computers: 10, keys: 1 }]);
+    expect(p.planned.rows.map((c) => c.name)).toContain('PC-101');
+    expect(p.stored.computers).toMatchObject({ total: 1, rows: [expect.objectContaining({ name: 'PC-500' })] });
+    expect((await asOwner('SELECT count(*)::int AS n FROM computer WHERE deleted_in_ad_at IS NOT NULL'))[0].n).toBe(0); // preview only
+
+    const web = await webLogin(app, 'admin.hq');
+    const list = (await web.agent.get('/admin/sync')).text;
+    expect(list).toContain('Đang chờ quyết định');
+    expect(list).toContain('Lượt full chỉ thấy'); // the overview stays in the note
+    expect(list).toContain(`href="/admin/sync/runs/${bad.runId}"`); // details: click the run number
+    expect(list).not.toContain(`/admin/sync/runs/${bad.runId}/ack`); // the decision is on the preview page
+    const page = (await web.agent.get(`/admin/sync/runs/${bad.runId}`)).text;
+    expect(page).toContain('Nếu chấp nhận');
+    expect(page).toContain('PC-101');
+    expect(page).toContain(`/admin/sync/runs/${bad.runId}/ack`);
+    // After the decision the note still tells what was found, and who decided.
+    await agent.post(`/api/admin/sync-runs/${bad.runId}/ack`).set('X-CSRF-Token', csrf).send({ decision: 'accept' });
+    const after = (await web.agent.get('/admin/sync')).text;
+    expect(after).toContain('Lượt full chỉ thấy');
+    expect(after).toContain('nếu chấp nhận, các máy này được gắn nhãn');
+    expect(after).toMatch(/Đã chấp nhận bởi admin.hq lúc/);
+  });
+
   it('applies nothing when a quarantined run is rejected', async () => {
     const all = [...tenComputers('HN', 1), ...tenComputers('HCM', 101)];
     await runSync({ computers: all });
@@ -273,42 +305,68 @@ describe('heartbeat, manual sync and watchdog', () => {
     expect(beats.map((b) => b.body.syncRequested).filter(Boolean)).toEqual(['full']);
   });
 
-  it('raises worker_silent and sync_stale when nothing has been heard, and clears them when it has', async () => {
-    let raised = await runSyncWatchdog({ pool, alerts: services.alerts, settings: services.settings });
-    expect(raised).toEqual(expect.arrayContaining(['worker_silent', 'sync_stale', 'full_stale']));
-    await ingest().post('/api/ingest/heartbeat').send({ workerId: 'w1', ldapOk: true });
-    await runSync({ computers: [computer(1)] });
-    raised = await runSyncWatchdog({ pool, alerts: services.alerts, settings: services.settings });
-    expect(raised).not.toContain('worker_silent');
-    expect(raised).not.toContain('sync_stale');
-    expect(sent.some((m) => m.subject.includes('Đã khôi phục'))).toBe(false); // back online: no mail
+  const watchdog = () => runSyncWatchdog({ pool, alerts: services.alerts, settings: services.settings });
+  const openTypes = async () => (await services.alerts.listOpen()).map((a) => a.type);
+  const heartbeat = (extra = {}) => ingest().post('/api/ingest/heartbeat').send({ workerId: 'w1', ldapOk: true, ...extra });
+
+  it('no heartbeat: only the worker is Offline, nothing about AD (it cannot be judged)', async () => {
+    const r = await watchdog();
+    expect(r.workerOffline).toBe(true);
+    expect(r.problems).toEqual([]);
+    expect(sent.map((m) => m.type)).toEqual(['worker_offline']);
+    expect(sent[0].subject).toContain('Worker đồng bộ AD đang Offline');
+    const open = await openTypes();
+    expect(open).toEqual(expect.arrayContaining(['worker_offline', 'worker_silent']));
+    expect(open).not.toContain('sync_problem');
+    expect(open).not.toContain('sync_stale'); // a consequence of the worker being down, not a second problem
   });
 
-  it('raises ldap_error from the heartbeat state', async () => {
-    await ingest().post('/api/ingest/heartbeat').send({ workerId: 'w1', ldapOk: false, lastErrorCode: 'ldap_tls_failed' });
-    expect(await runSyncWatchdog({ pool, alerts: services.alerts, settings: services.settings })).toContain('ldap_error');
+  it('the worker runs but AD / the sync is wrong: sync_problem, not worker_offline', async () => {
+    await heartbeat({ ldapOk: false, lastErrorCode: 'ldap_tls_failed' });
+    const r = await watchdog();
+    expect(r.workerOffline).toBe(false);
+    expect(r.problems).toEqual(expect.arrayContaining(['ldap_error', 'sync_stale', 'full_stale']));
+    expect(sent.map((m) => m.type)).toEqual(['sync_problem']);
+    expect(sent[0].subject).toContain('Đồng bộ AD có sự cố');
+    expect(sent[0].text).toContain('ldap_tls_failed');
+    const open = await openTypes();
+    expect(open).toContain('sync_problem');
+    expect(open).not.toContain('worker_offline');
   });
 
-  it('sends one Offline mail listing the conditions, at most once a day, and nothing once back online', async () => {
-    const watchdog = () => runSyncWatchdog({ pool, alerts: services.alerts, settings: services.settings });
+  it('each group mails once, then at most once a day, and nothing once it is over', async () => {
     await watchdog();
-    expect(sent.map((m) => m.type)).toEqual(['sync_offline']); // no mail per condition
-    expect(sent[0].subject).toContain('Đồng bộ AD đang Offline');
-    expect(sent[0].text).toContain('Sync worker không gửi heartbeat');
-    expect((await services.alerts.listOpen()).map((a) => a.type)).toEqual(expect.arrayContaining(['sync_offline', 'worker_silent']));
-
-    await watchdog(); // same day: nothing more
     expect(sent).toHaveLength(1);
-    await pool.query(`UPDATE sync_alert SET last_notified_at = now() - interval '1 day' WHERE type = 'sync_offline' AND resolved_at IS NULL`);
-    await watchdog(); // the next day: one reminder
+    await watchdog(); // same day
+    expect(sent).toHaveLength(1);
+    await pool.query(`UPDATE sync_alert SET last_notified_at = now() - interval '1 day' WHERE type = 'worker_offline' AND resolved_at IS NULL`);
+    await watchdog(); // the next day
     expect(sent).toHaveLength(2);
 
-    // Back online: every condition clears silently, the Offline status too.
-    await ingest().post('/api/ingest/heartbeat').send({ workerId: 'w1', ldapOk: true });
+    // The worker is back, but a full run was never done: AD side now has its own mail.
+    await heartbeat();
     await runSync({ computers: [computer(1)] });
-    expect(await watchdog()).toEqual([]);
+    const r = await watchdog();
+    expect(r.workerOffline).toBe(false);
+    expect(await openTypes()).not.toContain('worker_offline');
+    expect(sent.filter((m) => m.type === 'worker_offline')).toHaveLength(2); // no "recovered" mail
+
+    expect(await watchdog()).toMatchObject({ workerOffline: false, problems: [] });
     expect(await services.alerts.listOpen()).toEqual([]);
-    expect(sent).toHaveLength(2);
+    expect(sent.some((m) => m.subject.includes('Đã khôi phục'))).toBe(false);
+  });
+
+  it('the worker going down while a problem is open closes it quietly (Offline wins), and comes back as a problem if it persists', async () => {
+    await heartbeat({ ldapOk: false, lastErrorCode: 'ldap_bind_failed' });
+    await watchdog();
+    expect(await openTypes()).toContain('sync_problem');
+    await asOwner(`UPDATE worker_heartbeat SET at = now() - interval '2 hours'`);
+    await watchdog();
+    const open = await openTypes();
+    expect(open).toEqual(expect.arrayContaining(['worker_offline']));
+    expect(open).not.toContain('sync_problem');
+    expect(open).not.toContain('ldap_error');
+    expect(sent.map((m) => m.type)).toEqual(['sync_problem', 'worker_offline']);
   });
 });
 

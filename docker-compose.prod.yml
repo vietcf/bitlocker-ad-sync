@@ -1,0 +1,71 @@
+# Production: toan bo cau hinh nam trong server/.env (khong co secret nao ghi cung o day).
+#   DB ngoai Docker:  docker compose -f docker-compose.prod.yml up -d --build
+#   DB trong Docker:  docker compose -f docker-compose.prod.yml --profile db --env-file server/.env up -d --build
+# Xem README muc 3.
+
+x-logging: &logging
+  driver: local
+  options:
+    max-size: "50m"
+    max-file: "20"
+
+services:
+  # Chi chay khi co --profile db. Mat khau lay tu server/.env (POSTGRES_PASSWORD, BLK_OWNER_PASSWORD,
+  # APP_NODE_PASSWORD, BLK_BACKUP_PASSWORD); script server/db/init tao cac tai khoan o lan dau.
+  db:
+    profiles: ["db"]
+    image: postgres:17.6
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
+      POSTGRES_DB: blk
+      BLK_OWNER_PASSWORD: ${BLK_OWNER_PASSWORD:-}
+      APP_NODE_PASSWORD: ${APP_NODE_PASSWORD:-}
+      BLK_BACKUP_PASSWORD: ${BLK_BACKUP_PASSWORD:-}
+    volumes:
+      - ./server/db/init:/docker-entrypoint-initdb.d:ro
+      - blk-pg:/var/lib/postgresql/data
+    restart: unless-stopped
+    logging: *logging
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-d", "blk"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  migrate:
+    build: ./server
+    command: ["node", "src/db/migrate.js"]
+    env_file: ./server/.env
+    restart: "no"
+
+  server:
+    build: ./server
+    env_file: ./server/.env
+    volumes:
+      - ./backups:/app/backups
+    expose:
+      - "3000"
+      - "8443"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    logging: *logging
+
+  nginx:
+    image: nginx:1.28.0-alpine
+    ports:
+      - "${BIND_ADDR:-0.0.0.0}:443:443"
+      - "${BIND_ADDR:-0.0.0.0}:8443:8443"
+      - "${BIND_ADDR:-0.0.0.0}:80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./cert:/etc/nginx/cert:ro
+    depends_on:
+      - server
+    restart: unless-stopped
+    logging: *logging
+
+volumes:
+  blk-pg:

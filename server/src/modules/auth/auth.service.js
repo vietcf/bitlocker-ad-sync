@@ -2,6 +2,7 @@ import QRCode from 'qrcode';
 import { AppError, badRequest } from '../../http/errors.js';
 import { decryptSecret, encryptSecret } from '../mail/secret.js';
 import { generateSecret, otpauthUri, verifyCode } from './totp.js';
+import { loadLockoutPolicy } from './lockout.js';
 import { burnPasswordCheck, checkPasswordPolicy, hashPassword, loadPasswordPolicy, verifyPassword } from './password.js';
 import { DirectoryError } from './ldap.client.js';
 import {
@@ -25,8 +26,12 @@ const WRONG_CODE = () => new AppError(401, 'invalid_totp', 'Wrong or expired cod
 export const TOTP_ISSUER = 'BitLocker Keys';
 
 const INVALID = () => new AppError(401, 'invalid_credentials', 'Wrong username or password.');
-const LOCKED = () =>
-  new AppError(423, 'account_locked', 'The account is temporarily locked after too many failed attempts. Try again in 15 minutes.');
+/** The locked-account error: details.minutes is 0 when only Admin HQ can unlock it. */
+const LOCKED = (policy) => new AppError(423, 'account_locked',
+  policy.lockMinutes === 0
+    ? 'The account is locked after too many failed attempts. Ask Admin HQ to unlock it.'
+    : `The account is temporarily locked after too many failed attempts. Try again in ${policy.lockMinutes} minutes.`,
+  { minutes: policy.lockMinutes });
 
 export const PASSWORD_POLICY_MESSAGES = {
   too_short: 'The new password is too short (see the minimum length).',
@@ -85,6 +90,7 @@ export class AuthService {
    * Unknown users and wrong passwords fail with the same message.
    */
   async login(rawUsername, password, client) {
+    const lock = await loadLockoutPolicy(this.settings);
     const username = normalizeUsername(rawUsername, this.options.domain);
     const user = await findForLogin(this.pool, username);
     const method = user?.auth_source ?? 'unknown';
@@ -111,7 +117,7 @@ export class AuthService {
       }
       if (!(await verifyPassword(password, user.password_hash))) {
         if (!user.is_active || user.is_locked) return fail(user.is_locked ? 'locked' : 'disabled');
-        return fail((await recordFailure(this.pool, user.id)) ? 'wrong_password_locked' : 'wrong_password');
+        return fail((await recordFailure(this.pool, user.id, lock)) ? 'wrong_password_locked' : 'wrong_password');
       }
     } else {
       if (!this.ldap) {
@@ -126,7 +132,7 @@ export class AuthService {
             'Cannot reach the AD server. Try again later.'));
         }
         if (!user.is_active || user.is_locked) return fail(user.is_locked ? 'locked' : 'disabled');
-        return fail((await recordFailure(this.pool, user.id)) ? 'wrong_password_locked' : 'wrong_password');
+        return fail((await recordFailure(this.pool, user.id, lock)) ? 'wrong_password_locked' : 'wrong_password');
       }
       // Same name, different AD account (deleted and recreated, maybe for someone else).
       if (user.ad_object_guid && user.ad_object_guid !== account.objectGuid) {
@@ -139,7 +145,7 @@ export class AuthService {
 
     // Correct password: only now say why it still cannot sign in.
     if (!user.is_active) return fail('disabled');
-    if (user.is_locked) return fail('locked', LOCKED());
+    if (user.is_locked) return fail('locked', LOCKED(lock));
 
     const signedIn = {
       id: user.id,
@@ -179,6 +185,7 @@ export class AuthService {
    * as a failed sign-in (locks after MAX_FAILED_ATTEMPTS). Returns the signed-in user, as login() does.
    */
   async completeSecondFactor(userId, code, client, method = 'password') {
+    const lock = await loadLockoutPolicy(this.settings);
     const user = await findForLoginById(this.pool, userId);
     const t = await getTotp(this.pool, userId);
     const fail = async (reason, error = WRONG_CODE()) => {
@@ -193,12 +200,12 @@ export class AuthService {
     };
     if (!user || !t?.totp_required || !t.totp_secret) return fail('totp_not_set_up', badRequest('totp_not_set_up', 'Sign in again.'));
     if (!user.is_active) return fail('disabled');
-    if (user.is_locked) return fail('locked', LOCKED());
+    if (user.is_locked) return fail('locked', LOCKED(lock));
     const enroll = !t.totp_enrolled_at;
     const step = verifyCode(decryptSecret(this.secretKey, t.totp_secret), code, { lastStep: t.totp_last_step === null ? null : Number(t.totp_last_step) });
     if (step === null || !(await useTotpStep(this.pool, userId, step, { enroll }))) {
-      const locked = await recordFailure(this.pool, userId);
-      return fail(locked ? 'wrong_totp_locked' : 'wrong_totp', locked ? LOCKED() : WRONG_CODE());
+      const locked = await recordFailure(this.pool, userId, lock);
+      return fail(locked ? 'wrong_totp_locked' : 'wrong_totp', locked ? LOCKED(lock) : WRONG_CODE());
     }
     await recordSuccess(this.pool, user.id);
     await this.audit.log({

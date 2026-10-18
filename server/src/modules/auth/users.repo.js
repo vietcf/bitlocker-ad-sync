@@ -5,8 +5,7 @@ import { hashPassword } from './password.js';
 // username = sAMAccountName) or with a password stored here (auth_source 'local').
 // Not under RLS: holds no keys.
 
-export const MAX_FAILED_ATTEMPTS = 5;
-export const LOCK_MINUTES = 15;
+import { LOCKOUT_DEFAULTS } from './lockout.js';
 
 /** Stable identifier of a user in the audit log. */
 export const userSid = (id) => `user:${id}`;
@@ -93,15 +92,26 @@ export async function unlinkAd(db, id) {
   await db.query(`UPDATE app_user SET ad_object_guid = NULL, ad_linked_at = NULL WHERE id = $1`, [id]);
 }
 
-/** Counts a wrong password; locks the account on the MAX_FAILED_ATTEMPTS-th. Returns true if now locked. */
-export async function recordFailure(db, id) {
+/**
+ * Counts a wrong password; locks the account on the policy's maxAttempts-th (for lockMinutes, 0 = until
+ * Admin HQ unlocks it). Does nothing when the lockout is off, or for an Admin HQ account when the policy
+ * excludes them. Returns true if now locked.
+ */
+export async function recordFailure(db, id, policy = LOCKOUT_DEFAULTS) {
+  if (!policy.enabled) return false;
+  if (!policy.applyToAdmin) {
+    const { rows: admin } = await db.query(`SELECT 1 FROM user_grant WHERE user_id = $1 AND role = 'admin' LIMIT 1`, [id]);
+    if (admin.length) return false;
+  }
   const { rows } = await db.query(
     `UPDATE app_user
         SET failed_attempts = CASE WHEN failed_attempts + 1 >= $2 THEN 0 ELSE failed_attempts + 1 END,
-            locked_until    = CASE WHEN failed_attempts + 1 >= $2 THEN now() + make_interval(mins => $3) ELSE locked_until END
+            locked_until    = CASE WHEN failed_attempts + 1 < $2 THEN locked_until
+                                   WHEN $3::int = 0 THEN 'infinity'::timestamptz
+                                   ELSE now() + make_interval(mins => $3::int) END
       WHERE id = $1
       RETURNING locked_until IS NOT NULL AND locked_until > now() AS locked`,
-    [id, MAX_FAILED_ATTEMPTS, LOCK_MINUTES],
+    [id, policy.maxAttempts, policy.lockMinutes],
   );
   return rows[0]?.locked ?? false;
 }
@@ -170,6 +180,7 @@ export async function replaceGrants(db, userId, grants) {
 
 const USER_COLUMNS = `u.id, u.username, u.display_name, u.email, u.auth_source, u.is_active, u.must_change_password, u.last_login_at,
   u.ad_object_guid, u.ad_linked_at, (u.locked_until IS NOT NULL AND u.locked_until > now()) AS is_locked,
+  (u.locked_until = 'infinity') AS lock_permanent,
   u.totp_required, u.totp_enrolled_at`;
 
 export async function listUsers(db) {

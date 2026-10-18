@@ -10,6 +10,8 @@
  */
 export async function withScope(pool, branches, fn, { isolation = 'READ COMMITTED' } = {}) {
   const client = await pool.connect();
+  const afterCommit = [];
+  client.afterCommit = (fn) => afterCommit.push(fn); // runs after COMMIT, never for a rolled back transaction
   try {
     await client.query(`BEGIN ISOLATION LEVEL ${isolation}`);
     await client.query(
@@ -18,6 +20,13 @@ export async function withScope(pool, branches, fn, { isolation = 'READ COMMITTE
     );
     const result = await fn(client);
     await client.query('COMMIT');
+    for (const run of afterCommit) {
+      try {
+        run();
+      } catch {
+        // a follow-up of the commit must never fail the request
+      }
+    }
     return result;
   } catch (err) {
     await client.query('ROLLBACK').catch(() => undefined);

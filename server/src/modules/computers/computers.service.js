@@ -16,7 +16,7 @@ import {
 } from './computers.repo.js';
 import { keyHistoryOf } from '../sync/sync.repo.js';
 
-export const PAGE_SIZE = 25;
+import { PAGE_SIZES, pageSize } from '../settings/page-size.js';
 
 /** Empty form field -> null (clears the value). */
 const optional = (schema) =>
@@ -77,6 +77,7 @@ export class ComputersService {
     const q = normalizeQuery(rawQuery);
     if (q.length < 2) return { kind: 'name', query: q, rows: [], total: 0, page: 1, pages: 1 };
 
+    const PAGE_SIZE = await pageSize(this.settings, PAGE_SIZES.computers);
     return withScope(this.pool, branches, async (tx) => {
       // Search terms are logged (they are not secrets); only on the first page.
       if (pageNo === 1) await this.audit.append(tx, { ...this.audit.actor(scope, client), action: 'search', detail: { q } });
@@ -111,6 +112,7 @@ export class ComputersService {
    */
   async list(scope, filters = {}, pageNo = 1) {
     const branches = this.#branches(scope);
+    const PAGE_SIZE = await pageSize(this.settings, PAGE_SIZES.computers);
     return withScope(this.pool, branches, async (tx) => {
       const r = await listComputers(tx, branches, filters, { limit: PAGE_SIZE, offset: (pageNo - 1) * PAGE_SIZE });
       return { ...r, page: pageNo, pageSize: PAGE_SIZE, pages: Math.max(1, Math.ceil(r.total / PAGE_SIZE)), branches: await branchOptions(tx, branches), seesUnmapped: branches === 'all' };
@@ -131,7 +133,7 @@ export class ComputersService {
     });
     return toCsv(
       ['name', 'object_guid', 'dns_name', 'branch', 'distinguished_name', 'os', 'device_serial', 'owner_email',
-        'keys', 'latest_key_utc', 'ad_created_utc', 'first_seen_utc', 'in_ad', 'not_in_ad_since_utc'],
+        'keys', 'latest_key_utc', 'ad_created_utc', 'first_seen_utc', 'in_scope', 'out_of_scope_since_utc'],
       rows.map((c) => [
         c.name, c.object_guid, c.dns_name, c.branch_code ?? 'N/A', c.distinguished_name, c.os, c.device_serial, c.owner_email,
         c.key_count, c.latest_key_at, c.ad_created_at, c.first_seen_at, c.deleted_in_ad_at ? 'no' : 'yes', c.deleted_in_ad_at,

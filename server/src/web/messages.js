@@ -12,7 +12,9 @@ const BY_CODE = {
   session_expired: 'Phiên đăng nhập đã hết hạn.',
   password_change_required: 'Bạn cần đổi mật khẩu trước khi tiếp tục.',
   invalid_credentials: 'Sai tên đăng nhập hoặc mật khẩu.',
-  account_locked: 'Tài khoản đang bị khóa tạm thời do nhập sai nhiều lần. Thử lại sau 15 phút.',
+  account_locked: (d) => (d?.minutes === 0
+    ? 'Tài khoản bị khóa do nhập sai nhiều lần. Liên hệ Admin HQ để mở khóa.'
+    : `Tài khoản đang bị khóa tạm thời do nhập sai nhiều lần. Thử lại sau ${d?.minutes ?? 15} phút.`),
   directory_not_configured: 'Đăng nhập bằng tài khoản AD chưa được cấu hình.',
   directory_unavailable: 'Không kết nối được máy chủ AD. Thử lại sau; nếu khẩn cấp, liên hệ Admin HQ.',
   ad_account_mismatch: 'Tài khoản AD này không khớp với tài khoản đã đăng ký trong hệ thống. Liên hệ Admin HQ.',

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { id, parse } from '../../http/validate.js';
 import { clientInfo } from '../../http/security.js';
 import { flash } from '../../web/middleware.js';
+import { runRef } from './run-ref.js';
 
 /** /admin/sync — sync health, manual run request, quarantine decisions. */
 export function syncWeb({ syncAdmin }) {
@@ -17,13 +18,18 @@ export function syncWeb({ syncAdmin }) {
     res.redirect('/admin/sync');
   });
 
+  r.get('/runs/:id', async (req, res) => {
+    const p = await syncAdmin.runPreview(req.scope, parse(id, req.params.id));
+    res.render('admin/sync-run', { title: `Lượt sync ${runRef(p.run.id, p.run.started_at)}`, ...p });
+  });
+
   r.post('/runs/:id/ack', async (req, res) => {
     const result = await syncAdmin.ack(req.scope, parse(id, req.params.id), { decision: req.body.decision }, clientInfo(req));
     flash(
       req,
       'success',
       result.decision === 'accept'
-        ? `Đã chấp nhận lượt sync. ${result.markedDeleted} máy được gắn nhãn "Không còn trong AD" (dữ liệu và key vẫn giữ).`
+        ? `Đã chấp nhận lượt sync. ${result.markedDeleted} máy được gắn nhãn "Không còn trong phạm vi giám sát" (dữ liệu và key vẫn giữ).`
         : 'Đã bác bỏ lượt sync. Không thay đổi nào được áp dụng.',
     );
     res.redirect('/admin/sync');

@@ -15,7 +15,9 @@ export const THRESHOLDS = [
   { key: 'anomaly.branch_drop_min', group: 'run', unit: 'count', default: 10, min: 1, max: 100000,
     label: '... và giảm quá (số máy)' },
 
-  // Watchdog (every 5 minutes): a breach opens an alert.
+  // Watchdog: how often it checks, and what opens an alert.
+  { key: 'jobs.watchdog_interval_minutes', group: 'watchdog', unit: 'minutes', default: 5, min: 1, max: 60,
+    label: 'Watchdog kiểm tra mỗi (phút)' },
   { key: 'watchdog.heartbeat_max_minutes', group: 'watchdog', unit: 'minutes', default: 15, min: 5, max: 1440,
     label: 'Không có heartbeat của worker quá (phút)' },
   { key: 'watchdog.delta_max_minutes', group: 'watchdog', unit: 'minutes', default: 60, min: 15, max: 10080,

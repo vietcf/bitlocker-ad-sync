@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { clientInfo } from '../../http/security.js';
 import { flash, formAction } from '../../web/middleware.js';
+import { PAGE_SIZES, PAGE_SIZE_LIMITS } from './page-size.js';
 
 /**
  * Quan tri pages for settings: /admin/settings/mail-server, /notifications, /features,
@@ -42,7 +43,7 @@ export function settingsWeb({ settingsAdmin }) {
 
   // ---- features -----------------------------------------------------------------------
   const renderFeatures = async (req, res, error) => {
-    res.render('admin/settings-features', { title: 'Tính năng', values: await settingsAdmin.features(req.scope), error });
+    res.render('admin/settings-features', { title: 'Tính năng', pageSizes: PAGE_SIZES, pageSizeLimits: PAGE_SIZE_LIMITS, values: await settingsAdmin.features(req.scope), error });
   };
   r.get('/settings/features', (req, res) => renderFeatures(req, res, null));
   r.post('/settings/features', formAction(async (req, res) => {
@@ -69,7 +70,7 @@ export function settingsWeb({ settingsAdmin }) {
     const saved = await settingsAdmin.security(req.scope);
     const b = req.body ?? {};
     const form = error
-      ? { ...saved, ...b, password: { minLength: b.pwMinLength, upper: b.pwUpper === 'on', lower: b.pwLower === 'on', digit: b.pwDigit === 'on', special: b.pwSpecial === 'on' } }
+      ? { ...saved, ...b, lockout: { enabled: b.lockEnabled === 'on', maxAttempts: b.lockAttempts, lockMinutes: b.lockMinutes, applyToAdmin: b.lockAdmin === 'on' }, password: { minLength: b.pwMinLength, upper: b.pwUpper === 'on', lower: b.pwLower === 'on', digit: b.pwDigit === 'on', special: b.pwSpecial === 'on' } }
       : saved;
     res.render('admin/settings-security', { title: 'Bảo mật', form, error });
   };

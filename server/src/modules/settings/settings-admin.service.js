@@ -7,6 +7,8 @@ import { getMail, listMails, mailCounts, retryMail } from '../mail/mail.repo.js'
 import { SMTP_DEFAULTS } from '../mail/mail.service.js';
 import { NEW_OBJECTS_DEFAULTS } from '../mail/new-objects.js';
 import { DAILY_REPORT_DEFAULTS } from '../reports/daily-report.js';
+import { JOB_SCHEDULE, TIME_OF_DAY, jobMinutes, jobTime } from '../../jobs/job-schedule.js';
+import { LOCKOUT_DEFAULTS, LOCKOUT_LIMITS, loadLockoutPolicy } from '../auth/lockout.js';
 import { PASSWORD_LENGTH_LIMITS, describePasswordPolicy, loadPasswordPolicy } from '../auth/password.js';
 import { encryptSecret } from '../mail/secret.js';
 import { FEATURES } from './settings.service.js';
@@ -14,7 +16,7 @@ import { KEY_EXPORT_MODES } from '../keys/keys.service.js';
 import { RETENTION_LIMITS } from './retention.service.js';
 import { THRESHOLDS, fromForm, toForm } from './thresholds.js';
 
-const PAGE_SIZE = 50;
+import { PAGE_SIZES, PAGE_SIZE_LIMITS, pageSize } from './page-size.js';
 
 const email = z.string().trim().toLowerCase().max(254).pipe(z.email({ message: 'invalid_email' }));
 /** Textarea lines / commas (or a JSON array) -> unique e-mails. */
@@ -35,6 +37,9 @@ const smtpInput = z.object({
   from: email,
   rejectUnauthorized: checkbox,
   appUrl: z.preprocess((v) => (v === '' ? undefined : v), z.url({ protocol: /^https?$/ }).max(255).optional()),
+  // How often the mail job sends what is waiting (minutes).
+  sendIntervalMinutes: z.coerce.number().int().min(JOB_SCHEDULE.mailIntervalMinutes.min).max(JOB_SCHEDULE.mailIntervalMinutes.max)
+    .default(JOB_SCHEDULE.mailIntervalMinutes.default),
 }).superRefine((s, ctx) => {
   if (s.enabled && !s.host) ctx.addIssue({ code: 'custom', path: ['host'], message: 'host_required' });
 });
@@ -66,6 +71,13 @@ const securityInput = z.object({
   pwSpecial: checkbox,
   idleMinutes: z.coerce.number().int().min(SESSION_LIMITS.idleMinutes[0]).max(SESSION_LIMITS.idleMinutes[1]),
   maxHours: z.coerce.number().int().min(SESSION_LIMITS.maxHours[0]).max(SESSION_LIMITS.maxHours[1]),
+  // Locking an account after wrong passwords.
+  lockEnabled: checkbox,
+  lockAttempts: z.coerce.number().int().min(LOCKOUT_LIMITS.maxAttempts[0]).max(LOCKOUT_LIMITS.maxAttempts[1]).default(LOCKOUT_DEFAULTS.maxAttempts),
+  lockMinutes: z.coerce.number().int().min(LOCKOUT_LIMITS.lockMinutes[0]).max(LOCKOUT_LIMITS.lockMinutes[1]).default(LOCKOUT_DEFAULTS.lockMinutes),
+  lockAdmin: checkbox,
+  // Time of day of the daily check of the access log's hash chain.
+  chainCheckTime: z.string().trim().regex(TIME_OF_DAY, 'invalid_time').default(JOB_SCHEDULE.chainCheckTime.default),
 });
 
 const days = ([min, max]) => z.coerce.number().int().min(min).max(max);
@@ -75,6 +87,8 @@ const retentionInput = z.object({
   // Checked = never delete the access log (the default).
   keepAccessLog: checkbox,
   accessLogDays: z.preprocess((v) => (v === '' || v === null ? undefined : v), days(RETENTION_LIMITS.accessLogDays).optional()),
+  // Time of day of the daily clean-up.
+  runAt: z.string().trim().regex(TIME_OF_DAY, 'invalid_time').default(JOB_SCHEDULE.retentionTime.default),
 }).superRefine((r, ctx) => {
   if (!r.keepAccessLog && !r.accessLogDays) ctx.addIssue({ code: 'custom', path: ['accessLogDays'], message: 'access_log_days_required' });
 });
@@ -112,7 +126,7 @@ export class SettingsAdminService {
   async smtp(scope) {
     this.#check(scope);
     const { password, ...s } = { ...SMTP_DEFAULTS, ...(await this.settings.get('mail.smtp', {})) };
-    return { ...s, passwordSet: !!password };
+    return { ...s, passwordSet: !!password, sendIntervalMinutes: await jobMinutes(this.settings, JOB_SCHEDULE.mailIntervalMinutes) };
   }
 
   async notifications(scope) {
@@ -136,6 +150,9 @@ export class SettingsAdminService {
       maxHours: Number(await this.settings.get('session.max_hours', this.sessionDefaults.maxHours)),
       defaults: this.sessionDefaults,
       limits: { ...SESSION_LIMITS, pwMinLength: PASSWORD_LENGTH_LIMITS },
+      chainCheckTime: await jobTime(this.settings, JOB_SCHEDULE.chainCheckTime),
+      lockout: await loadLockoutPolicy(this.settings),
+      lockoutLimits: LOCKOUT_LIMITS,
       password: await loadPasswordPolicy(this.settings),
       passwordText: describePasswordPolicy(await loadPasswordPolicy(this.settings)),
     };
@@ -151,7 +168,10 @@ export class SettingsAdminService {
     await this.settings.set('session.idle_minutes', input.idleMinutes);
     await this.settings.set('session.max_hours', input.maxHours);
     await this.settings.set('password.policy', password);
-    await this.#log(scope, client, { op: 'settings_security', idleMinutes: input.idleMinutes, maxHours: input.maxHours, password });
+    await this.settings.set(JOB_SCHEDULE.chainCheckTime.key, input.chainCheckTime);
+    const lockout = { enabled: input.lockEnabled, maxAttempts: input.lockAttempts, lockMinutes: input.lockMinutes, applyToAdmin: input.lockAdmin };
+    await this.settings.set('security.lockout', lockout);
+    await this.#log(scope, client, { op: 'settings_security', idleMinutes: input.idleMinutes, maxHours: input.maxHours, chainCheckTime: input.chainCheckTime, lockout, password });
   }
 
   /** Builds and queues the daily report now ("Gui thu ngay"); does not count as today's report. */
@@ -164,12 +184,15 @@ export class SettingsAdminService {
 
   async features(scope) {
     this.#check(scope);
-    return { ...(await this.settings.features()), 'export.keys': await this.settings.get('export.keys', 'off') };
+    const pageSizes = {};
+    for (const spec of Object.values(PAGE_SIZES)) pageSizes[spec.key] = await pageSize(this.settings, spec);
+    return { ...(await this.settings.features()), 'export.keys': await this.settings.get('export.keys', 'off'), ...pageSizes };
   }
 
   async mailLog(scope, raw) {
     this.#check(scope);
     const { page, ...filters } = parse(mailQuery, raw);
+    const PAGE_SIZE = await pageSize(this.settings, PAGE_SIZES.mail);
     const r = await listMails(this.pool, filters, { limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE });
     return {
       ...r,
@@ -193,15 +216,17 @@ export class SettingsAdminService {
 
   async saveSmtp(scope, raw, client = {}) {
     this.#check(scope);
-    const { password, clearPassword, ...input } = parse(smtpInput, raw);
+    const { password, clearPassword, sendIntervalMinutes, ...input } = parse(smtpInput, raw);
     const before = { ...SMTP_DEFAULTS, ...(await this.settings.get('mail.smtp', {})) };
     let stored = before.password;
     if (clearPassword) stored = null;
     else if (password) stored = encryptSecret(this.secretKey, password);
     await this.settings.set('mail.smtp', { ...input, appUrl: input.appUrl ?? '', password: stored });
+    await this.settings.set(JOB_SCHEDULE.mailIntervalMinutes.key, sendIntervalMinutes);
     await this.#log(scope, client, {
       op: 'settings_smtp',
       ...input,
+      sendIntervalMinutes,
       passwordChanged: stored !== before.password, // never the password itself
     });
   }
@@ -254,6 +279,12 @@ export class SettingsAdminService {
     const values = {};
     for (const f of FEATURES) values[f.key] = parse(checkbox, raw?.[f.key]);
     values['export.keys'] = parse(z.enum(KEY_EXPORT_MODES), raw?.['export.keys'] ?? 'off');
+    // Rows per page of each list: left out = the default.
+    const size = z.coerce.number().int().min(PAGE_SIZE_LIMITS[0]).max(PAGE_SIZE_LIMITS[1]);
+    for (const spec of Object.values(PAGE_SIZES)) {
+      const v = raw?.[spec.key];
+      values[spec.key] = v === undefined || v === '' ? spec.default : parse(size, v);
+    }
     for (const [k, v] of Object.entries(values)) await this.settings.set(k, v);
     await this.#log(scope, client, { op: 'settings_features', features: values });
   }
@@ -294,7 +325,7 @@ export class SettingsAdminService {
     const { rows } = await this.pool.query(
       'SELECT purged_at, purged_by, before_at, up_to_id, rows FROM access_log_purge ORDER BY id DESC LIMIT 1',
     );
-    return { ...(await this.retention.values()), lastPurge: rows[0] ?? null };
+    return { ...(await this.retention.values()), runAt: await jobTime(this.settings, JOB_SCHEDULE.retentionTime), lastPurge: rows[0] ?? null };
   }
 
   async saveRetention(scope, raw, client = {}) {
@@ -304,7 +335,8 @@ export class SettingsAdminService {
     await this.settings.set('mail.retention_days', r.mailDays);
     await this.settings.set('retention.sync_days', r.syncDays);
     await this.settings.set('retention.access_log_days', accessLogDays);
-    await this.#log(scope, client, { op: 'settings_retention', mailDays: r.mailDays, syncDays: r.syncDays, accessLogDays });
+    await this.settings.set(JOB_SCHEDULE.retentionTime.key, r.runAt);
+    await this.#log(scope, client, { op: 'settings_retention', mailDays: r.mailDays, syncDays: r.syncDays, accessLogDays, runAt: r.runAt });
   }
 
   /** Runs the nightly clean-up now. Returns the deleted counts. */
@@ -319,6 +351,8 @@ export class SettingsAdminService {
     this.#check(scope);
     const mid = parse(id, mailId);
     if (!(await retryMail(this.pool, mid))) throw badRequest('not_failed', 'Only a failed mail can be sent again.');
+    const again = await getMail(this.pool, mid);
+    if (again) this.mail.report('retry_requested', again, { by: scope.upn });
     await this.#log(scope, client, { op: 'mail_retry', mailId: mid });
   }
 }

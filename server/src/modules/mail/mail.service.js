@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { decryptSecret } from './secret.js';
+import { EventLog } from '../audit/event-log.js';
 import { dueMails, insertMail, markAttemptFailed, markSent, markWaiting, purgeMails } from './mail.repo.js';
 
 const BATCH = 20;
@@ -42,7 +43,8 @@ function smtpOptions(s, password) {
  * `createTransport` is replaceable for tests.
  */
 export class MailService {
-  constructor({ pool, settings, config, logger, secretKey, templates, createTransport }) {
+  constructor({ pool, settings, config, logger, secretKey, templates, createTransport, eventLog = null }) {
+    this.eventLog = eventLog;
     this.pool = pool;
     this.settings = settings;
     this.config = config;
@@ -77,6 +79,24 @@ export class MailService {
    * `html`: an HTML version sent along with the plain-text `body` (optional).
    * Returns { id, queued } (queued = will be sent).
    */
+  /** A change of state of an e-mail, (same facts as the mail log screen). */
+  report(event, m, extra = {}) {
+    this.eventLog?.emit('mail', {
+      event,
+      mail_id: Number(m.id),
+      kind: m.kind,
+      recipients: m.recipients,
+      subject: m.subject,
+      status: m.status,
+      attempts: m.attempts ?? 0,
+      missing_recipients: m.missing_recipients ?? [],
+      error: m.last_error ?? null,
+      body: EventLog.body(m.body),
+      has_html: !!m.html,
+      ...extra,
+    });
+  }
+
   async enqueue({ kind, to, subject, body, html = null, reason = null, missing = [] }, db = this.pool) {
     const recipients = [...new Set(to.filter(Boolean).map((e) => e.trim().toLowerCase()))].sort();
     const missingUsers = [...new Set(missing)].sort();
@@ -85,9 +105,12 @@ export class MailService {
       const why = reason ?? 'No recipient with an e-mail address.';
       this.logger?.warn({ kind, subject }, `mail not sent: ${why}`);
       const id = await insertMail(db, { kind, recipients: [], subject, body, html, status: 'no_recipient', reason: why, missing: missingUsers });
+      this.report('no_recipient', { id, kind, recipients: [], subject, body, html, status: 'no_recipient', last_error: why, missing_recipients: missingUsers });
       return { id, queued: false };
     }
-    return { id: await insertMail(db, { kind, recipients, subject, body, html, missing: missingUsers }), queued: true };
+    const id = await insertMail(db, { kind, recipients, subject, body, html, missing: missingUsers });
+    this.report('queued', { id, kind, recipients, subject, body, html, status: 'pending', missing_recipients: missingUsers });
+    return { id, queued: true };
   }
 
   /** Sends what is due. Called every minute by the mail-outbox job. */
@@ -101,16 +124,20 @@ export class MailService {
       if (!t) {
         const giveUp = Date.now() - new Date(m.created_at).getTime() > WAIT_GIVE_UP_HOURS * 3_600_000;
         await markWaiting(this.pool, m.id, 'SMTP server not configured', giveUp);
+        if (giveUp) this.report('failed', { ...m, status: 'failed', last_error: 'SMTP server not configured' });
         continue;
       }
       try {
         await t.transport.sendMail({ from: t.from, to: m.recipients, subject: m.subject, text: m.body, ...(m.html ? { html: m.html } : {}) });
         await markSent(this.pool, m.id);
+        this.report('sent', { ...m, status: 'sent', attempts: m.attempts + 1 });
         sent++;
       } catch (err) {
         failed++;
         const retry = RETRY_MINUTES[m.attempts] ?? null;
         await markAttemptFailed(this.pool, m.id, err.message, retry);
+        this.report(retry === null ? 'failed' : 'retry', { ...m, status: retry === null ? 'failed' : 'pending', attempts: m.attempts + 1, last_error: err.message },
+          retry === null ? {} : { next_attempt_in_minutes: retry });
         this.logger.warn({ mailId: m.id, attempt: m.attempts + 1, err: { message: err.message, code: err.code } }, 'mail: send failed');
       }
     }
@@ -120,7 +147,9 @@ export class MailService {
   /** Deletes sent and failed mails older than Settings > mail.retention_days. */
   async purge() {
     const days = Number(await this.settings.get('mail.retention_days', 90));
-    return { deleted: await purgeMails(this.pool, days) };
+    const deleted = await purgeMails(this.pool, days);
+    if (deleted) this.eventLog?.emit('mail', { event: 'purged', deleted, older_than_days: days });
+    return { deleted };
   }
 
   /** Sends one test mail right away (not through the outbox) with the given settings. Throws on failure. */

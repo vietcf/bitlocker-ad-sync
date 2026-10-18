@@ -3,6 +3,8 @@ import { withAllBranches } from '../../db/scoped.js';
 import { conflict, notFound } from '../../http/errors.js';
 import { parse } from '../../http/validate.js';
 import { branchForDn, parentDn } from '../branchmap/branchmap.js';
+import { syncRunFields } from '../audit/event-log.js';
+import { runRef } from './run-ref.js';
 import { anomalyText, checkRun, loadThresholds } from './anomaly.js';
 import {
   branchBaseline,
@@ -13,6 +15,7 @@ import {
   findComputerByDn,
   findKeyOwner,
   finishRun,
+  getRun,
   getRunForUpdate,
   insertComputer,
   insertMetric,
@@ -145,7 +148,19 @@ export const ERROR_SEVERITY = {
 
 /** The ingest API's logic: the .NET worker pushes AD data; this decides what is written. */
 export class IngestService {
-  constructor({ pool, audit, alerts, settings, newObjects = null, logger = null }) {
+  /** The state of a run after a change (same columns as the Tinh trang sync list). */
+  async #emitRun(event, id) {
+    if (!this.eventLog?.enabled) return;
+    try {
+      const run = await getRun(this.pool, id);
+      if (run) this.eventLog.emit('sync_run', { event, ...syncRunFields(run) });
+    } catch (err) {
+      this.log?.warn({ err }, 'cannot write the sync run to the event log');
+    }
+  }
+
+  constructor({ pool, audit, alerts, settings, newObjects = null, logger = null, eventLog = null }) {
+    this.eventLog = eventLog;
     this.pool = pool;
     this.audit = audit;
     this.alerts = alerts;
@@ -159,7 +174,7 @@ export class IngestService {
   /**
    * Writes the changes of a committed transaction to the app log: one line per change (computer
    * added / moved / renamed / back in AD, key added / volume filled / status changed / skipped,
-   * computer not in AD) and one summary line. Unchanged objects are only counted. Never a password.
+   * computer out of the monitored scope) and one summary line. Unchanged objects are only counted. Never a password.
    */
   logEvents(events, summary) {
     if (!this.log) return;
@@ -185,12 +200,13 @@ export class IngestService {
       }
       try {
         const id = await insertRun(tx, { mode, dcName: input.dcName, sinceUsn });
-        return { runId: Number(id), mode, sinceUsn };
+        return { runId: Number(id), runRef: runRef(id, new Date()), mode, sinceUsn };
       } catch (err) {
         if (err.code === '23505') throw conflict('run_in_progress', 'Another sync run is in progress.');
         throw err;
       }
     });
+    await this.#emitRun('opened', opened.runId);
     this.logEvents([], {
       msg: 'sync run opened',
       data: { runId: opened.runId, requestedMode: input.mode, mode: opened.mode, dc: input.dcName, sinceUsn: opened.sinceUsn },
@@ -408,7 +424,7 @@ export class IngestService {
       );
       return;
     }
-    const moved = (outcome.settled?.moved ?? []).map((m) => ({ msg: 'key moved: its old computer left AD', runId: id, keyId: m.key_id, fromId: Number(m.from_id), toId: Number(m.to_id) }));
+    const moved = (outcome.settled?.moved ?? []).map((m) => ({ msg: 'key moved: its old computer left the monitored scope', runId: id, keyId: m.key_id, fromId: Number(m.from_id), toId: Number(m.to_id) }));
     this.logEvents([...notInAdEvents(id, outcome.notInAd), ...moved], {
       msg: 'sync run completed',
       data: { ...totals, markedNotInAd: outcome.markedDeleted, keysMoved: moved.length, duplicatesClosed: outcome.settled?.gone ?? 0 },
@@ -484,6 +500,7 @@ export class IngestService {
       return { status: 'success', run, markedDeleted: notInAd.length, notInAd, overall, settled };
     });
 
+    await this.#emitRun(outcome.status === 'quarantined' ? 'quarantined' : outcome.status === 'failed' ? 'failed' : 'finished', id);
     this.#logCompletion(id, input, outcome);
 
     // Alerts after commit (they send messages and must not hold the transaction).
@@ -494,8 +511,8 @@ export class IngestService {
       await this.alerts.raise(
         'sync_failed',
         ERROR_SEVERITY[code] ?? 'high',
-        { runId: id, mode: outcome.run.mode, dc: outcome.run.dc_name, errorCode: code },
-        { runId: id, errorCode: code },
+        { runId: id, runRef: runRef(id, outcome.run.started_at), mode: outcome.run.mode, dc: outcome.run.dc_name, errorCode: code },
+        { runId: id, runRef: runRef(id, outcome.run.started_at), errorCode: code },
       );
       return { status: 'failed' };
     }
@@ -505,15 +522,16 @@ export class IngestService {
         'high',
         {
           runId: id,
+          runRef: runRef(id, outcome.run.started_at),
           anomalies: outcome.anomalies.map((a) => `- ${a.message}`).join('\n'),
           anomaliesVi: outcome.anomalies.map((a) => `- ${anomalyText(a)}`).join('\n'),
         },
-        { runId: id },
+        { runId: id, runRef: runRef(id, outcome.run.started_at) },
       );
       await this.#notifyNewObjects(outcome.run);
       return { status: 'quarantined', anomalies: outcome.anomalies.map(({ code, message }) => ({ code, message })) };
     }
-    await this.alerts.clear('sync_failed', { runId: id });
+    await this.alerts.clear('sync_failed', { runId: id, runRef: runRef(id, outcome.run.started_at) });
     await this.#notifyNewObjects(outcome.run);
     if (outcome.run.mode === 'full') await this.notifyKeyDuplicates();
     return { status: 'success', markedDeleted: outcome.markedDeleted };
@@ -528,10 +546,10 @@ export class IngestService {
   }
 }
 
-/** One log line per computer flagged "not in AD" (nothing is deleted). */
+/** One log line per computer flagged "out of the monitored scope" (nothing is deleted). */
 export function notInAdEvents(runId, computers) {
   return computers.map((c) => ({
-    msg: 'computer not seen by the full run: flagged not in AD',
+    msg: 'computer not seen by the full run: flagged out of the monitored scope',
     runId,
     computerId: Number(c.id),
     objectGuid: c.object_guid,

@@ -34,11 +34,15 @@ async function logRows(n, daysAgo) {
 }
 
 describe('retention settings', () => {
-  it('keeps the access log forever by default and refuses less than 365 days', async () => {
+  it('keeps the access log forever by default and lets the admin choose any number of days from 1', async () => {
     const a = await admin();
     expect((await a.get('/api/admin/settings/retention')).body).toMatchObject({ mailDays: 90, syncDays: 180, accessLogDays: null, lastPurge: null });
-    const bad = await a.put('/api/admin/settings/retention', { mailDays: 90, syncDays: 180, keepAccessLog: false, accessLogDays: 30 });
+    const bad = await a.put('/api/admin/settings/retention', { mailDays: 90, syncDays: 180, keepAccessLog: false, accessLogDays: 0 });
     expect(bad.status).toBe(400);
+    const few = await a.put('/api/admin/settings/retention', { mailDays: 90, syncDays: 180, keepAccessLog: false, accessLogDays: 30 });
+    expect(few.status).toBe(200); // no longer limited to 365 days
+    expect((await a.get('/api/admin/settings/retention')).body).toMatchObject({ accessLogDays: 30 });
+    await a.put('/api/admin/settings/retention', { mailDays: 90, syncDays: 180, keepAccessLog: true });
     const noDays = await a.put('/api/admin/settings/retention', { mailDays: 90, syncDays: 180, keepAccessLog: false });
     expect(noDays.body.fields).toEqual([{ field: 'accessLogDays', message: 'access_log_days_required' }]);
     expect((await a.put('/api/admin/settings/retention', { mailDays: 90, syncDays: 10, keepAccessLog: true })).status).toBe(400);
@@ -75,7 +79,19 @@ describe('access log purge', () => {
     await expect(asOwner(`UPDATE access_log SET user_upn = 'x'`)).rejects.toThrow(/append-only/);
     await expect(asOwner('TRUNCATE access_log')).rejects.toThrow(/append-only/);
     await expect(pool.query('DELETE FROM access_log')).rejects.toThrow(/permission denied/);
-    await expect(pool.query(`SELECT * FROM purge_access_log(30, 'x')`)).rejects.toThrow(/at least 365 days/);
+    await expect(pool.query(`SELECT * FROM purge_access_log(0, 'x')`)).rejects.toThrow(/at least 1 day/);
+  });
+
+  it('purges by a short period chosen by the admin and the rest still verifies', async () => {
+    await logRows(4, 10);
+    await logRows(3, 1);
+    await asOwner(`UPDATE app_setting SET value = '5' WHERE key = 'retention.access_log_days'`);
+    services.settings.invalidate();
+    const done = await services.retention.run();
+    expect(done.accessLog).toBe(4);
+    expect(await services.audit.verify()).toMatchObject({ ok: true });
+    const [{ n }] = await asOwner("SELECT count(*)::int AS n FROM access_log WHERE at < now() - interval '5 days'");
+    expect(n).toBe(0);
   });
 
   it('detects rows removed after a purge checkpoint', async () => {

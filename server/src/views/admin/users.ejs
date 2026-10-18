@@ -20,7 +20,7 @@
           <% } else { %><span class="badge badge-info" title="Lần đăng nhập tới sẽ quét mã QR">Chờ thiết lập</span><% } %></td>
         <td>
           <% if (!u.is_active) { %><span class="badge badge-bad">Đã khóa</span>
-          <% } else if (u.is_locked) { %><span class="badge badge-warn">Tạm khóa (sai mật khẩu)</span>
+          <% } else if (u.is_locked) { %><span class="badge badge-warn"><%= u.lock_permanent ? 'Khóa (sai mật khẩu)' : 'Tạm khóa (sai mật khẩu)' %></span>
           <% } else if (u.auth_source === 'local' && u.must_change_password) { %><span class="badge badge-info">Chờ đổi mật khẩu</span>
           <% } else { %><span class="badge badge-good">Hoạt động</span><% } %>
         </td>

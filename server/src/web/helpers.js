@@ -1,5 +1,6 @@
 // Formatting helpers available in every template (res.locals.h).
 import { anomalyText } from '../modules/sync/anomaly.js';
+import { runRef } from '../modules/sync/run-ref.js';
 import { errorText, fieldText } from './messages.js';
 
 const TZ = 'Asia/Ho_Chi_Minh';
@@ -53,6 +54,8 @@ export const helpers = {
   errorText,
   fieldText,
   anomalyText,
+  /** Readable number of a sync run: 20261018-0042 (the day it started + its sequence number). */
+  runRef: (run) => runRef(run.id, run.started_at),
   dateTime: (d) => (d ? dateTimeFmt.format(new Date(d)) : '—'),
   date: (d) => (d ? dateFmt.format(new Date(d)) : '—'),
   role: (r) => ROLE_LABELS[r] ?? r,

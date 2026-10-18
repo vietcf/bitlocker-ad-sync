@@ -77,13 +77,17 @@ export class DashboardService {
         withAllBranches(this.pool, (tx) => listHeartbeats(tx)),
         this.alerts.listOpen(),
       ]);
-      // sync_offline is the watchdog's summary of the other alerts: a status, not one more alert.
-      const offline = openAlerts.find((a) => a.type === 'sync_offline') ?? null;
-      const others = openAlerts.filter((a) => a.type !== 'sync_offline');
+      // worker_offline and sync_problem are the watchdog's summaries of the other alerts: two statuses
+      // (the worker, and AD / the sync), not more alerts.
+      const SUMMARY = ['worker_offline', 'sync_problem', 'sync_offline'];
+      const offline = openAlerts.find((a) => a.type === 'worker_offline') ?? null;
+      const problem = openAlerts.find((a) => a.type === 'sync_problem') ?? null;
+      const others = openAlerts.filter((a) => !SUMMARY.includes(a.type));
       sync = {
         lastSuccessAt: last?.finished_at ?? null,
         lastHeartbeatAt: heartbeats[0]?.at ?? null,
-        offlineSince: offline?.opened_at ?? null,
+        workerOfflineSince: offline?.opened_at ?? null,
+        problemSince: problem?.opened_at ?? null,
         openAlerts: others.length,
         highAlerts: others.filter((a) => a.severity === 'high').length,
       };

@@ -1,4 +1,5 @@
 import { withAllBranches } from '../../db/scoped.js';
+import { runRef } from '../sync/run-ref.js';
 import { adminEmails, branchStaff, grantsWithoutEmail } from './mail.repo.js';
 
 export const NEW_OBJECTS_DEFAULTS = {
@@ -55,7 +56,7 @@ export class NewObjectsNotifier {
         : [];
       const keys = o.keys
         ? (await tx.query(
-            `SELECT c.id, c.name, c.branch_id, b.code AS branch_code, k.key_id_prefix, k.ad_created_at
+            `SELECT c.id, c.name, c.branch_id, b.code AS branch_code, k.key_id, k.key_id_prefix, k.ad_created_at
                FROM recovery_key k JOIN computer c ON c.id = k.computer_id LEFT JOIN branch b ON b.id = c.branch_id
               WHERE k.first_seen_run = $1 ORDER BY lower(c.name), k.ad_created_at`,
             [run.id],
@@ -135,6 +136,7 @@ function compose(templates, run, computers, keys, maxItems, appUrl) {
   };
   return templates.render('new_objects', {
     runId: run.id,
+    runRef: runRef(run.id, run.started_at),
     mode: run.mode,
     dc: run.dc_name,
     summary: parts.join(part('summary_join')),
@@ -143,6 +145,6 @@ function compose(templates, run, computers, keys, maxItems, appUrl) {
     computers: section('computers_title', computers, (c) =>
       part('computer_line', { name: c.name, branch: branchLabel(c.branch_code), link: link(c) })),
     keys: section('keys_title', keys, (k) =>
-      part('key_line', { name: k.name, branch: branchLabel(k.branch_code), keyIdPrefix: k.key_id_prefix, link: link(k) })),
+      part('key_line', { name: k.name, branch: branchLabel(k.branch_code), keyId: k.key_id.toUpperCase(), keyIdPrefix: k.key_id_prefix, link: link(k) })),
   });
 }

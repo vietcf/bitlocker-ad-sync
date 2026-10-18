@@ -85,7 +85,7 @@ describe('sync trace in the app log', () => {
     for (const n of [1, 2]) expect(JSON.stringify(lines)).not.toContain(PWD(n));
   });
 
-  it('logs keys it could not store and each computer flagged not in AD', async () => {
+  it('logs keys it could not store and each computer flagged out of the monitored scope', async () => {
     await run('full', [pc(1, 'PC-1', 'HN'), pc(2, 'PC-2', 'HN')]);
     lines.length = 0;
     const r = await run('full', [pc(1, 'PC-1', 'HN')], [
@@ -100,7 +100,7 @@ describe('sync trace in the app log', () => {
     await addUser(pool, 'admin.hq', [{ branchId: null, role: 'admin' }]);
     const { agent, csrf } = await apiLogin(app, 'admin.hq');
     await agent.post(`/api/admin/sync-runs/${r}/ack`).set('X-CSRF-Token', csrf).send({ decision: 'accept' });
-    expect(sync().find((l) => l.msg === 'computer not seen by the full run: flagged not in AD')).toMatchObject({ runId: r, name: 'PC-2' });
+    expect(sync().find((l) => l.msg === 'computer not seen by the full run: flagged out of the monitored scope')).toMatchObject({ runId: r, name: 'PC-2' });
     expect(sync().find((l) => l.msg === 'quarantined sync run decided')).toMatchObject({ runId: r, decision: 'accept', by: 'admin.hq', markedNotInAd: 1 });
   });
 });

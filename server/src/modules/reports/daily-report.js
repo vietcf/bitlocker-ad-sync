@@ -163,7 +163,8 @@ export class DailyReportService {
         ldapOk: h.ldap_ok,
         error: h.last_error_code,
       }));
-      const offline = alerts.find((a) => a.type === 'sync_offline') ?? null;
+      const workerOff = alerts.find((a) => a.type === 'worker_offline') ?? null;
+      const problem = alerts.find((a) => a.type === 'sync_problem') ?? null;
       return {
         period,
         day,
@@ -173,9 +174,12 @@ export class DailyReportService {
         byBranch,
         series,
         sync: {
-          online: !offline,
-          offlineSince: offline?.opened_at ?? null,
-          alerts: alerts.filter((a) => a.type !== 'sync_offline'),
+          workerOnline: !workerOff,
+          workerOfflineSince: workerOff?.opened_at ?? null,
+          // AD / the sync: only judged while the worker runs.
+          adState: workerOff ? 'unknown' : problem ? 'problem' : 'ok',
+          problemSince: problem?.opened_at ?? null,
+          alerts: alerts.filter((a) => !['worker_offline', 'sync_problem', 'sync_offline'].includes(a.type)),
           workers,
           lastSuccess: await lastSuccessfulRun(tx),
           lastFull: await lastSuccessfulRunOfMode(tx, 'full'),
@@ -194,7 +198,10 @@ export class DailyReportService {
     const c = d.changes;
     const last = d.series[d.series.length - 1];
     const periodText = d.period === 'today' ? `ngày ${dmy(d.day)} (tính đến ${when(d.end)})` : `ngày ${dmy(d.day)}`;
-    const syncText = d.sync.online ? 'Online' : 'Offline';
+    // Two statuses: the worker (Online / Offline) and AD / the sync (Binh thuong / Co su co / chua xac dinh).
+    const workerText = d.sync.workerOnline ? 'Online' : 'Offline';
+    const adText = { ok: 'bình thường', problem: 'có sự cố', unknown: 'chưa xác định' }[d.sync.adState];
+    const syncText = `worker ${workerText}, AD ${adText}`;
     const t = this.templates.render('daily_report', {
       day: dmy(d.day),
       period: periodText,
@@ -210,7 +217,8 @@ export class DailyReportService {
     const lines = [
       t.body,
       '',
-      `ĐỒNG BỘ AD: ${syncText}${d.sync.online ? '' : ` từ ${when(d.sync.offlineSince)}`}`,
+      `WORKER: ${workerText}${d.sync.workerOnline ? '' : ` từ ${when(d.sync.workerOfflineSince)}`}`,
+      `ĐỒNG BỘ AD: ${adText}${d.sync.adState === 'problem' ? ` từ ${when(d.sync.problemSince)}` : ''}`,
       ...d.sync.workers.map((w) => `- Worker ${w.id}${w.version ? ` v${w.version}` : ''}: heartbeat ${when(w.at)} (${w.alive ? 'đang chạy' : 'không phản hồi'}), LDAP ${w.ldapOk === false ? `lỗi ${w.error ?? ''}` : 'OK'}${w.dc ? `, DC ${w.dc}` : ''}`),
       d.sync.workers.length ? null : '- Chưa có worker nào gửi heartbeat',
       `- Lượt sync thành công gần nhất: ${when(d.sync.lastSuccess?.finished_at)}; full gần nhất: ${when(d.sync.lastFull?.finished_at)}`,
@@ -219,8 +227,8 @@ export class DailyReportService {
       ...d.sync.alerts.map((a) => `- Cảnh báo: ${a.subject}`),
       d.sync.duplicates ? `- ${num(d.sync.duplicates)} Key ID trùng giữa nhiều máy chưa xem xét` : null,
       '',
-      `MÁY: ${num(last?.computers)} (${signed(last?.dComputers ?? 0)}): ${num(c.new_computers)} mới ghi nhận, ${num(c.left_computers)} không còn trong AD`,
-      `KEY: ${num(last?.keys)} (${signed(last?.dKeys ?? 0)}): ${num(c.new_keys)} mới ghi nhận${c.keys_of_left ? `, ${num(c.keys_of_left)} key thuộc máy vừa rời AD (vẫn lưu)` : ''}${c.keys_moved ? `, ${num(c.keys_moved)} key chuyển sang máy mới (join lại AD)` : ''}`,
+      `MÁY: ${num(last?.computers)} (${signed(last?.dComputers ?? 0)}): ${num(c.new_computers)} mới ghi nhận, ${num(c.left_computers)} không còn trong phạm vi giám sát`,
+      `KEY: ${num(last?.keys)} (${signed(last?.dKeys ?? 0)}): ${num(c.new_keys)} mới ghi nhận${c.keys_of_left ? `, ${num(c.keys_of_left)} key thuộc máy vừa rời phạm vi giám sát (vẫn lưu)` : ''}${c.keys_moved ? `, ${num(c.keys_moved)} key chuyển sang máy mới (join lại AD)` : ''}`,
       '',
       ...(d.byBranch.length ? ['THEO CHI NHÁNH (có thay đổi):', ...d.byBranch.map((b) => `- ${b.code ?? 'N/A'}: máy +${b.new_computers} / −${b.left_computers}, key +${b.new_keys}`), ''] : []),
       `${CHART_DAYS} NGÀY GẦN NHẤT (cuối mỗi ngày):`,
@@ -290,18 +298,19 @@ export class DailyReportService {
   <h2 style="font-size:20px;margin:4px 0 4px;color:#1c1d21;">${esc(periodText.charAt(0).toUpperCase() + periodText.slice(1))}</h2>
   <div style="font-size:14px;${muted}">${esc(t.body)}</div>
 
-  <h3 style="font-size:15px;margin:20px 0 6px;color:#1c1d21;">Đồng bộ AD ${badge(d.sync.online, syncText)}${d.sync.online ? '' : ` <span style="font-size:13px;font-weight:400;${muted}">từ ${esc(when(d.sync.offlineSince))}</span>`}</h3>
+  <h3 style="font-size:15px;margin:20px 0 6px;color:#1c1d21;">Worker ${badge(d.sync.workerOnline, workerText)}${d.sync.workerOnline ? '' : ` <span style="font-size:13px;font-weight:400;${muted}">từ ${esc(when(d.sync.workerOfflineSince))}</span>`}
+    &nbsp; Đồng bộ AD ${d.sync.adState === 'unknown' ? `<span style="font-size:13px;font-weight:600;${muted}">chưa xác định</span>` : badge(d.sync.adState === 'ok', d.sync.adState === 'ok' ? 'Bình thường' : 'Có sự cố')}</h3>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${syncRows}</table>
 
   <h3 style="font-size:15px;margin:22px 0 8px;color:#1c1d21;">Thay đổi trong kỳ</h3>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-    ${stat('Máy trên hệ thống', num(last?.computers), signed(last?.dComputers ?? 0), `${esc(num(c.new_computers))} mới ghi nhận · ${esc(num(c.left_computers))} không còn trong AD`)}
-    ${stat('Recovery key', num(last?.keys), signed(last?.dKeys ?? 0), `${esc(num(c.new_keys))} mới ghi nhận${c.keys_of_left ? ` · ${esc(num(c.keys_of_left))} thuộc máy rời AD (vẫn lưu)` : ''}${c.keys_moved ? ` · ${esc(num(c.keys_moved))} chuyển máy` : ''}`)}
+    ${stat('Máy trên hệ thống', num(last?.computers), signed(last?.dComputers ?? 0), `${esc(num(c.new_computers))} mới ghi nhận · ${esc(num(c.left_computers))} không còn trong phạm vi giám sát`)}
+    ${stat('Recovery key', num(last?.keys), signed(last?.dKeys ?? 0), `${esc(num(c.new_keys))} mới ghi nhận${c.keys_of_left ? ` · ${esc(num(c.keys_of_left))} thuộc máy rời phạm vi giám sát (vẫn lưu)` : ''}${c.keys_moved ? ` · ${esc(num(c.keys_moved))} chuyển máy` : ''}`)}
   </tr></table>
   ${d.byBranch.length ? `
   <h3 style="font-size:15px;margin:22px 0 6px;color:#1c1d21;">Chi nhánh có thay đổi</h3>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-    <tr>${th('Chi nhánh')}${th('Máy mới', 'right')}${th('Rời AD', 'right')}${th('Key mới', 'right')}</tr>${branchRows}
+    <tr>${th('Chi nhánh')}${th('Máy mới', 'right')}${th('Rời phạm vi', 'right')}${th('Key mới', 'right')}</tr>${branchRows}
   </table>` : ''}
   ${chart(`Số máy, ${CHART_DAYS} ngày gần nhất`, 'computers', 'dComputers', '#2a78d6')}
   ${chart(`Số key, ${CHART_DAYS} ngày gần nhất`, 'keys', 'dKeys', '#eb6834')}

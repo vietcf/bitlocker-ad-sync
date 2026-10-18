@@ -89,7 +89,8 @@
 #   reasonLabel     Ly do bang tieng Viet, vi du "Khoi phuc du lieu o cung"    key_export
 #   rowId           So dong nhat ky, vi du 10452                               audit_chain_broken
 #   rows            So dong nhat ky da kiem tra, vi du 182344                  audit_chain_broken_recovered
-#   runId           So luot sync, vi du 812                                    sync_failed(_recovered), sync_anomaly, new_objects
+#   runId           So thu tu luot sync, vi du 812                             sync_failed(_recovered), sync_anomaly, new_objects
+#   runRef          Ma luot sync de doc: ngay chay + so thu tu, vi du 20261018-0812  (cung cac mau tren)
 #   runs            "#812, #813"                                               sync_run_aborted
 #   summary         Ghep tu parts: "3 may moi, 2 key moi" / "1 key moi"        new_objects
 #   ticket          So ticket, hoac "—"                                        key_export
@@ -124,10 +125,10 @@ templates:
     used_by: Sync AD (ingest API)
     sent_when: Worker báo lượt sync lỗi (không tới được DC, sai tài khoản, không gọi được API...). Nhắc lại tối đa 4 giờ một lần khi vẫn lỗi.
     recipients: Quản trị > Thông báo > Cảnh báo hệ thống (Admin HQ, địa chỉ thêm, NOTIFY_TO trong .env)
-    variables: [runId, mode, dc, errorCode]
+    variables: [runId, runRef, mode, dc, errorCode]
     subject: "Sync AD lỗi: {{errorCode}}"
     body: |
-      Lượt sync #{{runId}} ({{mode}}, DC {{dc}}) báo lỗi {{errorCode}}.
+      Lượt sync {{runRef}} ({{mode}}, DC {{dc}}) báo lỗi {{errorCode}}.
       Kiểm tra worker và kết nối LDAPS từ worker tới DC.
 
   sync_failed_recovered:
@@ -135,20 +136,20 @@ templates:
     used_by: Sync AD (ingest API)
     sent_when: Một lượt sync thành công sau khi đã gửi cảnh báo sync_failed.
     recipients: như sync_failed
-    variables: [runId, alertSubject]
+    variables: [runId, runRef, alertSubject]
     subject: "Đã khôi phục: {{alertSubject}}"
     body: |
-      Lượt sync #{{runId}} đã chạy thành công.
+      Lượt sync {{runRef}} đã chạy thành công.
 
   sync_anomaly:
     kind: alert
     used_by: Sync AD (kiểm tra bất thường khi lượt sync báo thành công)
     sent_when: Lượt sync báo thành công nhưng số liệu bất thường (thiếu nhiều máy hoặc key, một chi nhánh giảm mạnh, key không có mật khẩu, quá nhiều máy không còn thấy). Lượt bị giữ lại chờ Admin HQ chấp nhận hoặc bác bỏ.
     recipients: Quản trị > Thông báo > Cảnh báo hệ thống
-    variables: [runId, anomalies, anomaliesVi]
-    subject: "Sync AD có dữ liệu bất thường, lượt #{{runId}} bị giữ lại"
+    variables: [runId, runRef, anomalies, anomaliesVi]
+    subject: "Sync AD có dữ liệu bất thường, lượt {{runRef}} bị giữ lại"
     body: |
-      Lượt sync #{{runId}} bị giữ lại vì:
+      Lượt sync {{runRef}} bị giữ lại vì:
       {{anomaliesVi}}
       Vào Quản trị > Sync AD để chấp nhận hoặc bác bỏ.
 
@@ -164,22 +165,37 @@ templates:
 
   # ------------------------------------------------------------------------------------------
   # Canh bao cua watchdog (job sync-watchdog, moi 5 phut)
-  # Chi gui MOT mail: sync_offline. Cac mau ben duoi (worker_silent ... no_key_rising) khong gui
-  # mail rieng: tieu de / noi dung cua chung hien o Quan tri > Sync AD va tieu de duoc liet ke
-  # trong mail sync_offline. Het moi dieu kien (online tro lai) thi khong gui gi nua.
+  # Hai loai, moi loai MOT mail tong hop (gui khi bat dau, roi toi da 1 lan moi ngay, het su co thi khong gui nua):
+  #   worker_offline  agent (worker) khong gui heartbeat
+  #   sync_problem    worker van chay nhung AD / dong bo co van de (AD offline, khong doc duoc AD, lau khong sync...)
+  # Cac mau worker_silent, sync_stale ... no_key_rising ben duoi khong gui mail rieng: tieu de cua chung hien o
+  # Quan tri > Sync AD va duoc liet ke trong mail sync_problem (worker_silent chinh la noi dung cua worker_offline).
   # ------------------------------------------------------------------------------------------
-  sync_offline:
+  worker_offline:
     kind: alert
     used_by: Watchdog sync
-    sent_when: Có ít nhất một điều kiện watchdog bên dưới; đồng bộ AD được đánh dấu Offline. Gửi khi chuyển sang Offline, sau đó tối đa 1 lần mỗi ngày cho tới khi hết mọi điều kiện (Online trở lại thì không gửi nữa).
+    sent_when: Không nhận được heartbeat của worker (agent) lâu hơn watchdog.heartbeat_max_minutes (mặc định 15 phút). Gửi khi worker chuyển sang Offline, sau đó tối đa 1 lần mỗi ngày cho tới khi worker gửi heartbeat trở lại (Online thì không gửi nữa). Khi worker Offline, các cảnh báo phụ thuộc worker (lâu không sync, canary...) không báo thêm.
+    recipients: Quản trị > Thông báo > Cảnh báo hệ thống
+    variables: [worker, lastHeartbeatAt, minutesAgo, maxMinutes, checkedAt]
+    subject: "Worker đồng bộ AD đang Offline"
+    body: |
+      Watchdog kiểm tra lúc {{checkedAt}}: worker {{worker}} không gửi heartbeat từ {{lastHeartbeatAt}} ({{minutesAgo}} phút, ngưỡng {{maxMinutes}} phút).
+      Đây là sự cố của worker / đường truyền tới app, chưa nói gì về tình trạng AD.
+      Kiểm tra dịch vụ worker trên máy chạy worker, mạng, IP whitelist, API key và chứng chỉ HTTPS. Chi tiết ở Quản trị > Đồng bộ AD.
+      Mail này gửi tối đa 1 lần mỗi ngày cho tới khi worker gửi heartbeat trở lại.
+
+  sync_problem:
+    kind: alert
+    used_by: Watchdog sync
+    sent_when: "Worker vẫn chạy (có heartbeat) nhưng AD hoặc việc đồng bộ có vấn đề: worker không đọc được AD (DC offline, sai quyền, lỗi TLS), lâu không có lượt sync thành công, lượt sync bị treo, canary cũ, USN của DC đứng yên, chứng chỉ LDAPS sắp hết hạn, máy mới không lưu key, tỉ lệ máy chưa có key tăng. Gửi khi bắt đầu có sự cố, sau đó tối đa 1 lần mỗi ngày cho tới khi hết (hết thì không gửi nữa)."
     recipients: Quản trị > Thông báo > Cảnh báo hệ thống
     variables: [count, conditions, checkedAt]
-    subject: "Đồng bộ AD đang Offline ({{count}} sự cố)"
+    subject: "Đồng bộ AD có sự cố ({{count}})"
     body: |
-      Watchdog kiểm tra lúc {{checkedAt}} thấy đồng bộ AD đang có sự cố:
+      Watchdog kiểm tra lúc {{checkedAt}}: worker vẫn chạy nhưng AD hoặc việc đồng bộ có vấn đề:
       {{conditions}}
-      Chi tiết ở Quản trị > Sync AD.
-      Mail này gửi tối đa 1 lần mỗi ngày cho tới khi đồng bộ AD hoạt động bình thường trở lại.
+      Chi tiết ở Quản trị > Đồng bộ AD.
+      Mail này gửi tối đa 1 lần mỗi ngày cho tới khi các vấn đề trên hết.
 
   worker_silent:
     kind: alert
@@ -345,12 +361,12 @@ templates:
   key_duplicate:
     kind: alert
     used_by: Sync AD (lượt full kết thúc)
-    sent_when: Cùng một Key ID nằm dưới 2 máy đều còn trong AD (ví dụ máy clone từ image đã bật BitLocker), hoặc cùng Key ID nhưng mật khẩu khác. Mỗi cặp chỉ gửi 1 lần, sau khi một lượt full xác nhận; không nhắc lại. Không liên quan trạng thái Online / Offline.
+    sent_when: Cùng một Key ID nằm dưới 2 máy đều còn trong phạm vi giám sát (ví dụ máy clone từ image đã bật BitLocker), hoặc cùng Key ID nhưng mật khẩu khác. Mỗi cặp chỉ gửi 1 lần, sau khi một lượt full xác nhận; không nhắc lại. Không liên quan trạng thái Online / Offline.
     recipients: Quản trị > Thông báo > Cảnh báo hệ thống
     variables: [count, items]
     subject: "Key ID trùng giữa 2 máy ({{count}})"
     body: |
-      Phát hiện Key ID BitLocker nằm dưới nhiều máy cùng còn trong AD:
+      Phát hiện Key ID BitLocker nằm dưới nhiều máy cùng còn trong phạm vi giám sát:
       {{items}}
       Key vẫn giữ ở máy cũ, không bị ghi đè. Kiểm tra (máy clone, đặt lại BitLocker) rồi bấm "Đã xem xét" ở Quản trị > Sync AD.
 
@@ -386,10 +402,10 @@ templates:
     used_by: Sync AD (sau mỗi lượt có máy mới / key mới)
     sent_when: Lượt sync lưu máy hoặc key lần đầu. Mỗi người một email, chỉ liệt kê những gì trong phạm vi của họ. Mặc định không gửi cho lượt full sync đầu tiên.
     recipients: Quản trị > Thông báo > "Máy mới, key mới" (người dùng IT / Trưởng IT của chi nhánh và / hoặc Admin HQ)
-    variables: [runId, mode, dc, summary, computerCount, keyCount, computers, keys]
-    subject: "[BitLocker] Sync #{{runId}}: {{summary}}"
+    variables: [runId, runRef, mode, dc, summary, computerCount, keyCount, computers, keys]
+    subject: "[BitLocker] Sync {{runRef}}: {{summary}}"
     body: |
-      Lượt sync #{{runId}} ({{mode}}, DC {{dc}}) vừa ghi nhận {{summary}} trong phạm vi của bạn.
+      Lượt sync {{runRef}} ({{mode}}, DC {{dc}}) vừa ghi nhận {{summary}} trong phạm vi của bạn.
 
       {{computers}}{{keys}}Email tự động từ hệ thống quản lý BitLocker Key.
       Admin HQ có thể tắt loại thông báo này ở Quản trị > Thông báo.
@@ -400,8 +416,9 @@ templates:
       summary_join: ", "
       computers_title: "Máy mới:"
       computer_line: "- {{name}} (chi nhánh {{branch}}){{link}}"
-      keys_title: "Key mới (chỉ có Key ID, không có mật khẩu):"
-      key_line: "- {{name}} (chi nhánh {{branch}}): Key ID {{keyIdPrefix}}...{{link}}"
+      keys_title: "Key mới đã lưu vào hệ thống (kèm recovery password; vì an toàn email không ghi mật khẩu, xem trên web):"
+      # {{keyId}}: Key ID day du; {{keyIdPrefix}}: 8 ky tu dau (cach ghi cu).
+      key_line: "- {{name}} (chi nhánh {{branch}}): Key ID {{keyId}}{{link}}"
       more_line: "- ... và {{more}} mục khác (xem trên web)"
       link: "  {{url}}"
 
@@ -413,7 +430,7 @@ templates:
     sent_when: Mỗi ngày một lần vào giờ đã cấu hình (khi bật), hoặc khi bấm "Gửi thử ngay".
     recipients: Mọi Admin HQ có email (nếu chọn) và các địa chỉ thêm của báo cáo
     variables: [day, period, syncStatus, computers, keys, computersChange, keysChange]
-    subject: "Báo cáo BitLocker {{day}}: đồng bộ AD {{syncStatus}}, máy {{computersChange}}, key {{keysChange}}"
+    subject: "Báo cáo BitLocker {{day}}: {{syncStatus}}, máy {{computersChange}}, key {{keysChange}}"
     body: |
       Tình hình hệ thống quản lý recovery key BitLocker {{period}}.
 

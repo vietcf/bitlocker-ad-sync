@@ -112,7 +112,7 @@ describe('computer list (no search term)', () => {
     expect(res.headers['content-type']).toMatch(/text\/csv/);
     expect(res.headers['content-disposition']).toMatch(/attachment; filename="?computers-\d{4}-\d{2}-\d{2}\.csv"?/);
     const lines = res.text.replace(/^﻿/, '').trim().split('\r\n');
-    expect(lines[0]).toBe('name,object_guid,dns_name,branch,distinguished_name,os,device_serial,owner_email,keys,latest_key_utc,ad_created_utc,first_seen_utc,in_ad,not_in_ad_since_utc');
+    expect(lines[0]).toBe('name,object_guid,dns_name,branch,distinguished_name,os,device_serial,owner_email,keys,latest_key_utc,ad_created_utc,first_seen_utc,in_scope,out_of_scope_since_utc');
     expect(lines).toHaveLength(1 + 29); // HN machines without a key; not HN-LT-0001 (has a key), not HCM
     expect(res.text).not.toContain('HCM-LT-0001');
     expect(res.text).not.toMatch(/\d{6}-\d{6}-\d{6}/); // never a recovery password

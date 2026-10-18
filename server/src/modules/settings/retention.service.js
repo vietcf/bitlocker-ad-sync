@@ -4,11 +4,11 @@
 //   - sync history: finished runs, their metrics and resolved alerts older than retention.sync_days
 //     (the last successful run and the last successful full run are always kept: delta sync and
 //     the anomaly baseline need them);
-//   - access_log: only when retention.access_log_days is set (>= 365; default: keep forever),
+//   - access_log: only when retention.access_log_days is set (>= 1 day, any value the admin chooses; default: keep forever),
 //     through purge_access_log(), which keeps the hash chain verifiable. The purge is itself logged.
 
 export const RETENTION_DEFAULTS = { mailDays: 90, syncDays: 180, accessLogDays: null };
-export const RETENTION_LIMITS = { mailDays: [1, 3650], syncDays: [30, 3650], accessLogDays: [365, 36500] };
+export const RETENTION_LIMITS = { mailDays: [1, 3650], syncDays: [30, 3650], accessLogDays: [1, 36500] };
 
 export class RetentionService {
   constructor({ pool, settings, mail, audit }) {

@@ -23,3 +23,6 @@ cert/*.srl
 
 # Backup files (encrypted, but they hold every recovery key)
 backups/
+
+# Ban chay tot gan nhat (tools/snapshot.sh)
+_last-good/

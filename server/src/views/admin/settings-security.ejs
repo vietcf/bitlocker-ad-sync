@@ -23,6 +23,30 @@
         Đang áp dụng: <%= form.passwordText %></p>
     </fieldset>
     <fieldset>
+      <legend>Khóa tài khoản khi đăng nhập sai</legend>
+      <label class="check"><input type="checkbox" name="lockEnabled" <%= form.lockout.enabled ? 'checked' : '' %>>
+        <span><strong>Khóa tài khoản</strong> sau nhiều lần nhập sai mật khẩu (hoặc mã xác thực 2 bước)</span></label>
+      <div class="inline-fields">
+        <label>Số lần sai liên tiếp
+          <span class="nowrap"><input type="number" name="lockAttempts" value="<%= form.lockout.maxAttempts %>" min="<%= form.lockoutLimits.maxAttempts[0] %>" max="<%= form.lockoutLimits.maxAttempts[1] %>" required class="thr-input"> lần</span>
+          <span class="muted hint">Từ <%= form.lockoutLimits.maxAttempts[0] %> đến <%= form.lockoutLimits.maxAttempts[1] %>; mặc định 5.</span>
+        </label>
+        <label>Khóa trong
+          <span class="nowrap"><input type="number" name="lockMinutes" value="<%= form.lockout.lockMinutes %>" min="<%= form.lockoutLimits.lockMinutes[0] %>" max="<%= form.lockoutLimits.lockMinutes[1] %>" required class="thr-input"> phút</span>
+          <span class="muted hint">Mặc định 15. Nhập <strong>0</strong> = khóa tới khi Admin HQ mở.</span>
+        </label>
+      </div>
+      <label class="check"><input type="checkbox" name="lockAdmin" <%= form.lockout.applyToAdmin ? 'checked' : '' %>>
+        <span><strong>Áp dụng cho tài khoản Admin HQ</strong> <span class="muted">(bỏ chọn nếu không muốn Admin bị khóa; nếu Admin bị khóa: <code>node src/cli/users.js unlock &lt;tên&gt;</code>, xem README)</span></span></label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Kiểm tra nhật ký</legend>
+      <label>Kiểm tra chuỗi hash của nhật ký lúc <input type="time" name="chainCheckTime" value="<%= form.chainCheckTime %>" required class="input-time">
+        <span class="muted hint">Mỗi ngày một lần, giờ theo múi giờ của ứng dụng (APP_TZ); mặc định 02:00. Phát hiện dòng nhật ký bị sửa hoặc xóa.</span></label>
+    </fieldset>
+
+    <fieldset>
       <legend>Phiên đăng nhập</legend>
       <p class="muted small">Áp dụng cho mọi người dùng, cả trên web và API, kể cả với phiên đang mở.</p>
     <label>Tự đăng xuất sau khi không hoạt động

@@ -2,20 +2,34 @@
 <%- include('_tabs') %>
 <h2>Tình trạng sync AD</h2>
 
-<% const offline = openAlerts.find((a) => a.type === 'sync_offline'); %>
-<% if (offline) { %>
-  <div class="notice notice-<%= offline.severity === 'high' ? 'error' : 'warn' %>" role="status">
-    <strong>Đồng bộ AD: Offline</strong> từ <%= h.dateTime(offline.opened_at) %>.
-    Mail cảnh báo gửi khi chuyển sang Offline, sau đó tối đa 1 lần mỗi ngày<% if (offline.last_notified_at) { %> (gần nhất <%= h.dateTime(offline.last_notified_at) %>)<% } %>;
-    hết mọi cảnh báo dưới đây thì tự về Online và không gửi nữa.
+<% const SUMMARY = ['worker_offline', 'sync_problem', 'sync_offline'];
+   const workerOff = openAlerts.find((a) => a.type === 'worker_offline');
+   const problem = openAlerts.find((a) => a.type === 'sync_problem'); %>
+<%# Hai trang thai rieng: worker (agent) va AD / dong bo %>
+<div class="status-pair">
+  <div class="status-box <%= workerOff ? 'is-bad' : 'is-ok' %>">
+    <div class="status-title">Worker (agent)</div>
+    <% if (workerOff) { %><span class="badge badge-bad">● Offline</span> từ <%= h.dateTime(workerOff.opened_at) %>
+      <div class="muted small">Không có heartbeat quá <%= heartbeatMax %> phút: sự cố của worker hoặc đường truyền tới app, chưa nói gì về AD.
+        Mail gửi khi chuyển sang Offline, sau đó tối đa 1 lần mỗi ngày<% if (workerOff.last_notified_at) { %> (gần nhất <%= h.dateTime(workerOff.last_notified_at) %>)<% } %>; worker gửi heartbeat trở lại thì tự về Online, không gửi nữa.</div>
+    <% } else { %><span class="badge badge-good">● Online</span>
+      <div class="muted small">Có heartbeat trong <%= heartbeatMax %> phút gần nhất.</div><% } %>
   </div>
-<% } else { %>
-  <p><span class="badge badge-good">Online</span> <span class="muted small">Watchdog (5 phút một lần) không thấy sự cố nào.</span></p>
-<% } %>
-<% if (openAlerts.some((a) => a.type !== 'sync_offline')) { %>
+  <div class="status-box <%= problem ? 'is-bad' : (workerOff ? 'is-unknown' : 'is-ok') %>">
+    <div class="status-title">Đồng bộ AD</div>
+    <% if (workerOff) { %><span class="badge badge-muted">Chưa xác định</span>
+      <div class="muted small">Worker đang Offline nên chưa kiểm tra được AD.</div>
+    <% } else if (problem) { %><span class="badge badge-bad">● Có sự cố</span> từ <%= h.dateTime(problem.opened_at) %>
+      <div class="muted small">Worker vẫn chạy nhưng AD hoặc việc đồng bộ có vấn đề (xem các cảnh báo bên dưới).
+        Mail gửi khi bắt đầu, sau đó tối đa 1 lần mỗi ngày<% if (problem.last_notified_at) { %> (gần nhất <%= h.dateTime(problem.last_notified_at) %>)<% } %>; hết sự cố thì tự về bình thường, không gửi nữa.</div>
+    <% } else { %><span class="badge badge-good">● Bình thường</span>
+      <div class="muted small">Watchdog (5 phút một lần) không thấy sự cố nào.</div><% } %>
+  </div>
+</div>
+<% if (openAlerts.some((a) => !SUMMARY.includes(a.type))) { %>
 <section class="card">
   <h2>Cảnh báo đang mở</h2>
-  <% openAlerts.filter((a) => a.type !== 'sync_offline').forEach((a) => { %>
+  <% openAlerts.filter((a) => !SUMMARY.includes(a.type)).forEach((a) => { %>
     <div class="notice notice-<%= a.severity === 'high' ? 'error' : 'warn' %>">
       <strong><%= a.detail.subject %></strong> <span class="muted">· từ <%= h.dateTime(a.opened_at) %></span>
       <div class="pre"><%= a.detail.text %></div>
@@ -27,8 +41,8 @@
 <% if (duplicates.length) { %>
 <section class="card">
   <h2>Key ID trùng giữa nhiều máy (<%= duplicates.length %>)</h2>
-  <p class="muted small">Cùng một Key ID nằm dưới 2 máy đều còn trong AD (ví dụ máy clone từ image đã bật BitLocker), hoặc cùng Key ID nhưng mật khẩu khác.
-    Key vẫn giữ ở máy đang giữ, không bị ghi đè. Không ảnh hưởng trạng thái Online / Offline. Tự đóng khi một trong hai máy rời AD.</p>
+  <p class="muted small">Cùng một Key ID nằm dưới 2 máy đều còn trong phạm vi giám sát (ví dụ máy clone từ image đã bật BitLocker), hoặc cùng Key ID nhưng mật khẩu khác.
+    Key vẫn giữ ở máy đang giữ, không bị ghi đè. Không ảnh hưởng trạng thái Online / Offline. Tự đóng khi một trong hai máy rời phạm vi giám sát.</p>
   <div class="table-scroll">
   <table class="dense">
     <thead><tr><th>Key ID</th><th>Máy đang giữ key</th><th>Máy cũng có Key ID này</th><th>Mật khẩu</th><th>Phát hiện</th><th></th></tr></thead>
@@ -87,6 +101,7 @@
     <% } else { %>
     <p class="muted">Yêu cầu sync từ web đang tắt (Quản trị &gt; Tính năng).</p>
     <% } %>
+    <p class="muted small">Delta (15 phút) thấy máy mới, đổi tên, chuyển OU trong phạm vi và key mới. Máy bị xóa hoặc chuyển ra ngoài phạm vi chỉ được phát hiện ở <strong>full ban đêm</strong>; cần ngay thì bấm Full.</p>
     <p class="muted">Lần sync thành công gần nhất: <%= lastSuccess ? h.dateTime(lastSuccess.finished_at) : 'chưa có' %></p>
   </div>
 </section>
@@ -98,7 +113,7 @@
     <tbody>
     <% runs.forEach((r) => { const st = h.runStatus(r.status); %>
       <tr>
-        <td><%= r.id %></td>
+        <td><a href="/admin/sync/runs/<%= r.id %>" title="Số thứ tự #<%= r.id %>"><%= h.runRef(r) %></a></td>
         <td><%= h.dateTime(r.started_at) %></td>
         <td><%= r.mode %></td>
         <td><%= r.dc_name %></td>
@@ -109,14 +124,11 @@
           <% if (r.error_code) { %><code><%= r.error_code %></code><% } %>
           <% if (r.keys_empty_pwd) { %><span class="badge badge-warn"><%= r.keys_empty_pwd %> key rỗng</span><% } %>
           <% if (r.anomalies) { %><ul class="anomalies"><% r.anomalies.forEach((a) => { %><li><%= h.anomalyText(a) %></li><% }) %></ul><% } %>
+          <%# Tom tat o day (ke ca sau khi da quyet dinh); chi tiet va nut quyet dinh o trang mo bang ma luot %>
           <% if (r.status === 'quarantined' && !r.ack_decision) { %>
-            <form method="post" action="/admin/sync/runs/<%= r.id %>/ack" class="actions">
-              <%- include('../partials/csrf') %>
-              <button type="submit" name="decision" value="accept" class="small" data-confirm="Chấp nhận: áp dụng các thay đổi đang giữ (kể cả gắn nhãn "Không còn trong AD" cho máy không thấy; không xóa dữ liệu)?">Chấp nhận</button>
-              <button type="submit" name="decision" value="reject" class="small secondary">Bác bỏ</button>
-            </form>
+            <div class="run-summary"><strong>Đang chờ quyết định</strong> · bấm mã lượt <a href="/admin/sync/runs/<%= r.id %>"><%= h.runRef(r) %></a> để xem chi tiết và quyết định.</div>
           <% } else if (r.ack_decision) { %>
-            <span class="muted"><%= r.ack_decision === 'accept' ? 'Đã chấp nhận' : 'Đã bác bỏ' %> bởi <%= r.ack_by %></span>
+            <div class="run-summary muted"><%= r.ack_decision === 'accept' ? 'Đã chấp nhận' : 'Đã bác bỏ' %> bởi <%= r.ack_by %><% if (r.ack_at) { %> lúc <%= h.dateTime(r.ack_at) %><% } %></div>
           <% } %>
         </td>
       </tr>

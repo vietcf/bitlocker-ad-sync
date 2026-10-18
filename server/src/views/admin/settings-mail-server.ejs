@@ -44,6 +44,14 @@
     </fieldset>
 
     <fieldset>
+      <legend>Gửi mail</legend>
+      <label>Gửi những mail đang chờ mỗi
+        <span class="nowrap"><input type="number" name="sendIntervalMinutes" value="<%= form.sendIntervalMinutes %>" min="1" max="60" required class="thr-input"> phút</span>
+        <span class="muted hint">Từ 1 đến 60; mặc định 1. Mail xếp hàng ngay khi có sự kiện và được gửi ở lần chạy kế tiếp của job này. Áp dụng trong vòng một phút.</span>
+      </label>
+    </fieldset>
+
+    <fieldset>
       <legend>Nội dung</legend>
       <div class="settings-grid">
         <label>Địa chỉ gửi (From) <input type="email" name="from" value="<%= form.from %>" required maxlength="254"></label>

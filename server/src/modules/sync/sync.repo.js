@@ -75,7 +75,7 @@ export async function abortStaleRuns(db, hours) {
 export async function listRuns(db, limit = 30) {
   const { rows } = await db.query(
     `SELECT id, started_at, finished_at, mode, dc_name, since_usn, highest_usn, computers_seen, keys_seen,
-            keys_added, keys_empty_pwd, errors, error_code, status, anomalies, ack_by, ack_decision, ack_at
+            keys_added, keys_empty_pwd, errors, error_code, status, anomalies, pending, ack_by, ack_decision, ack_at
        FROM sync_run ORDER BY id DESC LIMIT $1`,
     [limit],
   );
@@ -200,7 +200,7 @@ export async function countNotSeenSince(db, runId) {
   return rows[0].n;
 }
 
-/** Flags computers a full run did not see as "not in AD" (nothing is deleted). Returns them. */
+/** Flags computers a full run did not see as "out of the monitored scope" (nothing is deleted). Returns them. */
 export async function markNotSeenAsDeleted(db, runId) {
   const { rows } = await db.query(
     `UPDATE computer SET deleted_in_ad_at = now()
@@ -360,7 +360,7 @@ export async function findKeyOwner(db, keyId, password) {
   return rows[0] ?? null;
 }
 
-/** Flags one computer as no longer in AD (replaced by a new AD object with the same name). */
+/** Flags one computer as out of the monitored scope (replaced by a new AD object with the same name). */
 export async function markComputerReplaced(db, computerId) {
   await db.query('UPDATE computer SET deleted_in_ad_at = now() WHERE id = $1 AND deleted_in_ad_at IS NULL', [computerId]);
 }
@@ -486,4 +486,70 @@ export async function keyHistoryOf(db, computerId) {
     [computerId],
   );
   return { moves, duplicates };
+}
+
+// ---- quarantined run: what accepting it would change (preview) ---------------------------------
+
+export async function getRun(db, id) {
+  const { rows } = await db.query('SELECT * FROM sync_run WHERE id = $1', [id]);
+  return rows[0] ?? null;
+}
+
+/** Metrics of a run, the whole system first, then per branch (with the branch code). */
+export async function runMetrics(db, runId) {
+  const { rows } = await db.query(
+    `SELECT m.*, b.code AS branch_code, b.name AS branch_name
+       FROM sync_metric m LEFT JOIN branch b ON b.id = m.branch_id
+      WHERE m.run_id = $1
+      ORDER BY m.branch_id IS NOT NULL, b.code`,
+    [runId],
+  );
+  return rows;
+}
+
+/**
+ * Computers that accepting the run would flag "Khong con trong pham vi giam sat": in AD now, not seen by this run
+ * nor by a later one (the same rule as markNotSeenAsDeleted). { total, byBranch, rows (first `limit`) }.
+ */
+export async function plannedNotInAd(db, runId, limit = 500) {
+  const where = 'c.deleted_in_ad_at IS NULL AND (c.last_seen_run IS NULL OR c.last_seen_run < $1)';
+  const { rows } = await db.query(
+    `SELECT c.id, c.name, c.object_guid, c.distinguished_name, c.os, c.last_seen_run, b.code AS branch_code,
+            (SELECT count(*)::int FROM recovery_key k WHERE k.computer_id = c.id) AS keys,
+            (SELECT max(r.started_at) FROM sync_run r WHERE r.id = c.last_seen_run) AS last_seen_at
+       FROM computer c LEFT JOIN branch b ON b.id = c.branch_id
+      WHERE ${where}
+      ORDER BY b.code NULLS FIRST, lower(c.name)
+      LIMIT $2`,
+    [runId, limit],
+  );
+  const { rows: byBranch } = await db.query(
+    `SELECT b.code AS branch_code, count(*)::int AS computers,
+            sum((SELECT count(*) FROM recovery_key k WHERE k.computer_id = c.id))::int AS keys
+       FROM computer c LEFT JOIN branch b ON b.id = c.branch_id
+      WHERE ${where}
+      GROUP BY b.code ORDER BY count(*) DESC, b.code NULLS FIRST`,
+    [runId],
+  );
+  return { total: byBranch.reduce((n, b) => n + b.computers, 0), byBranch, rows };
+}
+
+/** Computers and keys this run recorded for the first time (already stored; kept whatever the decision). */
+export async function runNewObjects(db, runId, limit = 200) {
+  const computers = await db.query(
+    `SELECT c.id, c.name, c.distinguished_name, b.code AS branch_code, count(*) OVER ()::int AS total
+       FROM computer c LEFT JOIN branch b ON b.id = c.branch_id
+      WHERE c.first_seen_run = $1 ORDER BY b.code NULLS FIRST, lower(c.name) LIMIT $2`,
+    [runId, limit],
+  );
+  const keys = await db.query(
+    `SELECT k.key_id, c.id AS computer_id, c.name AS computer_name, b.code AS branch_code, count(*) OVER ()::int AS total
+       FROM recovery_key k JOIN computer c ON c.id = k.computer_id LEFT JOIN branch b ON b.id = c.branch_id
+      WHERE k.first_seen_run = $1 ORDER BY b.code NULLS FIRST, lower(c.name) LIMIT $2`,
+    [runId, limit],
+  );
+  return {
+    computers: { total: computers.rows[0]?.total ?? 0, rows: computers.rows },
+    keys: { total: keys.rows[0]?.total ?? 0, rows: keys.rows },
+  };
 }

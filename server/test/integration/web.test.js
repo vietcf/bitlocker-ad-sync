@@ -139,3 +139,23 @@ describe('Tinh trang sync: worker Online / Offline', () => {
     expect(page).toMatch(/old-net[\s\S]*?badge badge-bad[^>]*>● Offline</);
   });
 });
+
+describe('Tinh trang sync: two separate statuses', () => {
+  it('shows the worker and AD / the sync apart', async () => {
+    await addUser(pool, 'status.admin', [{ branchId: null, role: 'admin' }]);
+    const { agent } = await webLogin(app, 'status.admin');
+    // Worker alive, AD problem.
+    await asOwner(`INSERT INTO worker_heartbeat (worker_id, version, at, ldap_ok, last_error_code) VALUES ('w1', '1', now(), false, 'ldap_tls_failed')`);
+    await asOwner(`INSERT INTO sync_alert (type, severity, detail) VALUES ('sync_problem', 'high', '{"subject":"x","text":"y"}')`);
+    let page = (await agent.get('/admin/sync')).text;
+    expect(page).toMatch(/Worker \(agent\)[\s\S]*?badge-good[^>]*>● Online/);
+    expect(page).toMatch(/Đồng bộ AD<\/div>[\s\S]*?badge-bad[^>]*>● Có sự cố/);
+    // Worker down: the worker is Offline and AD is "not determined", never "problem".
+    await asOwner(`DELETE FROM sync_alert; UPDATE worker_heartbeat SET at = now() - interval '3 hours'`);
+    await asOwner(`INSERT INTO sync_alert (type, severity, detail) VALUES ('worker_offline', 'high', '{"subject":"x","text":"y"}')`);
+    page = (await agent.get('/admin/sync')).text;
+    expect(page).toMatch(/Worker \(agent\)[\s\S]*?badge-bad[^>]*>● Offline/);
+    expect(page).toMatch(/Đồng bộ AD<\/div>[\s\S]*?badge-muted[^>]*>Chưa xác định/);
+    expect(page).not.toContain('● Có sự cố');
+  });
+});

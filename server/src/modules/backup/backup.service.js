@@ -269,14 +269,14 @@ export class BackupService {
     const bom = '﻿';
     const computersCsv = bom + toCsv(
       ['computer_id', 'object_guid', 'name', 'dns_name', 'distinguished_name', 'branch', 'branch_name', 'os', 'device_serial', 'owner_email',
-        'created_in_ad_utc', 'changed_in_ad_utc', 'first_seen_utc', 'in_ad', 'not_in_ad_since_utc', 'keys'],
+        'created_in_ad_utc', 'changed_in_ad_utc', 'first_seen_utc', 'in_scope', 'out_of_scope_since_utc', 'keys'],
       data.computers.map((c) => [c.id, c.object_guid, c.name, c.dns_name, c.distinguished_name, c.branch_code ?? 'N/A', c.branch_name, c.os,
         c.device_serial, c.owner_email, iso(c.ad_created_at), iso(c.when_changed), iso(c.first_seen_at), c.deleted_in_ad_at ? 'no' : 'yes',
         iso(c.deleted_in_ad_at), c.keys]),
     );
     const keysCsv = bom + toCsv(
       ['key_id', 'key_id_first8', 'recovery_password', 'key_dn', 'volume_guid', 'status', 'created_in_ad_utc', 'first_synced_utc', 'last_revealed_utc',
-        'computer_id', 'computer_object_guid', 'computer_name', 'computer_dn', 'branch', 'computer_in_ad'],
+        'computer_id', 'computer_object_guid', 'computer_name', 'computer_dn', 'branch', 'computer_in_scope'],
       data.keys.map((k) => [k.key_id, k.key_id_prefix, k.recovery_password, k.ad_dn, k.volume_guid, k.status, iso(k.ad_created_at),
         iso(k.first_synced_at), iso(k.last_revealed_at), k.computer_id, k.computer_guid, k.computer_name, k.computer_dn, k.branch_code ?? 'N/A',
         k.deleted_in_ad_at ? 'no' : 'yes']),
@@ -393,9 +393,9 @@ File này chứa TOÀN BỘ recovery key. Giữ kín như mật khẩu quản tr
 trên máy cá nhân. File mã hóa (AES-256): giải nén bằng 7-Zip hoặc WinRAR với mật khẩu sao lưu do Admin HQ
 đặt. File không mã hóa: phải cất ở nơi đã mã hóa và giới hạn người đọc.
 
-computers.csv       Mỗi máy (kể cả máy đã rời AD): id trong hệ thống, objectGUID (định danh trên AD),
+computers.csv       Mỗi máy (kể cả máy đã rời phạm vi giám sát): id trong hệ thống, objectGUID (định danh trên AD),
                     tên, DNS, DN, chi nhánh, hệ điều hành, serial, email người dùng, thời điểm tạo /
-                    sửa trên AD, lần đầu ghi nhận, còn trong AD hay không, số key.
+                    sửa trên AD, lần đầu ghi nhận, còn trong phạm vi giám sát hay không, số key.
 recovery_keys.csv   Mỗi recovery key: Key ID (8 ký tự đầu hiện trên màn hình BitLocker), MẬT KHẨU KHÔI
                     PHỤC, DN của key trên AD, volume GUID, trạng thái, thời điểm tạo trên AD, ghi nhận, hiện key gần nhất,
                     máy chứa key (id, objectGUID, tên, DN, chi nhánh).

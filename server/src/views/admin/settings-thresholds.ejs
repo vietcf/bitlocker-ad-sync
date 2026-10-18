@@ -3,7 +3,7 @@
 <% const UNIT = { percent: '%', minutes: 'phút', hours: 'giờ', count: '', points: 'điểm %' }; %>
 <% const GROUPS = [
   ['run', 'Kiểm tra khi lượt sync kết thúc', 'Vượt ngưỡng thì lượt sync bị giữ lại (cách ly) và chờ Admin HQ chấp nhận hoặc bác bỏ ở tab Sync AD. Các ngưỡng này chỉ xét lượt full (lượt delta chỉ đọc phần thay đổi); riêng key đọc được mà không có mật khẩu thì lượt nào cũng giữ lại.'],
-  ['watchdog', 'Watchdog (mỗi 5 phút)', 'Vượt bất kỳ ngưỡng nào thì đồng bộ AD chuyển sang Offline và gửi một mail (theo tab Thông báo), nhắc lại tối đa 1 lần mỗi ngày; hết vượt thì tự về Online, không gửi gì nữa.'],
+  ['watchdog', 'Watchdog', 'Hai loại sự cố riêng: không có heartbeat thì Worker Offline (một mail); worker vẫn chạy mà vượt ngưỡng khác (không đọc được AD, lâu không sync, canary, USN...) thì Đồng bộ AD có sự cố (một mail). Mỗi loại nhắc lại tối đa 1 lần mỗi ngày; hết thì tự về bình thường, không gửi gì nữa.'],
 ]; %>
 <section class="card">
   <h2>Ngưỡng cảnh báo</h2>

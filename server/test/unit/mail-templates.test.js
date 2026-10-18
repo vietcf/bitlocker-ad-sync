@@ -24,9 +24,9 @@ describe('mail templates', () => {
   it('fills placeholders, leaves unknown ones visible, and prefixes alerts with the severity', () => {
     expect(fill('Hi {{user}}, {{nope}}', { user: 'it.hn' })).toBe('Hi it.hn, {{nope}}');
     const t = new MailTemplates({ file: DEFAULT_TEMPLATES_FILE });
-    expect(t.render('sync_failed', { runId: 7, mode: 'delta', dc: 'DC01', errorCode: 'ldap_bind_failed' }, { severity: 'high' })).toEqual({
+    expect(t.render('sync_failed', { runId: 7, runRef: '20261018-0007', mode: 'delta', dc: 'DC01', errorCode: 'ldap_bind_failed' }, { severity: 'high' })).toEqual({
       subject: '[BitLocker][HIGH] Sync AD lỗi: ldap_bind_failed',
-      body: 'Lượt sync #7 (delta, DC DC01) báo lỗi ldap_bind_failed.\nKiểm tra worker và kết nối LDAPS từ worker tới DC.',
+      body: 'Lượt sync 20261018-0007 (delta, DC DC01) báo lỗi ldap_bind_failed.\nKiểm tra worker và kết nối LDAPS từ worker tới DC.',
     });
     expect(t.render('smtp_test').subject).toBe('[BitLocker] Email thử'); // a notification: no prefix
   });

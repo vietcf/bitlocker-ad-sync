@@ -69,7 +69,7 @@ export function checkRun(metrics, baseline, t) {
   if (metrics.liveComputers > 0 && metrics.plannedDeletes / metrics.liveComputers > t.maxDeleteRatio) {
     found.push({
       code: 'mass_delete',
-      message: `The full run did not see ${metrics.plannedDeletes}/${metrics.liveComputers} computers (over ${pct(t.maxDeleteRatio)}); if accepted they are flagged "not in AD" (no data is deleted, keys are kept).`,
+      message: `The full run did not see ${metrics.plannedDeletes}/${metrics.liveComputers} computers (over ${pct(t.maxDeleteRatio)}); if accepted they are flagged "no longer in the monitored scope" (no data is deleted, keys are kept).`,
       detail: { planned: metrics.plannedDeletes, live: metrics.liveComputers, threshold: t.maxDeleteRatio },
     });
   }
@@ -92,7 +92,7 @@ export function anomalyText(a) {
     case 'branch_drop':
       return `Chi nhánh ${d.branch}: thấy ${d.seen} máy, mức bình thường ${d.baseline}.`;
     case 'mass_delete':
-      return `Lượt full không thấy ${d.planned}/${d.live} máy trong AD (${pct(d.planned / d.live)}${limit}); nếu chấp nhận, các máy này được gắn nhãn "Không còn trong AD" (không xóa dữ liệu, key vẫn giữ).`;
+      return `Lượt full không thấy ${d.planned}/${d.live} máy trong phạm vi giám sát (${pct(d.planned / d.live)}${limit}); nếu chấp nhận, các máy này được gắn nhãn "Không còn trong phạm vi giám sát" (không xóa dữ liệu, key vẫn giữ).`;
     default:
       return a.message;
   }

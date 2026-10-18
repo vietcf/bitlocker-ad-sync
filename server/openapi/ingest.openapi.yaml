@@ -104,10 +104,10 @@ paths:
               schema: { $ref: '#/components/schemas/OpenRunResponse' }
               examples:
                 delta:
-                  value: { runId: 1842, mode: delta, sinceUsn: 48211930 }
+                  value: { runId: 1842, runRef: 20261013-1842, mode: delta, sinceUsn: 48211930 }
                 forcedFull:
                   summary: Delta requested against another DC
-                  value: { runId: 1843, mode: full, sinceUsn: 0 }
+                  value: { runId: 1843, runRef: 20261013-1843, mode: full, sinceUsn: 0 }
         '400': { $ref: '#/components/responses/ValidationError' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -363,7 +363,8 @@ components:
       type: object
       required: [runId, mode, sinceUsn]
       properties:
-        runId: { type: integer, format: int64 }
+        runId: { type: integer, format: int64, description: 'Sequence number of the run: the key to use in every following call.' }
+        runRef: { type: string, example: 20261013-1842, description: 'Readable number of the run (day it started + sequence), for logs and messages. Not a key.' }
         mode:
           type: string
           enum: [delta, full]

@@ -45,14 +45,14 @@ describe('daily report', () => {
     expect(last.day).toBe(d.day);
     expect(last).toMatchObject({ computers: 3, keys: 4, dComputers: 0, dKeys: 1 }); // +1 -1 computers, +1 key
     expect(d.byBranch.map((b) => b.code).sort()).toEqual(['HCM', 'HN']);
-    expect(d.sync).toMatchObject({ online: true, workers: [], quarantined: 0, duplicates: 0 });
+    expect(d.sync).toMatchObject({ workerOnline: true, adState: 'ok', workers: [], quarantined: 0, duplicates: 0 });
   });
 
   it('renders text and HTML: sync status, charts, escaped names, never a password', async () => {
     const r = report();
     const m = r.render(await r.build('yesterday'));
-    expect(m.subject).toMatch(/^Báo cáo BitLocker \d\d\/\d\d\/\d{4}: đồng bộ AD Online, máy 0, key \+1$/);
-    expect(m.text).toContain('MÁY: 3 (0): 1 mới ghi nhận, 1 không còn trong AD');
+    expect(m.subject).toMatch(/^Báo cáo BitLocker \d\d\/\d\d\/\d{4}: worker Online, AD bình thường, máy 0, key \+1$/);
+    expect(m.text).toContain('MÁY: 3 (0): 1 mới ghi nhận, 1 không còn trong phạm vi giám sát');
     expect(m.text).toContain('Chưa có worker nào gửi heartbeat');
     expect(m.html).toContain('Số máy, 10 ngày gần nhất');
     expect(m.html).toContain('&lt;b&gt;Ha Noi&lt;/b&gt;');

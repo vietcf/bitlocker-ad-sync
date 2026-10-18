@@ -39,19 +39,64 @@ const EMPTY = {
   detail: null,
 };
 
-export const PAGE_SIZE = 50;
+import { PAGE_SIZES, pageSize } from '../settings/page-size.js';
 const CSV_MAX_ROWS = 50_000;
 
 export class AuditService {
-  constructor({ pool, hmacKey, settings = null }) {
+  constructor({ pool, hmacKey, settings = null, eventLog = null }) {
     this.pool = pool;
     this.hmacKey = hmacKey;
     this.settings = settings;
+    this.eventLog = eventLog;
   }
 
-  /** Writes inside the caller's transaction (so the row commits or rolls back with the action). */
-  append(tx, entry) {
-    return appendLog(tx, this.hmacKey, { ...EMPTY, ...entry });
+  /**
+   * Writes inside the caller's transaction (so the row commits or rolls back with the action). Once it is
+   * committed the row also goes to the event log (stdout), in the background.
+   */
+  async append(tx, entry) {
+    const row = { ...EMPTY, ...entry };
+    const written = await appendLog(tx, this.hmacKey, row);
+    if (this.eventLog?.enabled) {
+      if (tx.afterCommit) tx.afterCommit(() => this.#emit(written, row));
+      else this.#emit(written, row);
+    }
+  }
+
+  /** One event line for a row of the Nhat ky: the fields the screen shows (branch code and computer name looked up). */
+  async #emit({ id, at }, e) {
+    try {
+      let branchCode = null;
+      let computerName = null;
+      if (e.branchId !== null || e.computerId !== null) {
+        const { rows } = await withScope(this.pool, 'all', (tx) => tx.query(
+          'SELECT (SELECT code FROM branch WHERE id = $1) AS branch_code, (SELECT name FROM computer WHERE id = $2) AS computer_name',
+          [e.branchId, e.computerId],
+        ));
+        branchCode = rows[0].branch_code;
+        computerName = rows[0].computer_name;
+      }
+      this.eventLog.emit('audit', {
+        time: at,
+        id,
+        user_sid: e.userSid,
+        user_upn: e.userUpn,
+        action: e.action,
+        computer_id: e.computerId === null ? null : Number(e.computerId),
+        computer_name: computerName,
+        key_id: e.keyId,
+        branch_id: e.branchId,
+        branch_code: branchCode,
+        reason: e.reason,
+        reason_note: e.reasonNote,
+        ticket_no: e.ticketNo,
+        client_ip: e.clientIp,
+        user_agent: e.userAgent,
+        detail: e.detail,
+      });
+    } catch {
+      // never let the event line get in the way of the action
+    }
   }
 
   /** Writes one row in its own transaction. */
@@ -67,7 +112,7 @@ export class AuditService {
   async search(scope, filters, pageNo = 1) {
     const branches = branchesFor(scope, 'logs');
     if (branches !== 'all' && branches.length === 0) throw forbidden();
-    const limit = PAGE_SIZE;
+    const limit = await pageSize(this.settings, PAGE_SIZES.audit);
     const offset = (pageNo - 1) * limit;
     const result = await withScope(this.pool, branches, (tx) => searchLog(tx, branches, filters, { limit, offset }));
     return { ...result, page: pageNo, pageSize: limit, pages: Math.max(1, Math.ceil(result.total / limit)) };

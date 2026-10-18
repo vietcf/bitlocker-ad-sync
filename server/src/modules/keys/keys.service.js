@@ -140,7 +140,7 @@ export class KeysService {
     }, { severity: 'high' });
     await this.notifier.send({ type: 'key_export', severity: 'high', subject: mail.subject, text: mail.body });
     const csv = toCsv(
-      ['computer', 'computer_object_guid', 'branch', 'distinguished_name', 'in_ad', 'key_id', 'volume_guid', 'device_serial', 'owner_email',
+      ['computer', 'computer_object_guid', 'branch', 'distinguished_name', 'in_scope', 'key_id', 'volume_guid', 'device_serial', 'owner_email',
         'status', 'key_created_utc', 'key_recorded_utc', 'recovery_password'],
       rows.map((k) => [
         k.computer_name, k.computer_object_guid, k.branch_code ?? 'N/A', k.distinguished_name, k.deleted_in_ad_at ? 'no' : 'yes',

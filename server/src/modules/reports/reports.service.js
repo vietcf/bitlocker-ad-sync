@@ -6,7 +6,7 @@ import { badRequest, forbidden } from '../../http/errors.js';
 import { parse } from '../../http/validate.js';
 import { toXlsx } from '../../http/xlsx.js';
 import { REASON_LABELS } from '../keys/keys.service.js';
-import { branchList, computersWithoutKey, earliestDay, inventoryByBranch, revealsInPeriod, revealStats } from './reports.repo.js';
+import { branchList, computersWithKey, computersWithoutKey, earliestDay, existingBranches, inventoryByBranch, revealsInPeriod, revealStats } from './reports.repo.js';
 
 const MAX_DAYS = 366;
 /** A computer recorded within this many days may still be waiting for BitLocker / the GPO: "new". */
@@ -75,7 +75,7 @@ export class ReportsService {
    * reveals per branch and user, and the computers without a key. Only within the caller's scope,
    * narrowed to one branch when branchId is set (a branch outside the scope gives an empty report).
    */
-  async summary(scope, rawQuery) {
+  async summary(scope, rawQuery, { withKeyList = false } = {}) {
     const all = this.#branches(scope);
     const f = this.filters(rawQuery);
     const inScope = all === 'all' || (f.branchId && all.includes(f.branchId));
@@ -83,16 +83,20 @@ export class ReportsService {
     const hours = this.settings ? await this.settings.get('reveal.working_hours', null) : null;
 
     const data = branches.length === 0
-      ? { list: [], inventory: [], reveals: [], noKey: [], options: [] }
+      ? { list: [], existing: [], inventory: [], reveals: [], noKey: [], options: [] }
       : await withScope(this.pool, branches, async (tx) => {
         if (f.all) f.from = (await earliestDay(tx, branches, this.tz)) ?? f.to;
         const period = { from: f.from, to: f.to, tz: this.tz };
+        const list = await branchList(tx, branches);
         return {
           options: await branchList(tx, all),
-          list: await branchList(tx, branches),
+          list,
+          existing: await existingBranches(tx, branches),
           inventory: await inventoryByBranch(tx, branches, period),
           reveals: await revealsInPeriod(tx, branches, period),
           noKey: await computersWithoutKey(tx, branches),
+          // Computers that have keys, with their key counts: for the Excel file of one branch only.
+          withKey: withKeyList && (f.branchId || list.length <= 1) ? await computersWithKey(tx, branches) : null,
         };
       });
     f.from ??= f.to;
@@ -104,8 +108,15 @@ export class ReportsService {
       reveals: 0, exported: 0, out_of_hours: hours ? 0 : null, users: new Set(), devices: new Set(), reasons: {},
     });
     const rows = new Map(data.list.map((b) => [b.id, fresh(b.id, b.code, b.name)]));
-    const row = (id) => {
-      if (!rows.has(id)) rows.set(id, fresh(id));
+    // The access log keeps the id of a branch that was deleted since: every such id is counted in the
+    // one N/A row (like the computers the deletion moved to no branch), not one N/A row per old id.
+    const existing = new Map(data.existing.map((b) => [b.id, b]));
+    const row = (rawId) => {
+      const id = rawId !== null && existing.has(rawId) ? rawId : null;
+      if (!rows.has(id)) {
+        const b = id === null ? null : existing.get(id);
+        rows.set(id, fresh(id, b?.code ?? null, b?.name ?? null));
+      }
       return rows.get(id);
     };
     for (const inv of data.inventory) Object.assign(row(inv.branch_id), inv);
@@ -119,8 +130,8 @@ export class ReportsService {
       r.users.add(l.user_upn);
       if (l.computer_id) r.devices.add(String(l.computer_id));
       if (l.reason) r.reasons[l.reason] = (r.reasons[l.reason] ?? 0) + 1;
-      const uk = `${l.branch_id ?? 'na'}|${l.user_upn}`;
-      const u = users.get(uk) ?? { branch_id: l.branch_id, user_upn: l.user_upn, reveals: 0, devices: new Set(), last_at: null };
+      const uk = `${r.branch_id ?? 'na'}|${l.user_upn}`;
+      const u = users.get(uk) ?? { branch_id: r.branch_id, user_upn: l.user_upn, reveals: 0, devices: new Set(), last_at: null };
       u.reveals += 1;
       if (l.computer_id) u.devices.add(String(l.computer_id));
       u.last_at = l.at;
@@ -196,12 +207,13 @@ export class ReportsService {
       noKeyNewDays: NO_KEY_NEW_DAYS,
       // List computers only when the report covers one branch; across branches, the summary only.
       noKeyDetail: Boolean(f.branchId) || data.list.length <= 1,
+      ...(withKeyList ? { withKey: data.withKey } : {}),
     };
   }
 
   /** The report as an Excel workbook (no key values). Logged as export_report. Returns { buffer, report }. */
   async exportXlsx(scope, rawQuery, client = {}) {
-    const report = await this.summary(scope, rawQuery);
+    const report = await this.summary(scope, rawQuery, { withKeyList: true });
     const buffer = toXlsx(workbook(report, scope), { tz: this.tz });
     if (this.audit) {
       await withScope(this.pool, this.#branches(scope), (tx) => this.audit.append(tx, {
@@ -240,14 +252,14 @@ function workbook(r, scope) {
       [],
       [H('Chỉ số'), H('Giá trị'), H('Ghi chú')],
       ['Số chi nhánh', t.branches, 'Chi nhánh đang hoạt động trong phạm vi'],
-      ['Máy trong AD', t.computers, 'Hiện tại, không tính máy đã gắn nhãn "Không còn trong AD"'],
+      ['Máy được giám sát', t.computers, 'Hiện tại, không tính máy đã gắn nhãn "Không còn trong phạm vi giám sát"'],
       ['Máy đã có key', t.withKey],
       ['Máy chưa có key', t.noKey, r.noKeyDetail ? 'Danh sách ở sheet "Máy chưa có key"' : 'Theo chi nhánh ở sheet "Máy chưa có key"; chọn một chi nhánh để xuất danh sách máy'],
       ['Tỉ lệ máy có key', P(t.coverage)],
-      ['Số key', t.keys, 'Key của các máy còn trong AD'],
+      ['Số key', t.keys, 'Key của các máy còn trong phạm vi giám sát'],
       [`Máy mới ghi nhận trong kỳ`, t.newComputers],
       [`Key mới ghi nhận trong kỳ`, t.newKeys],
-      [`Máy rời AD trong kỳ`, t.leftAd, 'Gắn nhãn "Không còn trong AD" trong kỳ'],
+      [`Máy rời phạm vi giám sát trong kỳ`, t.leftAd, 'Gắn nhãn "Không còn trong phạm vi giám sát" trong kỳ'],
       ['Lượt hiện key trong kỳ', t.reveals, 'Kể cả key xuất kèm file'],
       ['  trong đó xuất kèm file', t.exported],
       ['  trong đó ngoài giờ làm việc', t.outOfHours ?? 'Chưa cấu hình giờ làm việc'],
@@ -262,7 +274,7 @@ function workbook(r, scope) {
     freeze: 1,
     filterRow: 1,
     rows: [
-      [H('Chi nhánh'), H('Tên'), H('Máy'), H('Có key'), H('Chưa có key'), H('% có key'), H('Số key'), H('Máy mới'), H('Key mới'), H('Rời AD'), H('Lượt hiện key')],
+      [H('Chi nhánh'), H('Tên'), H('Máy'), H('Có key'), H('Chưa có key'), H('% có key'), H('Số key'), H('Máy mới'), H('Key mới'), H('Rời phạm vi'), H('Lượt hiện key')],
       ...r.branches.map((b) => [code(b), b.branch_name ?? 'Máy chưa thuộc chi nhánh nào', b.computers, b.with_key, b.no_key, P(b.coverage), b.keys, b.new_computers, b.new_keys, b.left_ad, b.reveals]),
       [T('Tổng'), T(''), TI(t.computers), TI(t.withKey), TI(t.noKey), { v: t.coverage, s: 'pct' }, TI(t.keys), TI(t.newComputers), TI(t.newKeys), TI(t.leftAd), TI(t.reveals)],
     ],
@@ -304,6 +316,21 @@ function workbook(r, scope) {
     ],
   };
 
+  // Mot chi nhanh: cac may da co key va so key cua tung may (dat truoc sheet may chua co key)
+  const withKeySheet = r.withKey ? {
+    name: 'Máy đã có key',
+    widths: [12, 24, 28, 18, 30, 10, 18, 16, 16, 60],
+    freeze: 1,
+    filterRow: 1,
+    rows: [
+      [H('Chi nhánh'), H('Máy'), H('Hệ điều hành'), H('Serial'), H('Email người dùng'), H('Số key'), H('Key mới nhất (tạo trên AD)'), H('Tạo trên AD'), H('Ghi nhận'), H('DN')],
+      ...r.withKey.map((c) => [c.branch_code ?? 'N/A', c.name, c.os, c.device_serial, c.owner_email, c.keys,
+        c.latest_key_at ? { v: new Date(c.latest_key_at), s: 'date' } : null,
+        c.ad_created_at ? { v: new Date(c.ad_created_at), s: 'date' } : null, { v: new Date(c.first_seen_at), s: 'date' }, c.distinguished_name]),
+      [T('Tổng'), TI(r.withKey.length), T(''), T(''), T(''), TI(r.withKey.reduce((n, c) => n + c.keys, 0)), T(''), T(''), T(''), T('')],
+    ],
+  } : null;
+
   // Tat ca chi nhanh: chi tong hop theo chi nhanh, khong liet ke tung may (giong trang bao cao)
   const noKeySummarySheet = {
     name: 'Máy chưa có key',
@@ -317,5 +344,5 @@ function workbook(r, scope) {
     ],
   };
 
-  return [overview, branchSheet, revealSheet, userSheet, r.noKeyDetail ? noKeySheet : noKeySummarySheet];
+  return [overview, branchSheet, revealSheet, userSheet, ...(r.noKeyDetail && withKeySheet ? [withKeySheet] : []), r.noKeyDetail ? noKeySheet : noKeySummarySheet];
 }

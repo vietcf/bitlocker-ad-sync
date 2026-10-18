@@ -7,7 +7,7 @@
   <div class="notice notice-error">
     <strong>Thao tác này không hoàn tác được.</strong> Khi xóa chi nhánh:
     <ul>
-      <li><strong><%= h.number(impact.computers) %></strong> máy đang trong AD<% if (impact.computers_gone) { %> (và <%= h.number(impact.computers_gone) %> máy đã không còn trong AD)<% } %>
+      <li><strong><%= h.number(impact.computers) %></strong> máy đang được giám sát<% if (impact.computers_gone) { %> (và <%= h.number(impact.computers_gone) %> máy đã không còn trong phạm vi giám sát)<% } %>
         chuyển về <strong>N/A</strong> (chỉ Admin HQ thấy). Máy nằm trong OU của chi nhánh khác sẽ chuyển sang chi nhánh đó.</li>
       <li>Các OU gốc của chi nhánh bị gỡ:
         <% if (branch.ous.length) { %><% branch.ous.forEach((ou) => { %><code class="wrap block"><%= ou %></code><% }) %><% } else { %><span class="muted">không có</span><% } %></li>

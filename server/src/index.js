@@ -9,6 +9,7 @@ import { createUserApp } from './app.js';
 import { createIngestApp } from './ingest/ingest.app.js';
 import { DEFAULT_ADMIN, ensureDefaultAdmin } from './modules/auth/users.repo.js';
 import { Scheduler } from './jobs/scheduler.js';
+import { JOB_SCHEDULE, jobMinutes, jobTime } from './jobs/job-schedule.js';
 import { runChainCheck, runSyncWatchdog } from './jobs/watchdog.js';
 
 const config = loadConfig();
@@ -66,16 +67,18 @@ ingestServer.listen(config.INGEST_PORT, config.INGEST_HOST, () => {
 // Background jobs.
 const scheduler = new Scheduler({ pool, logger, tz: config.APP_TZ });
 if (config.JOBS_ENABLED) {
-  scheduler.every('sync-watchdog', 5, () => runSyncWatchdog({ pool, alerts: services.alerts, settings: services.settings }));
-  scheduler.daily('audit-chain-check', '02:00', () => runChainCheck(services));
+  const { settings } = services;
+  scheduler.every('sync-watchdog', () => jobMinutes(settings, JOB_SCHEDULE.watchdogIntervalMinutes),
+    () => runSyncWatchdog({ pool, alerts: services.alerts, settings }));
+  scheduler.daily('audit-chain-check', () => jobTime(settings, JOB_SCHEDULE.chainCheckTime), () => runChainCheck(services));
   // Mail outbox: send what is due every minute.
-  scheduler.every('mail-outbox', 1, () => services.mail.processOutbox(), 10_000);
+  scheduler.every('mail-outbox', () => jobMinutes(settings, JOB_SCHEDULE.mailIntervalMinutes), () => services.mail.processOutbox(), 10_000);
   // Daily report for Admin HQ: checks every minute, sends once a day at the configured time.
   scheduler.every('daily-report', 1, () => services.dailyReport.tick(), 20_000);
   // Backups (Quan tri > Sao luu): checks every minute, runs once a day at the configured time.
   scheduler.every('backup', 1, () => services.backup.tick(), 25_000);
   // Delete old mail, sync history and (if configured) access log rows (Quan tri > Luu tru).
-  scheduler.daily('data-retention', '03:00', () => services.retention.run());
+  scheduler.daily('data-retention', () => jobTime(settings, JOB_SCHEDULE.retentionTime), () => services.retention.run());
 }
 
 function shutdown(signal) {

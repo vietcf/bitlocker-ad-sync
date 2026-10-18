@@ -243,7 +243,7 @@ paths:
             Search: `{ kind: "key" | "name", query, rows, total, page, pages }` (key rows carry the
             Key ID and status). List: `{ rows, total, page, pageSize, pages, seesUnmapped }`.
             CSV: columns name, dns_name, branch, distinguished_name, os, device_serial, owner_email,
-            keys, latest_key_utc, ad_created_utc, first_seen_utc, in_ad, not_in_ad_since_utc.
+            keys, latest_key_utc, ad_created_utc, first_seen_utc, in_scope, out_of_scope_since_utc.
           content:
             application/json:
               schema:
@@ -387,7 +387,7 @@ paths:
         Keys of the computers matching the list filters, in the caller's scope. Who may use it is set
         under Admin > Features (off by default / Admin HQ only / IT, lead and Admin HQ). Every exported
         key gets its own `reveal` log row plus one `export_keys` row, and Admin HQ is alerted.
-        CSV columns: computer, branch, distinguished_name, in_ad, key_id, volume_guid, device_serial,
+        CSV columns: computer, branch, distinguished_name, in_scope, key_id, volume_guid, device_serial,
         owner_email, status, key_created_utc, key_recorded_utc, recovery_password.
       requestBody:
         required: true
@@ -471,7 +471,8 @@ paths:
         noKeyByBranch: [ { branch_id, branch_code, branch_name, total, recent, older } ], noKeyNewDays (7), noKeyDetail }`.
         `noKeyDetail` is true when the report covers one branch (the page and the xlsx sheet "Máy chưa có key" then list the computers; otherwise only the per-branch summary).
         `format=xlsx`: a workbook with the sheets Tổng quan, Theo chi nhánh, Xem key theo CN, Người xem key and
-        Máy chưa có key (never a key value), logged as `export_report`.
+        Máy chưa có key (never a key value), logged as `export_report`. For one branch there is also the sheet
+        "Máy đã có key" (before "Máy chưa có key"): each monitored computer with at least one key and its number of keys.
       parameters:
         - { name: from, in: query, schema: { type: string, format: date }, description: 'First day (APP_TZ); default 29 days before "to".' }
         - { name: to, in: query, schema: { type: string, format: date }, description: 'Last day (APP_TZ); default today. At most 366 days.' }
@@ -692,6 +693,19 @@ paths:
       responses:
         '202': { description: '`{ mode }`', content: { application/json: { schema: { type: object, additionalProperties: true } } } }
         '403': { $ref: '#/components/responses/Error', description: feature_disabled }
+  /api/admin/sync-runs/{id}:
+    get:
+      operationId: getAdminSyncRunsById
+      tags: [Admin - sync]
+      summary: One sync run and, while it is quarantined, what accepting it would change (preview)
+      description: |
+        `{ run, waiting, metrics: [per branch, whole system first], planned: { total, byBranch: [{ branch_code, computers, keys }],
+        rows: [computers that would be flagged "not in AD", first 500] }, stored: { computers, keys } }`.
+        `stored` is what the run already recorded (kept whatever the decision). Nothing is changed by this call.
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { description: The run and the preview., content: { application/json: { schema: { type: object, additionalProperties: true } } } }
+        '404': { $ref: '#/components/responses/Error' }
   /api/admin/sync-runs/{id}/ack:
     post:
       operationId: postAdminSyncRunsByIdAck
@@ -949,7 +963,7 @@ components:
         info_updated_by: { type: [string, 'null'] }
         ad_created_at: { type: [string, 'null'], format: date-time, description: Created in AD (whenCreated). }
         first_seen_at: { type: string, format: date-time, description: First recorded in this system (by sync). }
-        deleted_in_ad_at: { type: [string, 'null'], format: date-time, description: 'Set = no longer in AD (nothing is deleted).' }
+        deleted_in_ad_at: { type: [string, 'null'], format: date-time, description: 'Set = no longer in the monitored scope (the SearchBases of the worker): deleted from AD or moved out of it. Nothing is deleted here.' }
         key_count: { type: integer }
       additionalProperties: true
     KeyMeta:
@@ -1015,3 +1029,7 @@ components:
         feature.reveal_alerts: { type: boolean, description: Alert on reveals outside working hours. }
         reveal.ticket_required: { type: boolean }
         export.keys: { type: string, enum: ['off', admin, all], description: Who may export keys with passwords. }
+        ui.page_size.computers: { type: integer, minimum: 5, maximum: 200, default: 25, description: Rows per page of the computer search and list. }
+        ui.page_size.audit: { type: integer, minimum: 5, maximum: 200, default: 50, description: Rows per page of the access log. }
+        ui.page_size.mail: { type: integer, minimum: 5, maximum: 200, default: 50, description: Rows per page of the mail log. }
+        ui.page_size.report: { type: integer, minimum: 5, maximum: 200, default: 20, description: Branches per page of "Chi tiết theo chi nhánh" in the report. }

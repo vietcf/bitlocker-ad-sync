@@ -120,7 +120,18 @@ describe('report', () => {
       r.on('data', (c) => chunks.push(c));
       r.on('end', () => cb(null, Buffer.concat(chunks)));
     });
-    expect(unzip(one.body)['xl/worksheets/sheet5.xml']).toContain('HN-PC-NEW'); // one branch: the list
+    // All branches: no sheet of computers with keys either (only the overview).
+    expect(files['xl/workbook.xml']).not.toContain('Máy đã có key');
+    // One branch: the computers that have keys (with their key count) come before the computers without a key.
+    const oneFiles = unzip(one.body);
+    const names = [...oneFiles['xl/workbook.xml'].matchAll(/<sheet name="([^"]+)"/g)].map((m) => m[1]);
+    expect(names).toEqual(['Tổng quan', 'Theo chi nhánh', 'Xem key theo CN', 'Người xem key', 'Máy đã có key', 'Máy chưa có key']);
+    expect(oneFiles['xl/worksheets/sheet5.xml']).toContain('HN-LT-0001'); // has a key
+    expect(oneFiles['xl/worksheets/sheet5.xml']).not.toContain('HN-PC-NEW'); // none
+    expect(oneFiles['xl/worksheets/sheet5.xml']).not.toContain('HCM-LT-0001'); // another branch
+    expect(oneFiles['xl/worksheets/sheet6.xml']).toContain('HN-PC-NEW'); // the list without a key
+    expect(oneFiles['xl/worksheets/sheet6.xml']).not.toContain('HN-LT-0001');
+    expect(Object.values(oneFiles).join('')).not.toContain('aaaaaaaa-0000-0000-0000-000000000001'); // not even a Key ID
     const all = Object.values(files).join('');
     expect(all).not.toMatch(/\d{6}-\d{6}-\d{6}/); // no recovery password
     const log = await asOwner(`SELECT user_upn, detail FROM access_log WHERE action = 'export_report'`);
@@ -154,5 +165,40 @@ describe('report', () => {
     // A lead sees one branch: the list directly.
     const lead = await apiLogin(app, 'lead.hn');
     expect((await lead.agent.get('/api/reports/summary')).body.noKeyDetail).toBe(true);
+  });
+});
+
+describe('deleted branches', () => {
+  it('counts what deleted branches left in the log in the one N/A row, not one N/A row each', async () => {
+    await addUser(pool, 'boss', [{ branchId: null, role: 'admin' }]);
+    // Reveals logged under two branches that were deleted since (their ids stay in the log).
+    for (const branchId of [98, 99, 99]) {
+      await services.audit.log({ userSid: 'user:9', userUpn: 'old.it', action: 'reveal', branchId, reason: 'other' });
+    }
+    const { agent } = await apiLogin(app, 'boss');
+    const r = (await agent.get('/api/reports/summary')).body;
+    const na = r.branches.filter((b) => b.branch_code === null);
+    expect(na).toHaveLength(1);
+    expect(na[0]).toMatchObject({ branch_id: null, reveals: 3, computers: 1 }); // with SRV-0001, which has no branch
+    expect(r.revealUsers.filter((u) => u.user_upn === 'old.it')).toEqual([expect.objectContaining({ branch_code: null, reveals: 3 })]);
+    const dash = (await agent.get('/api/dashboard')).body;
+    expect(dash.branches.find((b) => b.branch_code === null).reveals_30d).toBe(3);
+  });
+});
+
+describe('Excel of one branch: computers with keys', () => {
+  it('lists each computer that has keys with its number of keys, and a total', async () => {
+    await asOwner(`INSERT INTO recovery_key (computer_id, key_id, recovery_password, ad_created_at)
+                   VALUES (1, 'aaaaaaaa-0000-0000-0000-0000000000a2', '111111-222222-333333-444444-555555-666666-777777-888888', now())`);
+    const { agent } = await webLogin(app, 'auditor');
+    const res = await agent.get('/reports/export.xlsx').query({ branchId: 1 }).buffer(true).parse((r, cb) => {
+      const chunks = [];
+      r.on('data', (c) => chunks.push(c));
+      r.on('end', () => cb(null, Buffer.concat(chunks)));
+    });
+    const sheet = unzip(res.body)['xl/worksheets/sheet5.xml'];
+    expect(sheet).toMatch(/HN-LT-0001[\s\S]*?<v>2<\/v>/); // two keys on that computer
+    expect(sheet).toContain('Tổng');
+    expect(sheet).not.toMatch(/\d{6}-\d{6}-\d{6}/);
   });
 });

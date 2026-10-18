@@ -28,6 +28,28 @@ export async function earliestDay(tx, branches, tz) {
   return rows[0]?.day ?? null;
 }
 
+/**
+ * Computers being monitored that have at least one recovery key, with how many keys each has and when
+ * the newest key was created in AD. Never a key value. For the Excel export of one branch.
+ */
+export async function computersWithKey(tx, branches) {
+  const params = [];
+  const scope = branchFilter('c.branch_id', branches, params);
+  const { rows } = await tx.query(
+    `SELECT c.id, c.name, c.os, c.distinguished_name, c.device_serial, c.owner_email, c.ad_created_at, c.first_seen_at,
+            c.branch_id, b.code AS branch_code, b.name AS branch_name,
+            k.keys, k.latest_key_at
+       FROM computer c
+       LEFT JOIN branch b ON b.id = c.branch_id
+       JOIN LATERAL (SELECT count(*)::int AS keys, max(rk.ad_created_at) AS latest_key_at
+                       FROM recovery_key rk WHERE rk.computer_id = c.id) k ON k.keys > 0
+      WHERE ${scope} AND c.deleted_in_ad_at IS NULL
+      ORDER BY b.code NULLS FIRST, lower(c.name)`,
+    params,
+  );
+  return rows;
+}
+
 /** Computers present in AD with no recovery key at all (BitLocker key not escrowed). */
 export async function computersWithoutKey(tx, branches) {
   const params = [];
@@ -50,6 +72,14 @@ export async function branchList(tx, branches) {
   const params = [];
   const scope = branchFilter('b.id', branches, params);
   const { rows } = await tx.query(`SELECT b.id, b.code, b.name FROM branch b WHERE ${scope} AND b.is_active ORDER BY b.code`, params);
+  return rows;
+}
+
+/** Every branch still in the table (active or not) in scope: to tell a deleted branch from a live one. */
+export async function existingBranches(tx, branches) {
+  const params = [];
+  const scope = branchFilter('b.id', branches, params);
+  const { rows } = await tx.query(`SELECT b.id, b.code, b.name FROM branch b WHERE ${scope}`, params);
   return rows;
 }
 

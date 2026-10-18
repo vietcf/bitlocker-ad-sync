@@ -26,9 +26,9 @@
       <legend>Máy mới, key mới</legend>
       <p class="muted small">Sau mỗi lượt sync, mỗi người nhận một email gom các máy/key mới trong phạm vi của họ.</p>
       <label class="check"><input type="checkbox" name="newComputers" <%= n.newObjects.computers ? 'checked' : '' %>>
-        <span><strong>Khi có máy mới</strong> trong AD</span></label>
+        <span><strong>Khi có máy mới</strong> trong phạm vi giám sát</span></label>
       <label class="check"><input type="checkbox" name="newKeys" <%= n.newObjects.keys ? 'checked' : '' %>>
-        <span><strong>Khi có recovery key mới</strong> (email chỉ có Key ID, không có mật khẩu)</span></label>
+        <span><strong>Khi có recovery key mới</strong> (email ghi tên máy và Key ID đầy đủ; recovery password đã lưu trong hệ thống nhưng không bao giờ gửi qua email)</span></label>
       <p><strong>Gửi cho</strong></p>
       <label class="check"><input type="checkbox" name="newBranchUsers" <%= n.newObjects.branchUsers ? 'checked' : '' %>>
         <span>Người dùng của chi nhánh (vai trò IT, Trưởng IT) có máy nằm trong OU của chi nhánh</span></label>

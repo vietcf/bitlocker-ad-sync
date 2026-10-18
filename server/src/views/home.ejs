@@ -27,7 +27,7 @@
         <tr>
           <td><a href="/computers/<%= r.id %>?key=<%= r.key_id %>"><%= r.name %></a>
             <span class="guid" title="objectGUID trên AD"><%= r.object_guid %></span>
-            <% if (r.deleted_in_ad_at) { %><span class="badge badge-muted">Không còn trong AD</span><% } %></td>
+            <% if (r.deleted_in_ad_at) { %><span class="badge badge-muted">Không còn trong phạm vi giám sát</span><% } %></td>
           <td><%= h.branchCode(r.branch_code) %></td>
           <td><code><%= r.key_id.toUpperCase() %></code></td>
           <td><%= h.date(r.key_created_at) %></td>
@@ -98,7 +98,7 @@
     </fieldset>
     </div>
     <div class="filter-actions">
-      <label class="check"><input type="checkbox" name="includeDeleted" <%= filters.includeDeleted ? 'checked' : '' %>> Hiện cả máy không còn trong AD</label>
+      <label class="check"><input type="checkbox" name="includeDeleted" <%= filters.includeDeleted ? 'checked' : '' %>> Hiện cả máy không còn trong phạm vi giám sát</label>
       <span class="spacer"></span>
       <a href="/" class="small">Xóa lọc</a>
       <button type="submit" class="small">Lọc</button>
@@ -121,7 +121,7 @@
         <td><%= h.date(c.ad_created_at) %></td>
         <td title="Lần đầu hệ thống ghi nhận máy này (qua đồng bộ AD)"><%= h.date(c.first_seen_at) %></td>
         <td>
-          <% if (c.deleted_in_ad_at) { %><span class="badge badge-muted">Không còn trong AD</span>
+          <% if (c.deleted_in_ad_at) { %><span class="badge badge-muted">Không còn trong phạm vi giám sát</span>
           <% } else if (c.key_count === 0) { %><span class="badge badge-bad">Chưa có key</span>
           <% } else { %><span class="badge badge-good">Có key</span><% } %>
         </td>

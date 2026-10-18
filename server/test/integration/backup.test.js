@@ -59,7 +59,7 @@ describe('backup', () => {
     const files = unzipAes(keysZip, PASSWORD);
     expect(Object.keys(files).sort()).toEqual(['README.txt', 'computers.csv', 'key_moves.csv', 'manifest.json', 'recovery_keys.csv']);
     const keys = files['recovery_keys.csv'].toString('utf8');
-    expect(keys.split('\r\n')[0]).toBe('﻿key_id,key_id_first8,recovery_password,key_dn,volume_guid,status,created_in_ad_utc,first_synced_utc,last_revealed_utc,computer_id,computer_object_guid,computer_name,computer_dn,branch,computer_in_ad');
+    expect(keys.split('\r\n')[0]).toBe('﻿key_id,key_id_first8,recovery_password,key_dn,volume_guid,status,created_in_ad_utc,first_synced_utc,last_revealed_utc,computer_id,computer_object_guid,computer_name,computer_dn,branch,computer_in_scope');
     expect(keys).toContain(PWD(1));
     expect(keys).toContain('"CN=2026-01-02T03:04:05-00:00{AAAAAAAA-0000-0000-0000-000000000001},CN=HN-LT-0001,OU=Computers,OU=HN,DC=corp,DC=local"');
     expect(keys).toContain('00000000-0000-0000-0000-000000000001'); // computer objectGUID

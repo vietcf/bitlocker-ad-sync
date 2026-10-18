@@ -1,0 +1,109 @@
+<%- include('../partials/head') %>
+<%- include('_tabs') %>
+<p class="crumbs"><a href="/admin/sync">← Tình trạng sync</a></p>
+<% const ov = metrics.find((m) => m.branch_id === null); const st = h.runStatus(run.status); %>
+<section class="card">
+  <div class="title-row">
+    <h2>Lượt sync <%= h.runRef(run) %> <span class="badge badge-<%= st.tone %>"><%= st.label %></span></h2>
+    <span class="muted"><%= run.mode %> · DC <%= run.dc_name %> · <%= h.dateTime(run.started_at) %></span>
+  </div>
+  <% if (waiting) { %>
+    <div class="notice notice-warn" role="status">
+      Lượt này bị <strong>giữ lại</strong>: các thay đổi bên dưới <strong>chưa được áp dụng</strong>. Xem kỹ rồi chọn
+      <strong>Chấp nhận</strong> (thay đổi là thật, ví dụ đã thu hồi một lô máy) hoặc <strong>Bác bỏ</strong> (nguyên nhân đã được sửa, ví dụ
+      worker đọc thiếu OU; không áp dụng gì).
+    </div>
+  <% } else if (run.ack_decision) { %>
+    <p class="muted"><%= run.ack_decision === 'accept' ? 'Đã chấp nhận' : 'Đã bác bỏ' %> bởi <%= run.ack_by %> lúc <%= h.dateTime(run.ack_at) %>.</p>
+  <% } %>
+
+  <% if (run.anomalies?.length) { %>
+    <h3>Lý do bị giữ lại</h3>
+    <ul class="anomalies"><% run.anomalies.forEach((a) => { %><li><%= h.anomalyText(a) %></li><% }) %></ul>
+  <% } %>
+
+  <h3>Số liệu của lượt so với hệ thống</h3>
+  <table class="dense">
+    <thead><tr><th>Phạm vi</th><th class="num">Máy lượt này thấy</th><th class="num">Máy đang có</th><th class="num">Chênh lệch</th>
+      <th class="num">Key lượt này thấy</th><th class="num">Key đang có</th><th class="num">Key không đọc được mật khẩu</th></tr></thead>
+    <tbody>
+    <% metrics.forEach((m) => { const d = m.computers_seen - m.computers_in_db; %>
+      <tr class="<%= m.branch_id === null ? 'row-total' : '' %>">
+        <td><%= m.branch_id === null ? 'Toàn hệ thống' : h.branchCode(m.branch_code) %></td>
+        <td class="num"><%= h.number(m.computers_seen) %></td><td class="num"><%= h.number(m.computers_in_db) %></td>
+        <td class="num <%= d < 0 ? 'bad-text' : '' %>"><%= d > 0 ? '+' : '' %><%= h.number(d) %></td>
+        <td class="num"><%= m.branch_id === null ? h.number(m.keys_seen) : '—' %></td>
+        <td class="num"><%= m.branch_id === null ? h.number(m.keys_expected) : '—' %></td>
+        <td class="num"><%= m.branch_id === null ? h.number(m.keys_empty_pwd) : '—' %></td>
+      </tr>
+    <% }) %>
+    <% if (!metrics.length) { %><tr><td colspan="7" class="muted">Không có số liệu.</td></tr><% } %>
+    </tbody>
+  </table>
+</section>
+
+<% if (waiting) { %>
+<section class="card">
+  <h2>Nếu chấp nhận</h2>
+  <ul>
+    <li><strong><%= h.number(planned.total) %> máy</strong> được gắn nhãn <strong>"Không còn trong phạm vi giám sát"</strong> (lượt này và các lượt sau không thấy).
+      Máy và key của chúng <strong>vẫn được giữ</strong>, vẫn hiện key được; máy xuất hiện lại trong phạm vi giám sát sẽ tự trở lại bình thường.</li>
+    <li>Mốc USN <code><%= run.pending?.highestUsn ?? '—' %></code> được lưu: lượt delta kế tiếp chỉ đọc thay đổi sau mốc này.</li>
+    <li>Lượt được tính vào số liệu nền cho các lần kiểm tra bất thường sau.</li>
+  </ul>
+  <p class="muted small">Nếu bác bỏ: không máy nào bị gắn nhãn, USN không đổi (lượt sau đọc lại từ mốc cũ), lượt không vào số liệu nền.</p>
+
+  <% if (planned.total) { %>
+    <h3>Máy sẽ bị gắn nhãn "Không còn trong phạm vi giám sát", theo chi nhánh</h3>
+    <table class="dense">
+      <thead><tr><th>Chi nhánh</th><th class="num">Máy</th><th class="num">Key của các máy này</th></tr></thead>
+      <tbody><% planned.byBranch.forEach((b) => { %>
+        <tr><td><%= h.branchCode(b.branch_code) %></td><td class="num"><%= h.number(b.computers) %></td><td class="num"><%= h.number(b.keys) %></td></tr>
+      <% }) %></tbody>
+    </table>
+    <details class="table-view" <%= planned.total <= 50 ? 'open' : '' %>>
+      <summary>Danh sách máy (<%= h.number(planned.total) %><%= planned.total > planned.rows.length ? `, hiện ${planned.rows.length} máy đầu` : '' %>)</summary>
+      <div class="table-scroll">
+      <table class="dense">
+        <thead><tr><th>Máy</th><th>Chi nhánh</th><th>DN</th><th class="num">Key</th><th>Thấy lần cuối</th></tr></thead>
+        <tbody><% planned.rows.forEach((c) => { %>
+          <tr><td><a href="/computers/<%= c.id %>"><%= c.name %></a><br><span class="guid"><%= c.object_guid %></span></td>
+            <td><%= h.branchCode(c.branch_code) %></td><td class="small"><code class="wrap"><%= c.distinguished_name %></code></td>
+            <td class="num"><%= c.keys %></td><td><%= c.last_seen_at ? h.dateTime(c.last_seen_at) : '—' %><% if (c.last_seen_run) { %> <span class="muted">(#<%= c.last_seen_run %>)</span><% } %></td></tr>
+        <% }) %></tbody>
+      </table>
+      </div>
+    </details>
+  <% } %>
+
+  <form method="post" action="/admin/sync/runs/<%= run.id %>/ack" class="actions decision">
+    <%- include('../partials/csrf') %>
+    <button type="submit" name="decision" value="accept"
+      data-confirm="Chấp nhận lượt <%= h.runRef(run) %>: gắn nhãn &quot;Không còn trong phạm vi giám sát&quot; cho <%= planned.total %> máy (không xóa dữ liệu) và lưu mốc USN?">Chấp nhận</button>
+    <button type="submit" name="decision" value="reject" class="secondary"
+      data-confirm="Bác bỏ lượt <%= h.runRef(run) %>: không áp dụng thay đổi nào?">Bác bỏ</button>
+  </form>
+</section>
+<% } %>
+
+<section class="card">
+  <h2>Lượt này đã lưu</h2>
+  <p class="muted small">Máy và key ghi nhận lần đầu được lưu ngay khi worker gửi lên, kể cả khi lượt bị giữ lại; quyết định không làm mất chúng.</p>
+  <div class="two-col">
+    <div>
+      <h3>Máy mới (<%= h.number(stored.computers.total) %>)</h3>
+      <% if (!stored.computers.total) { %><p class="muted">Không có.</p><% } else { %>
+        <ul class="plain-list"><% stored.computers.rows.forEach((c) => { %><li><a href="/computers/<%= c.id %>"><%= c.name %></a> <span class="muted">· <%= h.branchCode(c.branch_code) %></span></li><% }) %></ul>
+        <% if (stored.computers.total > stored.computers.rows.length) { %><p class="muted small">... và <%= stored.computers.total - stored.computers.rows.length %> máy khác.</p><% } %>
+      <% } %>
+    </div>
+    <div>
+      <h3>Key mới (<%= h.number(stored.keys.total) %>)</h3>
+      <% if (!stored.keys.total) { %><p class="muted">Không có.</p><% } else { %>
+        <ul class="plain-list"><% stored.keys.rows.forEach((k) => { %><li><code><%= k.key_id.toUpperCase() %></code> · <a href="/computers/<%= k.computer_id %>"><%= k.computer_name %></a> <span class="muted">· <%= h.branchCode(k.branch_code) %></span></li><% }) %></ul>
+        <% if (stored.keys.total > stored.keys.rows.length) { %><p class="muted small">... và <%= stored.keys.total - stored.keys.rows.length %> key khác.</p><% } %>
+      <% } %>
+    </div>
+  </div>
+</section>
+<%- include('../partials/foot') %>

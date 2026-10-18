@@ -1,23 +1,43 @@
 import { branchFilter } from '../../db/scoped.js';
 
-/** Per branch: live computers and computers without any key. */
+/**
+ * Per branch: live computers and computers without any key. Every branch of the caller's scope is
+ * listed, also one that has no computer yet (all zeros); computers with no branch (N/A) only when
+ * there are any (Admin HQ).
+ */
 export async function inventoryByBranch(tx, branches) {
   const params = [];
-  const scope = branchFilter('c.branch_id', branches, params);
+  const scope = branchFilter('b.id', branches, params);
   const { rows } = await tx.query(
-    `SELECT c.branch_id, b.code AS branch_code, b.name AS branch_name,
-            count(*)::int AS computers,
-            count(*) FILTER (WHERE kc.n > 0)::int AS with_key,
-            count(*) FILTER (WHERE kc.n = 0)::int AS no_key,
+    `SELECT b.id AS branch_id, b.code AS branch_code, b.name AS branch_name,
+            count(c.id)::int AS computers,
+            count(c.id) FILTER (WHERE kc.n > 0)::int AS with_key,
+            count(c.id) FILTER (WHERE kc.n = 0)::int AS no_key,
             coalesce(sum(kc.n), 0)::int AS keys
-       FROM computer c
-       LEFT JOIN branch b ON b.id = c.branch_id
-       CROSS JOIN LATERAL (SELECT count(*)::int AS n FROM recovery_key k WHERE k.computer_id = c.id) kc
-      WHERE ${scope} AND c.deleted_in_ad_at IS NULL
-      GROUP BY c.branch_id, b.code, b.name
-      ORDER BY count(*) DESC, b.code NULLS LAST`,
+       FROM branch b
+       LEFT JOIN computer c ON c.branch_id = b.id AND c.deleted_in_ad_at IS NULL
+       LEFT JOIN LATERAL (SELECT count(*)::int AS n FROM recovery_key k WHERE k.computer_id = c.id) kc ON true
+      WHERE ${scope}
+      GROUP BY b.id, b.code, b.name, b.is_active
+     HAVING b.is_active OR count(c.id) > 0
+      ORDER BY count(c.id) DESC, b.code`,
     params,
   );
+  if (branches === 'all') {
+    const na = await tx.query(
+      `SELECT NULL::int AS branch_id, NULL::text AS branch_code, NULL::text AS branch_name,
+              count(*)::int AS computers,
+              count(*) FILTER (WHERE kc.n > 0)::int AS with_key,
+              count(*) FILTER (WHERE kc.n = 0)::int AS no_key,
+              coalesce(sum(kc.n), 0)::int AS keys
+         FROM computer c
+         CROSS JOIN LATERAL (SELECT count(*)::int AS n FROM recovery_key k WHERE k.computer_id = c.id) kc
+        WHERE c.branch_id IS NULL AND c.deleted_in_ad_at IS NULL
+       HAVING count(*) > 0`,
+    );
+    rows.push(...na.rows);
+    rows.sort((a, b) => b.computers - a.computers || String(a.branch_code ?? '~').localeCompare(String(b.branch_code ?? '~')));
+  }
   return rows;
 }
 
@@ -70,10 +90,11 @@ export async function revealsByBranch(tx, branches, days) {
   const params = [days];
   const scope = branchFilter('l.branch_id', branches, params);
   const { rows } = await tx.query(
-    `SELECT l.branch_id, count(*)::int AS reveals
-       FROM access_log l
+    // A deleted branch (its id stays in the log) counts as N/A, with the computers it had.
+    `SELECT b.id AS branch_id, count(*)::int AS reveals
+       FROM access_log l LEFT JOIN branch b ON b.id = l.branch_id
       WHERE ${scope} AND l.action = 'reveal' AND l.at > now() - make_interval(days => $1)
-      GROUP BY l.branch_id`,
+      GROUP BY b.id`,
     params,
   );
   return rows;

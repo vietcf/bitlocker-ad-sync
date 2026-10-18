@@ -24,16 +24,17 @@
   </div>
 <% } %>
 
-<% if (sync && (sync.highAlerts || sync.openAlerts)) { %>
-  <a class="notice notice-<%= sync.highAlerts ? 'error' : 'warn' %> block-link" href="/admin/sync">
-    <% if (sync.offlineSince) { %><strong>Đồng bộ AD đang Offline</strong> từ <%= h.dateTime(sync.offlineSince) %> · <% } %>
-    <strong><%= sync.openAlerts %> cảnh báo sync đang mở</strong><% if (sync.highAlerts) { %> (<%= sync.highAlerts %> mức cao)<% } %> · xem chi tiết →
+<% if (sync && (sync.workerOfflineSince || sync.problemSince || sync.highAlerts || sync.openAlerts)) { %>
+  <a class="notice notice-<%= sync.workerOfflineSince || sync.highAlerts ? 'error' : 'warn' %> block-link" href="/admin/sync">
+    <% if (sync.workerOfflineSince) { %><strong>Worker đang Offline</strong> từ <%= h.dateTime(sync.workerOfflineSince) %> · <% } %>
+    <% if (sync.problemSince) { %><strong>Đồng bộ AD có sự cố</strong> từ <%= h.dateTime(sync.problemSince) %> · <% } %>
+    <% if (sync.openAlerts) { %><strong><%= sync.openAlerts %> cảnh báo sync đang mở</strong><% if (sync.highAlerts) { %> (<%= sync.highAlerts %> mức cao)<% } %> · <% } %>xem chi tiết →
   </a>
 <% } %>
 
 <section class="tiles">
   <div class="tile">
-    <div class="tile-label">Máy trong AD</div>
+    <div class="tile-label">Máy được giám sát</div>
     <div class="tile-value"><%= h.number(totals.computers) %></div>
   </div>
   <div class="tile">
@@ -69,7 +70,7 @@
     <%- include('partials/line-chart', { chart: charts.keys, label: 'Số key trên hệ thống theo ngày', cls: 'series-2' }) %>
   </div>
 </section>
-<p class="muted small chart-note">Máy được tính từ ngày hệ thống ghi nhận đến khi bị gắn nhãn "Không còn trong AD"; key được tính từ ngày ghi nhận. Rê chuột lên biểu đồ để xem số từng ngày.</p>
+<p class="muted small chart-note">Máy được tính từ ngày hệ thống ghi nhận đến khi bị gắn nhãn "Không còn trong phạm vi giám sát"; key được tính từ ngày ghi nhận. Rê chuột lên biểu đồ để xem số từng ngày.</p>
 
 <% if (charts.reveals) { %>
 <section class="card">

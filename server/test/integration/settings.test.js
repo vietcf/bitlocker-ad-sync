@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { runRef as makeRunRef } from '../../src/modules/sync/run-ref.js';
 import request from 'supertest';
 import { appPool, asOwner, PWD, resetDatabase } from './db.js';
 import { addUser, apiLogin, buildApp, webLogin } from './app.js';
@@ -201,10 +202,12 @@ describe('new computer / key e-mails', () => {
     const mails = await asOwner(`SELECT recipients[1] AS rcpt, subject, body FROM mail_outbox WHERE kind = 'new_objects' ORDER BY 1`);
     expect(mails.map((m) => m.rcpt)).toEqual(['admin.hq@corp.local', 'it.hcm@corp.local', 'it.hn@corp.local']);
     const byTo = Object.fromEntries(mails.map((m) => [m.rcpt, m]));
-    expect(byTo['admin.hq@corp.local'].subject).toBe(`[BitLocker] Sync #${runId}: 2 máy mới, 2 key mới`);
+    expect(byTo['admin.hq@corp.local'].subject).toBe(`[BitLocker] Sync ${makeRunRef(runId, new Date())}: 2 máy mới, 2 key mới`);
     expect(byTo['it.hn@corp.local'].body).toContain('HN-PC-2');
     expect(byTo['it.hn@corp.local'].body).not.toContain('HCM-PC-1');
-    expect(byTo['it.hn@corp.local'].body).toContain('Key ID 00000002...');
+    // The full Key ID (36 characters), not only the first 8.
+    expect(byTo['it.hn@corp.local'].body).toMatch(/Key ID 00000002-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}/);
+    expect(byTo['it.hn@corp.local'].body).not.toContain('00000002...');
     for (const m of mails) {
       for (const i of [1, 2, 3]) expect(m.body).not.toContain(PWD(i));
     }
@@ -221,7 +224,7 @@ describe('new computer / key e-mails', () => {
 
     const rows = await asOwner(`SELECT recipients, missing_recipients, status, subject, body, last_error FROM mail_outbox WHERE kind = 'new_objects'`);
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ recipients: [], status: 'no_recipient', subject: `[BitLocker] Sync #${runId}: 1 máy mới, 1 key mới` });
+    expect(rows[0]).toMatchObject({ recipients: [], status: 'no_recipient', subject: `[BitLocker] Sync ${makeRunRef(runId, new Date())}: 1 máy mới, 1 key mới` });
     expect(rows[0].missing_recipients).toEqual(['admin.hq', 'it.hn']); // it.hcm does not see HN computers
     expect(rows[0].body).toContain('HN-PC-2');
     expect(rows[0].body).not.toContain(PWD(2));
