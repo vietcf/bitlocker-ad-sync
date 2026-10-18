@@ -1,4 +1,5 @@
 import { can } from '../domain/scope.js';
+import { APP_VERSION } from '../version.js';
 import { csrfToken } from '../http/csrf.js';
 import { AppError } from '../http/errors.js';
 import { helpers } from './helpers.js';
@@ -16,6 +17,7 @@ export function templateLocals(req, res, next) {
   res.locals.can = (capability) => !!scope && can(scope, capability);
   res.locals.csrfToken = csrfToken(req);
   res.locals.h = helpers;
+  res.locals.appVersion = APP_VERSION;
   res.locals.path = req.path;
   res.locals.flash = req.session.flash ?? null;
   delete req.session.flash;

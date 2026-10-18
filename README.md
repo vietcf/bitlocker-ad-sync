@@ -310,6 +310,16 @@ Sao lưu DB trước (mục 6.8). Dùng docker-compose thì **migration tự ch�
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
+
+**Phiên bản.** Theo [Semantic Versioning](https://semver.org/lang/vi/) (`MAJOR.MINOR.PATCH`), ghi trong [CHANGELOG.md](CHANGELOG.md) và hiện ở chân trang. Phát hành (người bảo trì):
+
+```bash
+# 1. sửa "version" trong server/package.json (và package-lock.json), ghi CHANGELOG.md; chạy hết test
+# 2. commit, gắn tag (bản thử dùng hậu tố -rc.1) rồi push
+git commit -am "release: 1.0.0" && git tag -a v1.0.0 -m "1.0.0" && git push origin main v1.0.0
+```
+
+Migration chỉ thêm, nên nâng từ bản nào lên bản nào cũng chạy được; đổi `.env` hay cách dùng thì ghi ở mục **Khi nâng cấp** của CHANGELOG.
 ---
 
 ## 4. Cài sync worker trên Windows

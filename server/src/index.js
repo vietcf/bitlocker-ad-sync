@@ -3,6 +3,7 @@ import http from 'node:http';
 import https from 'node:https';
 import { loadConfig, ldapIsPlain } from './config.js';
 import { createLogger } from './logger.js';
+import { APP_VERSION } from './version.js';
 import { createPool } from './db/pool.js';
 import { createServices } from './services.js';
 import { createUserApp } from './app.js';
@@ -41,7 +42,7 @@ if (ldapIsPlain(config)) {
 // User-facing pages + API (plain HTTP behind the TLS-terminating reverse proxy).
 const userServer = createUserApp({ config, pool, logger, services }).listen(config.USER_PORT, config.USER_HOST, () => {
   logger.info(
-    { host: config.USER_HOST, port: config.USER_PORT, ldap: config.LDAP_SERVERS.length ? { servers: config.LDAP_SERVERS, protocol: config.LDAP_PROTOCOL } : 'off', localLogin: config.LOCAL_LOGIN_ENABLED },
+    { version: APP_VERSION, host: config.USER_HOST, port: config.USER_PORT, ldap: config.LDAP_SERVERS.length ? { servers: config.LDAP_SERVERS, protocol: config.LDAP_PROTOCOL } : 'off', localLogin: config.LOCAL_LOGIN_ENABLED },
     'user app listening',
   );
 });
