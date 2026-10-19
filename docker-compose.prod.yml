@@ -78,11 +78,14 @@ services:
   nginx:
     image: nginx:1.28.0-alpine
     ports:
-      - "${BIND_ADDR:-0.0.0.0}:443:443"
-      - "${BIND_ADDR:-0.0.0.0}:8443:8443"
-      - "${BIND_ADDR:-0.0.0.0}:80:80"
+      # Cong ra ngoai doi duoc bang HTTPS_PORT, INGEST_PUBLIC_PORT, HTTP_PORT (file .env canh file compose;
+      # tools/install.sh --https-port ... ghi giup). Cong trong container giu nguyen.
+      - "${BIND_ADDR:-0.0.0.0}:${HTTPS_PORT:-443}:443"
+      - "${BIND_ADDR:-0.0.0.0}:${INGEST_PUBLIC_PORT:-8443}:8443"
+      - "${BIND_ADDR:-0.0.0.0}:${HTTP_PORT:-80}:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/redirect.conf:/etc/nginx/blk-redirect.conf:ro
       - ./cert:/etc/nginx/cert:ro
     depends_on:
       - server

@@ -15,7 +15,7 @@ D="$(cd "$(dirname "$0")" && pwd)"
 cd "$D"
 
 DB_MODE="" WORKER_IPS="" AD_SERVERS="" AD_DOMAIN="" AD_BASE_DN="" AD_PROTOCOL="" TZ_NAME=""
-DB_HOST="" DB_PORT="" DB_NAME="" DB_SSL="" UP=0 YES=0 MAKE_CERT=""
+DB_HOST="" DB_PORT="" DB_NAME="" DB_SSL="" UP=0 YES=0 MAKE_CERT="" P_HTTPS="" P_INGEST="" P_HTTP=""
 usage() { sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; cat <<'EOF'
 Tuy chon (bo trong thi script hoi):
   --db docker|external       DB trong Docker hoac PostgreSQL ngoai
@@ -24,6 +24,7 @@ Tuy chon (bo trong thi script hoi):
   --ad-domain corp.local     --ad-base-dn DC=corp,DC=local     --ad-protocol ldap|starttls|ldaps
   --db-host H --db-port P --db-name blk --db-ssl true|false      (DB ngoai)
   Mat khau DB ngoai: bien moi truong BLK_APP_PASSWORD, BLK_OWNER_PASSWORD (hoac nhap khi duoc hoi)
+  --https-port 443 --ingest-port 8443 --http-port 80     cong ra ngoai (doi khi cong chuan bi chiem)
   --tz Asia/Ho_Chi_Minh      --up (khoi dong luon)      --yes (khong hoi, dung gia tri mac dinh)
 EOF
 }
@@ -39,6 +40,9 @@ while [[ $# -gt 0 ]]; do
     --db-port) DB_PORT="$2"; shift 2 ;;
     --db-name) DB_NAME="$2"; shift 2 ;;
     --db-ssl) DB_SSL="$2"; shift 2 ;;
+    --https-port) P_HTTPS="$2"; shift 2 ;;
+    --ingest-port) P_INGEST="$2"; shift 2 ;;
+    --http-port) P_HTTP="$2"; shift 2 ;;
     --tz) TZ_NAME="$2"; shift 2 ;;
     --up) UP=1; shift ;;
     --yes|-y) YES=1; shift ;;
@@ -169,6 +173,24 @@ if [[ ! -f cert/server.crt || ! -f cert/server.key ]]; then
   else say "Dat server.crt va server.key vao cert/ truoc khi khoi dong."; fi
 fi
 
+# --- 4b. Cong ra ngoai (mac dinh 443 / 8443 / 80). Ghi vao .env canh docker-compose.prod.yml, compose tu doc ---
+PENV=.env
+getp() { [[ -f $PENV ]] && { grep -E "^$1=" "$PENV" | head -1 | cut -d= -f2- || true; }; true; }
+P_HTTPS="${P_HTTPS:-$(getp HTTPS_PORT)}"; P_HTTPS="${P_HTTPS:-443}"
+P_INGEST="${P_INGEST:-$(getp INGEST_PUBLIC_PORT)}"; P_INGEST="${P_INGEST:-8443}"
+P_HTTP="${P_HTTP:-$(getp HTTP_PORT)}"; P_HTTP="${P_HTTP:-80}"
+for p in "$P_HTTPS" "$P_INGEST" "$P_HTTP"; do
+  [[ "$p" =~ ^[0-9]+$ ]] && (( p >= 1 && p <= 65535 )) || die "Cong khong hop le: $p (1-65535)."
+done
+[[ "$P_HTTPS" != "$P_INGEST" && "$P_HTTPS" != "$P_HTTP" && "$P_INGEST" != "$P_HTTP" ]] || die "Ba cong (web, ingest, http) phai khac nhau."
+[[ -f $PENV ]] || : > "$PENV"
+set_env "$PENV" HTTPS_PORT "$P_HTTPS"; set_env "$PENV" INGEST_PUBLIC_PORT "$P_INGEST"; set_env "$PENV" HTTP_PORT "$P_HTTP"
+# Cong 80 chuyen sang HTTPS: giu cong HTTPS khi khac 443.
+mkdir -p nginx
+if [[ "$P_HTTPS" == 443 ]]; then printf 'return 301 https://$host$request_uri;\n' > nginx/redirect.conf
+else printf 'return 301 https://$host:%s$request_uri;\n' "$P_HTTPS" > nginx/redirect.conf; fi
+SUFFIX=""; [[ "$P_HTTPS" == 443 ]] || SUFFIX=":$P_HTTPS"
+
 # --- 5. Kiem tra ---
 bad=0
 for k in DATABASE_URL MIGRATION_DATABASE_URL SESSION_SECRET SECRET_KEY INGEST_API_KEY INGEST_ALLOWED_IPS; do
@@ -182,6 +204,17 @@ say ""; say "Cau hinh ($ENV, mat khau da che):"
 grep -E '^(DATABASE_URL|MIGRATION_DATABASE_URL|DB_SSL|INGEST_ALLOWED_IPS|APP_TZ|LDAP_SERVERS|LDAP_DOMAIN|LDAP_BASE_DN|LDAP_PROTOCOL|LOCAL_LOGIN_ENABLED)=' "$ENV" | mask | sed 's/^/  /'
 say "  (SESSION_SECRET, SECRET_KEY, INGEST_API_KEY: da co; CAT MOT BAN SECRET_KEY o kho mat khau)"
 
+final_info() {
+  say ""
+  say "Web:    https://<ten-may-chu>$SUFFIX/   (dang nhap admin / admin, bat buoc doi mat khau lan dau)"
+  say "Worker: Ingest.BaseUrl = https://<ten-may-chu>:$P_INGEST/api/ingest   (ten phai co trong chung chi)"
+  if [[ -f cert/ca.crt ]]; then
+    say "Chung chi TU KY: chep cert/ca.crt sang may worker, dat Ingest.CaFile = duong dan file do"
+    say "                (hoac Ingest.SkipCertificateValidation=true khi chi thu; khong nen dung lau dai)."
+  fi
+  say "Cong can mo tren tuong lua: $P_HTTPS (web), $P_INGEST (chi cho IP may worker), $P_HTTP (chuyen huong)."
+}
+
 # --- 6. Khoi dong ---
 COMPOSE=(docker compose -f docker-compose.prod.yml ${PROFILE[@]+"${PROFILE[@]}"})
 BUILD_FLAG=--no-build; [[ -f server/Dockerfile ]] && BUILD_FLAG=--build
@@ -190,15 +223,15 @@ if [[ $UP -eq 0 ]]; then
   if interactive; then read -r -p "Khoi dong ngay? (y/n) [y]: " go || true; [[ "${go:-y}" =~ ^[yY] ]] && UP=1; fi
 fi
 if [[ $UP -eq 0 ]]; then
-  say ""; say "Khoi dong khi san sang:"; say "  ${CMD[*]}"; exit 0
+  say ""; say "Khoi dong khi san sang:"; say "  ${CMD[*]}"; final_info; exit 0
 fi
 say ""; say "Khoi dong: ${CMD[*]}"
 "${CMD[@]}"
-URL="${BLK_HEALTH_URL:-https://localhost/healthz}"
+URL="${BLK_HEALTH_URL:-https://localhost$SUFFIX/healthz}"
 say "Doi he thong san sang ($URL) ..."
 for _ in $(seq 1 45); do
   body="$(curl -sk --max-time 3 "$URL" 2>/dev/null || true)"
-  if [[ "$body" == *'"dbOk":true'* ]]; then say "OK: $body"; say "Mo https://<ten-may-chu>/ va dang nhap admin / admin (bat buoc doi mat khau lan dau)."; exit 0; fi
+  if [[ "$body" == *'"dbOk":true'* ]]; then say "OK: $body"; final_info; exit 0; fi
   sleep 2
 done
 say "Chua san sang sau ~90 giay. Xem nguyen nhan:"

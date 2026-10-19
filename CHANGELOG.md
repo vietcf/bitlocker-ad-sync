@@ -13,6 +13,20 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.4.0] - 2026-10-19
+
+### Thêm
+
+- Đổi cổng ra ngoài khi cài bằng Docker Compose: `docker-compose.prod.yml` đọc `HTTPS_PORT`, `INGEST_PUBLIC_PORT`, `HTTP_PORT` (mặc định 443, 8443, 80); `tools/install.sh --https-port N --ingest-port N --http-port N` ghi vào `.env` cạnh file compose, kiểm tra `healthz` đúng cổng và in địa chỉ web, `Ingest.BaseUrl` cho worker và hướng dẫn `Ingest.CaFile` khi dùng chứng chỉ tự ký.
+
+### Đổi
+
+- Cổng 80 chuyển hướng sang HTTPS giữ đúng cổng HTTPS khi khác 443 (nginx đọc `nginx/redirect.conf`, do `install.sh` ghi).
+
+### Khi nâng cấp
+
+Không có migration. File mới `nginx/redirect.conf` được `docker-compose.prod.yml` gắn vào nginx; gói offline đã kèm file này.
+
 ## [2.3.2] - 2026-10-19
 
 ### Sửa
@@ -190,7 +204,8 @@ mới được kiểm thử trên mô phỏng và kết nối thử, chưa qua m
 - `server/.env`: `LDAP_URL` đã bỏ, thay bằng `LDAP_SERVERS` và `LDAP_PROTOCOL` (ví dụ `LDAP_SERVERS=dc01.corp.local`).
 - Script gọi API bằng tài khoản AD phải chuyển sang tài khoản local.
 
-[Chưa phát hành]: https://github.com/vietcf/bitlocker-ad-sync/compare/v2.3.2...HEAD
+[Chưa phát hành]: https://github.com/vietcf/bitlocker-ad-sync/compare/v2.4.0...HEAD
+[2.4.0]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v2.4.0
 [2.3.2]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v2.3.2
 [2.3.1]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v2.3.1
 [2.3.0]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v2.3.0

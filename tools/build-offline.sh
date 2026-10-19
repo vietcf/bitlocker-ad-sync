@@ -56,7 +56,7 @@ echo "== Luu image: ${IMAGES[*]} =="
 docker save "${IMAGES[@]}" | gzip -6 > "$STAGE/images.tar.gz"
 
 cp docker-compose.prod.yml "$STAGE/"
-cp nginx/nginx.conf "$STAGE/nginx/"
+cp nginx/nginx.conf nginx/redirect.conf "$STAGE/nginx/"
 cp server/.env.example "$STAGE/server/"
 # DB trong Docker: mau mat khau va script tao tai khoan o lan khoi tao dau (server/db/init)
 if [[ $WITH_DB -eq 1 ]]; then
