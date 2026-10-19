@@ -130,6 +130,18 @@ if [[ -z "$WORKER_IPS" ]]; then
   [[ -z "$WORKER_IPS" || "$WORKER_IPS" == "127.0.0.1,::1" ]] && { WORKER_IPS="127.0.0.1"; say "CANH BAO: chua co IP worker, tam dat 127.0.0.1 (worker chua goi duoc). Sua sau: bash install.sh --worker-ips <IP>"; }
 fi
 set_env "$ENV" INGEST_ALLOWED_IPS "$WORKER_IPS"
+# Worker cai tren CUNG may voi Docker: server thay nguon la gateway cua mang Docker (thuong 172.18.0.1), khong phai IP that.
+has_local_ip() {
+  local ip
+  [[ ",$WORKER_IPS," == *",127.0.0.1,"* ]] && return 0
+  for ip in $(hostname -I 2>/dev/null || true); do [[ ",$WORKER_IPS," == *",$ip,"* ]] && return 0; done
+  return 1
+}
+if has_local_ip; then
+  say "LUU Y: worker cung may voi Docker thi server thay IP nguon la gateway mang Docker, khong phai IP may nay."
+  say "       Sau khi chay, xem gateway: docker network inspect <ten-thu-muc>_default --format '{{(index .IPAM.Config 0).Gateway}}'"
+  say "       roi them vao danh sach: bash install.sh --db ... --worker-ips <gateway>[,<ip-khac>] --up"
+fi
 ask TZ_NAME "Mui gio" "Asia/Ho_Chi_Minh"; set_env "$ENV" APP_TZ "$TZ_NAME"
 ask AD_SERVERS "May chu AD (vi du dc01.corp.local,dc02.corp.local; de trong = chi dung tai khoan noi bo)" ""
 if [[ -n "$AD_SERVERS" ]]; then

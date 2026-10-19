@@ -743,6 +743,8 @@ Các khóa cần sửa:
 máy worker: thêm IP đó vào `INGEST_ALLOWED_IPS`. Máy worker chưa tin CA của chứng chỉ server thì đặt
 `Ingest.CaFile` (mục 3.5).
 
+**Worker cài cùng máy với Docker (server app).** Kết nối từ máy chủ vào cổng 8443 đi qua cầu nối Docker nên server thấy IP nguồn là **gateway của mạng Docker** (thường `172.18.0.1`), không phải IP của máy. Log server ghi `ingest: address not allowed` và worker nhận 403. Lấy gateway bằng `docker network inspect <tên-thư-mục>_default --format '{{(index .IPAM.Config 0).Gateway}}'` rồi thêm vào `INGEST_ALLOWED_IPS`: `bash install.sh --db ... --worker-ips <gateway> --up`. Worker ở máy khác thì dùng IP thật của máy đó.
+
 ### 4B.7. Lưu bí mật
 
 Mật khẩu AD và API key lưu thành **systemd credential mã hóa**. Unit đã khai báo sẵn hai credential này.

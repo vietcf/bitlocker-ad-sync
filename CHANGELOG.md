@@ -13,6 +13,16 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.3.1] - 2026-10-19
+
+### Sửa
+
+- Worker cài cùng máy với Docker bị `403 ingest: address not allowed`: server thấy IP nguồn là gateway của mạng Docker (thường `172.18.0.1`). `install.sh` nay nhắc điều này khi IP worker là chính máy này, và README mục 4B.6 giải thích cách xử lý.
+
+### Khi nâng cấp
+
+Không có migration. Worker cùng máy với Docker: thêm gateway vào `INGEST_ALLOWED_IPS`.
+
 ## [2.3.0] - 2026-10-19
 
 ### Thêm
@@ -170,7 +180,8 @@ mới được kiểm thử trên mô phỏng và kết nối thử, chưa qua m
 - `server/.env`: `LDAP_URL` đã bỏ, thay bằng `LDAP_SERVERS` và `LDAP_PROTOCOL` (ví dụ `LDAP_SERVERS=dc01.corp.local`).
 - Script gọi API bằng tài khoản AD phải chuyển sang tài khoản local.
 
-[Chưa phát hành]: https://github.com/vietcf/bitlocker-ad-sync/compare/v2.3.0...HEAD
+[Chưa phát hành]: https://github.com/vietcf/bitlocker-ad-sync/compare/v2.3.1...HEAD
+[2.3.1]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v2.3.1
 [2.3.0]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v2.3.0
 [2.2.1]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v2.2.1
 [2.2.0]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v2.2.0
