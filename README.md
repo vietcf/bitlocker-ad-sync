@@ -144,11 +144,17 @@ GRANT USAGE ON SCHEMA public TO app_node;
 
 ### 3.3. Tạo secret
 
-Chạy ba lần, mỗi lần ra một chuỗi hex 64 ký tự:
+Cần ba chuỗi ngẫu nhiên, mỗi chuỗi 64 ký tự hex. Lệnh dưới tạo `server/.env` từ file mẫu và **tự điền** cả ba (không in giá trị ra màn hình):
 
 ```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+cp server/.env.example server/.env && chmod 600 server/.env
+for k in SESSION_SECRET SECRET_KEY INGEST_API_KEY; do
+  v=$(openssl rand -hex 32)
+  if grep -q "^$k=" server/.env; then sed -i "s/^$k=.*/$k=$v/" server/.env; else echo "$k=$v" >> server/.env; fi
+done
 ```
+
+Máy không có `openssl` (hoặc Windows): thay `openssl rand -hex 32` bằng `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`; tạo từng chuỗi rồi dán vào `.env`.
 
 - `SESSION_SECRET`: ký cookie phiên.
 - `SECRET_KEY` (64 ký tự hex, trước đây tên `LOG_HMAC_KEY`, tên cũ vẫn dùng được): khóa mã hóa mật khẩu SMTP, mật khẩu sao lưu và khóa 2 bước lưu trong DB. Không lưu trong DB. Mất khóa thì app vẫn chạy, chỉ phải nhập lại các mật khẩu đó.
@@ -172,7 +178,7 @@ INGEST_TRUST_PROXY=1
 COOKIE_SECURE=true
 
 # Worker: HTTPS + API key (cùng giá trị trong cấu hình worker) + IP được phép
-INGEST_API_KEY=<hex 64>
+INGEST_API_KEY=<hex 64>      # đã tự điền ở mục 3.3
 INGEST_ALLOWED_IPS=10.0.5.21
 
 # Database. PostgreSQL ngoài: đổi host, bật DB_SSL. DB trong Docker: host "db", DB_SSL=false
@@ -190,8 +196,8 @@ LDAP_BASE_DN=DC=corp,DC=local
 # LDAP_CA_FILE=/app/certs/corp-root-ca.pem   # nếu máy chủ chưa tin CA của DC
 LOCAL_LOGIN_ENABLED=true                     # giữ để còn admin local khi AD lỗi
 
-SESSION_SECRET=<hex 64>
-SECRET_KEY=<hex 64>
+SESSION_SECRET=<hex 64>      # đã tự điền ở mục 3.3
+SECRET_KEY=<hex 64>          # đã tự điền ở mục 3.3, nhớ cất một bản riêng
 SESSION_IDLE_MINUTES=15
 SESSION_MAX_HOURS=8
 
