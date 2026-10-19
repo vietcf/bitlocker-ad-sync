@@ -28,3 +28,7 @@ backups/
 
 # Ban chay tot gan nhat (tools/snapshot.sh)
 _last-good/
+
+# Script nhap OU/chi nhanh dung rieng, khong dua vao git
+tools/import-branches.ps1
+tools/export-ou.ps1
