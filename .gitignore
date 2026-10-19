@@ -33,3 +33,6 @@ _last-good/
 tools/import-branches.ps1
 tools/export-ou.ps1
 tools/import-branches.sh
+tools/import-branches.mjs
+tools/import-branches.txt
+tools/export-ou.txt
