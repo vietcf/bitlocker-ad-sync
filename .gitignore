@@ -36,3 +36,4 @@ tools/import-branches.sh
 tools/import-branches.mjs
 tools/import-branches.txt
 tools/export-ou.txt
+tools/import-ou.mjs
