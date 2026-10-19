@@ -13,8 +13,8 @@ export const DEFAULT_TEMPLATES_FILE = fileURLToPath(new URL('../../../templates/
 export const REQUIRED_TEMPLATES = [
   'sync_failed', 'sync_failed_recovered', 'sync_anomaly', 'sync_anomaly_recovered',
   'worker_offline', 'sync_problem', 'worker_silent', 'sync_stale', 'full_stale', 'sync_run_aborted', 'ldap_error', 'dc_cert_expiring',
-  'canary_stale', 'dc_usn_stalled', 'escrow_broken', 'no_key_rising', 'audit_chain_broken',
-  'audit_chain_broken_recovered', 'recovered', 'key_duplicate', 'backup_failed', 'backup_failed_recovered', 'reveal_out_of_hours', 'key_export', 'new_objects', 'daily_report', 'smtp_test',
+  'canary_stale', 'dc_usn_stalled', 'escrow_broken', 'no_key_rising',
+  'recovered', 'key_duplicate', 'backup_failed', 'backup_failed_recovered', 'reveal_out_of_hours', 'key_export', 'new_objects', 'daily_report', 'smtp_test',
 ];
 
 /** Replaces {{name}} with vars[name]; unknown names stay as they are. */

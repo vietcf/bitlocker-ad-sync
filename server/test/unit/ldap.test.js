@@ -84,3 +84,14 @@ describe('LdapAuthenticator on a plain port', () => {
     expect(first).toBe(0x30); // an LDAP message (SEQUENCE); a TLS ClientHello would start with 0x16
   });
 });
+
+describe('SECRET_KEY config', () => {
+  const base = { NODE_ENV: 'development', DATABASE_URL: 'postgres://x', SESSION_SECRET: 'x'.repeat(32) };
+  it('takes SECRET_KEY, still accepts the old name LOG_HMAC_KEY, and needs one of them', async () => {
+    const { loadConfig } = await import('../../src/config.js');
+    expect(loadConfig({ ...base, SECRET_KEY: 'b'.repeat(64) }).SECRET_KEY).toBe('b'.repeat(64));
+    expect(loadConfig({ ...base, LOG_HMAC_KEY: 'c'.repeat(64) }).SECRET_KEY).toBe('c'.repeat(64));
+    expect(() => loadConfig(base)).toThrow(/SECRET_KEY/);
+    expect(() => loadConfig({ ...base, SECRET_KEY: 'short' })).toThrow();
+  });
+});

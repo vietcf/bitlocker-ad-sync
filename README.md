@@ -2,7 +2,7 @@
 
 Hệ thống đồng bộ BitLocker recovery key từ Active Directory (AD) về một database riêng. IT chi nhánh
 chỉ thấy key của máy thuộc chi nhánh mình. Mỗi lần hiện key phải chọn lý do và được ghi vào nhật ký
-có chuỗi hash, không sửa hay xóa được.
+chỉ thêm, không sửa hay xóa được.
 
 | Thư mục | Nội dung |
 | --- | --- |
@@ -151,7 +151,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
 - `SESSION_SECRET`: ký cookie phiên.
-- `LOG_HMAC_KEY`: khóa HMAC cho chuỗi hash nhật ký. **Sao lưu an toàn**: mất khóa thì nhật ký cũ không kiểm chứng được và mật khẩu SMTP, mật khẩu sao lưu, khóa 2 bước không đọc được (app vẫn chạy; cách xử lý ở mục 6.8). Không lưu trong DB.
+- `SECRET_KEY` (64 ký tự hex, trước đây tên `LOG_HMAC_KEY`, tên cũ vẫn dùng được): khóa mã hóa mật khẩu SMTP, mật khẩu sao lưu và khóa 2 bước lưu trong DB. Không lưu trong DB. Mất khóa thì app vẫn chạy, chỉ phải nhập lại các mật khẩu đó.
 - `INGEST_API_KEY`: API key của worker.
 
 ### 3.4. File `server/.env`
@@ -191,7 +191,7 @@ LDAP_BASE_DN=DC=corp,DC=local
 LOCAL_LOGIN_ENABLED=true                     # giữ để còn admin local khi AD lỗi
 
 SESSION_SECRET=<hex 64>
-LOG_HMAC_KEY=<hex 64>
+SECRET_KEY=<hex 64>
 SESSION_IDLE_MINUTES=15
 SESSION_MAX_HOURS=8
 
@@ -808,7 +808,7 @@ Watchdog chạy mỗi 5 phút và tách **hai loại sự cố**, mỗi loại m
 | --- | --- |
 | **Agent (worker) ngừng hoạt động** | Worker Offline |
 | **Kết nối AD và đồng bộ có vấn đề** | Đồng bộ AD có sự cố, sync lỗi, sync bất thường bị giữ lại, Key ID trùng |
-| **Xem key ngoài giờ và bảo mật dữ liệu** | Hiện key ngoài giờ, xuất key hàng loạt, chuỗi hash nhật ký gãy |
+| **Xem key ngoài giờ và bảo mật dữ liệu** | Hiện key ngoài giờ, xuất key hàng loạt |
 | **Sao lưu** | Một lượt sao lưu bị lỗi |
 
 Ngưỡng của watchdog (**Quản trị > Ngưỡng cảnh báo**):
@@ -848,7 +848,7 @@ Mọi cấu hình của Admin HQ nằm trong menu **Quản trị**, gom thành 4
 **Cách gửi mail**
 
 - Mọi email ghi vào bảng `mail_outbox` trước; job `mail-outbox` chạy mỗi phút để gửi. Lỗi tạm thời thử lại sau 1, 5, 15, 60, 240 phút, sau đó đánh dấu thất bại để Admin HQ gửi lại.
-- Mật khẩu SMTP mã hóa AES-256-GCM bằng khóa suy ra từ `LOG_HMAC_KEY`, không hiện lại (đổi `LOG_HMAC_KEY` thì nhập lại). Tắt mail server trong Quản trị thì app dùng `SMTP_URL` trong `.env` (nếu có); `NOTIFY_TO` luôn nhận email cảnh báo.
+- Mật khẩu SMTP mã hóa AES-256-GCM bằng khóa suy ra từ `SECRET_KEY`, không hiện lại (đổi `SECRET_KEY` thì nhập lại). Tắt mail server trong Quản trị thì app dùng `SMTP_URL` trong `.env` (nếu có); `NOTIFY_TO` luôn nhận email cảnh báo.
 - Mail server tắt hoặc chưa cấu hình: email nằm ở **Chờ gửi** và tự gửi khi bật.
 - **Máy mới / key mới**: sau mỗi lượt sync, mỗi người nhận **một** email gom các máy/key mới trong phạm vi của họ (IT, Trưởng IT: máy thuộc OU chi nhánh mình; Admin HQ: tất cả, kể cả N/A). Mặc định không gửi cho lượt full đầu tiên. Email ghi tên máy và Key ID đầy đủ; recovery password **không bao giờ gửi qua email**.
 - Chỉ người dùng đang hoạt động và có email mới nhận. Người lẽ ra nhận nhưng chưa có email được ghi trên đúng email đó ("Không có email: <tên>"). Không ai có email thì email lưu với trạng thái **Không gửi (thiếu email)** kèm nội dung (không tự gửi lại; thêm email ở Quản trị > Người dùng cho các lượt sau).
@@ -883,7 +883,7 @@ Mỗi máy có hai trường do người dùng nhập: **Serial máy** và **Ema
 
 Nội dung mọi email và tin Teams nằm trong **một file**: `server/templates/mail-templates.yaml`, có sẵn đủ mẫu tiếng Việt; chỉ sửa khi muốn đổi câu chữ. Đầu file có bảng giải thích từng mẫu và biến. Mỗi mẫu có `subject` và `body` (phần bạn sửa), cùng `used_by`, `sent_when`, `recipients`, `variables` để tra cứu.
 
-Các mẫu chính: `sync_failed`, `sync_anomaly`, `worker_offline`, `sync_problem`, `audit_chain_broken`, `backup_failed`, `key_duplicate`, `reveal_out_of_hours`, `key_export`, `new_objects`, `daily_report`, `smtp_test` (và bản `_recovered` của một số mẫu). Các điều kiện của watchdog (`sync_stale`, `ldap_error`...) không gửi mail riêng, chỉ hiện trong app và trong mail `sync_problem`. Mẫu cảnh báo (`kind: alert`) được thêm tiền tố `alert_subject_prefix` (`[BitLocker][HIGH] `...) ở dòng đầu file.
+Các mẫu chính: `sync_failed`, `sync_anomaly`, `worker_offline`, `sync_problem`, `backup_failed`, `key_duplicate`, `reveal_out_of_hours`, `key_export`, `new_objects`, `daily_report`, `smtp_test` (và bản `_recovered` của một số mẫu). Các điều kiện của watchdog (`sync_stale`, `ldap_error`...) không gửi mail riêng, chỉ hiện trong app và trong mail `sync_problem`. Mẫu cảnh báo (`kind: alert`) được thêm tiền tố `alert_subject_prefix` (`[BitLocker][HIGH] `...) ở dòng đầu file.
 
 **Cách sửa:** sửa `subject` / `body`, giữ tên mẫu và thụt lề YAML (`body: |` cho nhiều dòng); chỉ dùng biến có trong `variables` của mẫu (sai tên thì hiện nguyên `{{tên_sai}}`); không biến nào chứa recovery password. Lưu file là xong, **không cần khởi động lại**. File hỏng thì app giữ bản tốt trước đó và ghi lỗi `mail templates: bad edit ignored`; lúc khởi động, file hỏng làm app từ chối chạy. Thử bằng **Gửi thử** ở Quản trị > Mail server.
 
@@ -909,7 +909,7 @@ Tab Quản trị > Lưu trữ. Job `data-retention` chạy hằng ngày (mặc �
 
 Máy, recovery key và người dùng không bao giờ bị xóa.
 
-Nhật ký truy cập là append-only: app không có quyền DELETE, trigger chặn UPDATE / DELETE / TRUNCATE. Khi bật hạn lưu trữ, việc xóa chỉ đi qua hàm `purge_access_log()`: chỉ xóa **phần cũ nhất liên tục từ đầu chuỗi**, không xóa dòng mới nhất, và lưu mốc (hash dòng cuối bị xóa, số dòng, người chạy) vào `access_log_purge` để job kiểm tra chuỗi hash (02:00) vẫn kiểm chứng phần còn lại; xóa ngoài app bị phát hiện. Việc xóa được ghi nhật ký (`log_purge`). Nên lưu bản sao nhật ký ở nơi khác (hệ thống thu log, mục 6.15) trước khi bật.
+Nhật ký truy cập là append-only: app không có quyền DELETE, trigger chặn UPDATE / DELETE / TRUNCATE. Khi bật hạn lưu trữ, việc xóa chỉ đi qua hàm `purge_access_log()`: chỉ xóa **phần cũ nhất liên tục từ đầu chuỗi**, không xóa dòng mới nhất, và lưu mốc (số dòng, người chạy) vào `access_log_purge`. Việc xóa được ghi nhật ký (`log_purge`). Nên lưu bản sao nhật ký ở nơi khác (hệ thống thu log, mục 6.15) trước khi bật.
 
 ### 6.8. Sao lưu và khôi phục
 
@@ -954,33 +954,21 @@ Thêm vào `server/.env`: `BACKUP_DATABASE_URL=postgres://blk_backup:<mk>@<db-ho
 docker compose run --rm --no-deps server node src/cli/restore.js backups/bitlocker-db-20261018-013000.zip
 ```
 
-Lệnh hỏi mật khẩu của file, kiểm tra SHA-256, nạp dữ liệu, chạy migration và báo kết quả. DB đã có dữ liệu thì từ chối trừ khi thêm `--force`. Tùy chọn:
+Lệnh hỏi mật khẩu của file, kiểm tra SHA-256, nạp dữ liệu, chạy migration và báo kết quả (kèm các mật khẩu cần nhập lại). DB đã có dữ liệu thì từ chối trừ khi thêm `--force`. Tùy chọn:
 
 | Tùy chọn | Dùng khi |
 | --- | --- |
 | `--force` | Thay toàn bộ dữ liệu đang có (hỏi gõ lại tên DB; thêm `--yes` để bỏ hỏi) |
-| `--new-log-key` | `LOG_HMAC_KEY` khác bản lúc sao lưu: đặt lại mốc chuỗi nhật ký (xem dưới) |
 | `--reset-2fa` | Tắt xác thực 2 bước cho mọi user (khi 2 bước không đọc được hoặc mất điện thoại) |
 | `--reset-admin` | Cấp mật khẩu một lần mới cho admin gốc (in một lần, phải đổi khi đăng nhập) |
 
 Xong thì khởi động app, đăng nhập và chạy một lượt full. Mật khẩu file lấy từ ô nhập, hoặc biến `RESTORE_ZIP_PASSWORD`. Cần `pg_restore` 17 (đã có trong image). File zip lớn hơn 1,5 GB: giải nén bằng 7-Zip rồi `pg_restore --no-owner -d blk bitlocker.dump`.
 
-**`LOG_HMAC_KEY` không có hoặc khác bản cũ thì sao?** App vẫn chạy bình thường, dữ liệu máy và key còn nguyên. Chỉ ba thứ bị ảnh hưởng, lệnh khôi phục báo cụ thể:
-
-| Việc | Cách xử lý |
-| --- | --- |
-| Nhật ký báo "chuỗi gãy" | Chạy lại với `--new-log-key` (hoặc xem "Sửa chuỗi nhật ký gãy" dưới) |
-| Mật khẩu SMTP, mật khẩu sao lưu | Nhập lại ở Quản trị |
-| 2 bước của user | `--reset-2fa`, hoặc `users.js disable-2fa <user>` (mục 6.9) |
-
-**Sửa chuỗi nhật ký gãy.** Cảnh báo "chuỗi hash nhật ký gãy" nghĩa là có dòng không khớp chữ ký. Kiểm tra: `docker compose exec server node src/cli/audit.js verify` (in số dòng đã kiểm và dòng gãy đầu tiên).
-
-- **Nguyên nhân là đổi `LOG_HMAC_KEY`** (khôi phục sang máy chủ mới, mất khóa): các dòng cũ không còn kiểm chứng được bằng khóa mới, dữ liệu vẫn còn. Đặt mốc mới: `docker compose exec server node src/cli/audit.js reanchor --yes`. Các dòng cũ giữ nguyên nhưng không còn được kiểm tra; dòng mới chain từ mốc này. Lần đặt mốc được ghi vào nhật ký.
-- **Khóa không đổi mà vẫn gãy**: có thể ai đó đã sửa nhật ký trực tiếp trong DB. **Không đặt mốc**; giữ nguyên hiện trạng, so với bản sao lưu gần nhất và điều tra trước.
+**Sau khi khôi phục.** Các mật khẩu lưu mã hóa trong DB (SMTP, mật khẩu sao lưu, khóa 2 bước) chỉ đọc được trên máy cùng `SECRET_KEY` với bản sao lưu. Máy mới thì lệnh tự xóa những giá trị không đọc được và báo, bạn chỉ cần vào Quản trị nhập lại: mật khẩu mail server, mật khẩu sao lưu; user có 2 bước sẽ quét mã QR mới ở lần đăng nhập kế (hoặc `--reset-2fa` để tắt hẳn 2 bước). Dữ liệu máy, key, người dùng, nhật ký còn nguyên.
 
 **Sao lưu tay** trước khi nâng cấp: `pg_dump -U blk_backup -h <db-host> -d blk --format=custom -f bitlocker.dump`, rồi `7z a -tzip -mem=AES256 -p x.zip bitlocker.dump` và `shred -u bitlocker.dump`.
 
-Cất **tách khỏi** file sao lưu: `LOG_HMAC_KEY`, `server/.env`, mật khẩu sao lưu, `cert/` và cấu hình worker.
+Cất **tách khỏi** file sao lưu: `SECRET_KEY`, `server/.env`, mật khẩu sao lưu, `cert/` và cấu hình worker.
 
 ### 6.9. Quản lý người dùng bằng dòng lệnh
 
@@ -1109,7 +1097,7 @@ Trang hiện key cho thấy 8 nhóm số và tự ẩn sau 60 giây. **Sao chép
 
 - Lần đăng nhập đầu sau khi bật: nhập mật khẩu, quét **mã QR** (hoặc nhập khóa), nhập mã 6 số. Từ lần sau: mật khẩu rồi mã 6 số. Chưa đúng mã thì chưa đăng nhập; trang nhập mã hết hạn sau 5 phút.
 - Mã đổi mỗi 30 giây, **mỗi mã dùng một lần**. Sai mã tính như sai mật khẩu (xem khóa tài khoản).
-- Khóa bí mật được mã hóa (khóa suy ra từ `LOG_HMAC_KEY`) và không hiện lại; đổi `LOG_HMAC_KEY` thì mọi người phải thiết lập lại.
+- Khóa bí mật được mã hóa (khóa suy ra từ `SECRET_KEY`) và không hiện lại; đổi `SECRET_KEY` thì mọi người phải thiết lập lại.
 - **Mất / đổi điện thoại**: Admin HQ bấm **Đặt lại xác thực 2 bước** ở trang sửa người dùng (hoặc CLI `reset-2fa`, mục 6.9). Bỏ chọn ô Bắt buộc rồi lưu thì tắt hẳn.
 - API: `POST /api/auth/login` trả `{ secondFactor: 'setup' | 'code', csrfToken }`; lần đầu `GET /api/auth/2fa/setup`, rồi `POST /api/auth/2fa` `{ code }`. Tài khoản dùng cho script nên tắt 2 bước.
 
@@ -1133,7 +1121,6 @@ Ngoài log ứng dụng, app ghi ra **stdout** của container server, mỗi s�
 | `log_type` | Tương ứng | Khi nào |
 | --- | --- | --- |
 | `audit` | Nhật ký truy cập | Ngay khi dòng nhật ký được lưu (kèm `id`) |
-| `audit_chain_check` | | Mỗi lần kiểm tra chuỗi hash |
 | `mail` | Log email | Mỗi lần đổi trạng thái của email |
 | `sync_run` | Danh sách lượt sync | Mở, kết thúc, bị giữ lại, đã quyết định |
 | `alert` | Cảnh báo | Mở, đã gửi, đã đóng |
@@ -1148,7 +1135,6 @@ Mỗi job có giờ / chu kỳ mặc định, chỉnh ngay trên trang của job
 | --- | --- | --- |
 | Gửi mail đang chờ | mỗi **1 phút** (1–60) | Quản trị > Mail server |
 | Watchdog | mỗi **5 phút** (1–60) | Quản trị > Ngưỡng cảnh báo |
-| Kiểm tra chuỗi hash nhật ký | **02:00** | Quản trị > Bảo mật |
 | Dọn dữ liệu quá hạn | **03:00** | Quản trị > Lưu trữ |
 | Báo cáo email hằng ngày | **07:30** (tắt) | Quản trị > Thông báo |
 | Sao lưu | **01:30** (tắt) | Quản trị > Sao lưu |
@@ -1175,7 +1161,6 @@ Giờ đọc AD của **worker** (delta 15 phút, full 01:00, heartbeat 5 phút)
 | Lượt sync lỗi `ldap_search_base_failed` | Một OU trong `SearchBases` không tồn tại, bị đổi tên/di chuyển, hoặc tài khoản worker không có quyền đọc | Log worker ghi tên OU. Chạy `check` để xem OU nào `FAIL`, sửa `SearchBases` hoặc cấp quyền (mục 4.1) |
 | Trang Tổng quan báo dữ liệu có thể đã cũ | Worker dừng, lỗi, hoặc lượt sync bị giữ lại | Xem Quản trị > Sync AD và log worker; ngưỡng ở Quản trị > Ngưỡng cảnh báo |
 | Quên mật khẩu, mất điện thoại 2 bước, web hỏng | | CLI trên máy chủ: `reset-password`, `reset-2fa`, `disable-2fa`, `unlock` (mục 6.9) |
-| Cảnh báo "chuỗi hash nhật ký gãy" | Đổi `LOG_HMAC_KEY` (máy mới, khôi phục), hoặc nhật ký bị sửa trong DB | `audit.js verify`; nếu chỉ do đổi khóa thì `audit.js reanchor --yes` (mục 6.8) |
 | Sao lưu lỗi hoặc "Đang sao lưu" mãi | `pg_dump` lỗi, hết đĩa, sai `BACKUP_DATABASE_URL` | Xem "Lần chạy gần nhất" ở Quản trị > Sao lưu và log server (mục 6.8) |
 | Không nhận được email | Chưa bật mail server, sai SMTP, hoặc người nhận chưa có email | Quản trị > Mail server > **Gửi thử** để xem lỗi; Quản trị > Log email xem trạng thái và lỗi từng mail; kiểm tra email của user ở Quản trị > Người dùng |
 | App không khởi động, log nhắc `mail-templates.yaml` | File mẫu email hỏng hoặc thiếu mẫu | Sửa theo thông báo (tên mẫu thiếu), hoặc lấy lại file mẫu gốc trong repo (mục 6.6) |
@@ -1208,7 +1193,7 @@ Giờ đọc AD của **worker** (delta 15 phút, full 01:00, heartbeat 5 phút)
 | `LOCAL_LOGIN_ENABLED` | `true` | Cho phép đăng nhập bằng tài khoản local |
 | `SESSION_SECRET` | | 32 ký tự trở lên |
 | `SESSION_IDLE_MINUTES`, `SESSION_MAX_HOURS` | `15`, `8` | Thời gian chờ và thời gian tối đa của phiên (mặc định; Admin HQ đổi được ở Quản trị > Bảo mật) |
-| `LOG_HMAC_KEY` | | 64 ký tự hex |
+| `SECRET_KEY` | | 64 ký tự hex (tên cũ `LOG_HMAC_KEY` vẫn nhận) |
 | `BACKUP_DIR` | `backups` | Thư mục ghi file sao lưu (mục 6.8) |
 | `BACKUP_DATABASE_URL` | | Tài khoản chỉ đọc `blk_backup` cho `pg_dump`; bỏ trống thì không sao lưu database |
 | `PG_DUMP_PATH` | `pg_dump` | Đường dẫn `pg_dump` bản 17 (khi chạy ngoài Docker) |
@@ -1313,7 +1298,7 @@ services.js             tạo mọi service một lần; web, API, ingest, job v
 api/index.js            router /api: phiên đăng nhập, chỉ nhận JSON, CSRF header, lỗi dạng JSON
 web/                    router trang web, biến dùng chung cho template, flash, dịch lỗi sang tiếng Việt (messages.js)
 ingest/ingest.app.js    API cho worker trên cổng riêng (API key + lọc IP; HTTPS ở nginx)
-jobs/                   lịch chạy job (mỗi job một instance nhờ advisory lock), watchdog sync, kiểm tra chuỗi hash
+jobs/                   lịch chạy job (mỗi job một instance nhờ advisory lock), watchdog sync
 http/                   AppError, kiểm tra dữ liệu (zod), CSRF, header bảo mật
 db/                     pool, chạy migration, withScope (phạm vi RLS theo transaction), dữ liệu mẫu
 domain/                 vai trò -> quyền -> tập chi nhánh; giờ làm việc

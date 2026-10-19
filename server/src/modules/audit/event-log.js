@@ -6,7 +6,6 @@ import { runRef } from '../sync/run-ref.js';
 // screens show as a log, so a collector that reads the container's stdout (a SIEM, a log shipper) has them all.
 // Each line has "log_type" to filter on:
 //   audit             a row of the Nhat ky (access_log), the fields the screen shows, with its id
-//   audit_chain_check the daily result of the hash chain check
 //   mail              a change of state of an e-mail (queued, sent, retry, failed, no_recipient...)
 //   sync_run          a sync run opened / finished / decided
 //   alert             a sync / system alert opened, notified or resolved

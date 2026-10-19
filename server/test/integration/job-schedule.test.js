@@ -69,7 +69,6 @@ describe('job schedule settings', () => {
   it('have defaults, and a wrong stored value falls back to the default', async () => {
     expect(await jobMinutes(services.settings, JOB_SCHEDULE.mailIntervalMinutes)).toBe(1);
     expect(await jobMinutes(services.settings, JOB_SCHEDULE.watchdogIntervalMinutes)).toBe(5);
-    expect(await jobTime(services.settings, JOB_SCHEDULE.chainCheckTime)).toBe('02:00');
     expect(await jobTime(services.settings, JOB_SCHEDULE.retentionTime)).toBe('03:00');
     await services.settings.set(JOB_SCHEDULE.mailIntervalMinutes.key, 0);
     await services.settings.set(JOB_SCHEDULE.retentionTime.key, '25:99');
@@ -79,11 +78,10 @@ describe('job schedule settings', () => {
 });
 
 describe('Quan tri: job schedules on their pages', () => {
-  it('show the defaults and save changes (mail interval, clean-up time, chain check time, watchdog interval)', async () => {
+  it('show the defaults and save changes (mail interval, clean-up time, watchdog interval)', async () => {
     const web = await webLogin(app, 'admin.hq');
     expect((await web.agent.get('/admin/settings/mail-server')).text).toMatch(/name="sendIntervalMinutes" value="1"/);
     expect((await web.agent.get('/admin/settings/retention')).text).toMatch(/name="runAt" value="03:00"/);
-    expect((await web.agent.get('/admin/settings/security')).text).toMatch(/name="chainCheckTime" value="02:00"/);
     expect((await web.agent.get('/admin/settings/thresholds')).text).toContain('Watchdog kiểm tra mỗi (phút)');
 
     const smtp = { _csrf: web.csrf, host: 'smtp.corp.local', port: '25', security: 'none', from: 'bl@corp.local', sendIntervalMinutes: '10' };
@@ -95,21 +93,20 @@ describe('Quan tri: job schedules on their pages', () => {
     expect((await web.agent.post('/admin/settings/retention').type('form').send(retention)).status).toBe(302);
     expect((await web.agent.post('/admin/settings/retention').type('form').send({ ...retention, runAt: '25:00' })).status).toBe(400);
 
-    const security = { _csrf: web.csrf, pwMinLength: '12', idleMinutes: '15', maxHours: '8', chainCheckTime: '01:15' };
+    const security = { _csrf: web.csrf, pwMinLength: '12', idleMinutes: '15', maxHours: '8' };
     expect((await web.agent.post('/admin/settings/security').type('form').send(security)).status).toBe(302);
-    expect((await web.agent.post('/admin/settings/security').type('form').send({ ...security, chainCheckTime: 'xx' })).status).toBe(400);
+    expect((await web.agent.post('/admin/settings/security').type('form').send({ ...security, pwMinLength: 'xx' })).status).toBe(400);
 
     services.settings.invalidate();
     expect(await jobMinutes(services.settings, JOB_SCHEDULE.mailIntervalMinutes)).toBe(10);
     expect(await jobTime(services.settings, JOB_SCHEDULE.retentionTime)).toBe('04:30');
-    expect(await jobTime(services.settings, JOB_SCHEDULE.chainCheckTime)).toBe('01:15');
     // The interval does not end up in the SMTP settings object.
     const [{ value }] = await asOwner(`SELECT value FROM app_setting WHERE key = 'mail.smtp'`);
     expect(value).not.toHaveProperty('sendIntervalMinutes');
     const log = await asOwner(`SELECT detail FROM access_log WHERE action = 'admin_change' ORDER BY id`);
     expect(log.some((l) => l.detail.op === 'settings_smtp' && l.detail.sendIntervalMinutes === 10)).toBe(true);
     expect(log.some((l) => l.detail.op === 'settings_retention' && l.detail.runAt === '04:30')).toBe(true);
-    expect(log.some((l) => l.detail.op === 'settings_security' && l.detail.chainCheckTime === '01:15')).toBe(true);
+    expect(log.some((l) => l.detail.op === 'settings_security')).toBe(true);
   });
 
   it('the watchdog interval is a threshold with its default and limits', async () => {

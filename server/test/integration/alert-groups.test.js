@@ -27,7 +27,7 @@ describe('alert mails in three groups', () => {
     expect(alertGroupOf('worker_offline')).toBe('agent');
     expect(alertGroupOf('worker_offline_recovered')).toBe('agent');
     for (const t of ['sync_problem', 'sync_failed', 'sync_anomaly', 'key_duplicate', 'something_new']) expect(alertGroupOf(t)).toBe('ad');
-    for (const t of ['reveal_out_of_hours', 'key_export', 'audit_chain_broken']) expect(alertGroupOf(t)).toBe('key');
+    for (const t of ['reveal_out_of_hours', 'key_export']) expect(alertGroupOf(t)).toBe('key');
     for (const t of ['backup_failed', 'backup_failed_recovered']) expect(alertGroupOf(t)).toBe('backup');
   });
 

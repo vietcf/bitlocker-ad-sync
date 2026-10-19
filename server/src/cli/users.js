@@ -33,7 +33,7 @@ const ROLES = ['it', 'lead', 'admin', 'auditor'];
 
 const config = loadConfig();
 const pool = createPool(config);
-const audit = new AuditService({ pool, hmacKey: Buffer.from(config.LOG_HMAC_KEY, 'hex') });
+const audit = new AuditService({ pool });
 
 function fail(message) {
   console.error(message);

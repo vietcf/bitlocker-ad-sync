@@ -11,13 +11,12 @@ import { createIngestApp } from './ingest/ingest.app.js';
 import { DEFAULT_ADMIN, ensureDefaultAdmin } from './modules/auth/users.repo.js';
 import { Scheduler } from './jobs/scheduler.js';
 import { JOB_SCHEDULE, jobMinutes, jobTime } from './jobs/job-schedule.js';
-import { runChainCheck, runSyncWatchdog } from './jobs/watchdog.js';
+import { runSyncWatchdog } from './jobs/watchdog.js';
 
 const config = loadConfig();
 const logger = createLogger(config.LOG_LEVEL);
 const pool = createPool(config);
-const hmacKey = Buffer.from(config.LOG_HMAC_KEY, 'hex');
-const services = createServices({ config, pool, logger, hmacKey });
+const services = createServices({ config, pool, logger, secret: Buffer.from(config.SECRET_KEY, 'hex') });
 
 // After a reboot the database may still be starting: wait for it (up to 2 minutes) instead of exiting.
 for (let attempt = 1; ; attempt++) {
@@ -75,7 +74,6 @@ if (config.JOBS_ENABLED) {
   const { settings } = services;
   scheduler.every('sync-watchdog', () => jobMinutes(settings, JOB_SCHEDULE.watchdogIntervalMinutes),
     () => runSyncWatchdog({ pool, alerts: services.alerts, settings }));
-  scheduler.daily('audit-chain-check', () => jobTime(settings, JOB_SCHEDULE.chainCheckTime), () => runChainCheck(services));
   // Mail outbox: send what is due every minute.
   scheduler.every('mail-outbox', () => jobMinutes(settings, JOB_SCHEDULE.mailIntervalMinutes), () => services.mail.processOutbox(), 10_000);
   // Daily report for Admin HQ: checks every minute, sends once a day at the configured time.

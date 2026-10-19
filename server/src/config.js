@@ -58,8 +58,10 @@ const schema = z
     // Secure cookies need HTTPS (the reverse proxy). Defaults to on in production.
     COOKIE_SECURE: bool.optional(),
 
-    // HMAC key for the access_log hash chain. Lives on the app server only, never in the DB.
-    LOG_HMAC_KEY: z.string().regex(/^[0-9a-fA-F]{64}$/, 'LOG_HMAC_KEY must be 32 bytes hex'),
+    // 32 random bytes (64 hex digits): encrypts the secrets kept in the database (SMTP and backup passwords,
+    // two-step keys). Lives on the app server only, never in the DB. LOG_HMAC_KEY is the old name of the same key.
+    SECRET_KEY: z.string().regex(/^[0-9a-fA-F]{64}$/, 'SECRET_KEY must be 32 bytes hex').optional(),
+    LOG_HMAC_KEY: z.string().regex(/^[0-9a-fA-F]{64}$/, 'LOG_HMAC_KEY must be 32 bytes hex').optional(),
 
     // Alerts: e-mail via SMTP (e.g. smtp://relay.corp.local:25) and/or a Teams incoming webhook.
     SMTP_URL: z.string().optional(),
@@ -83,6 +85,7 @@ const schema = z
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
   })
   .superRefine((c, ctx) => {
+    if (!c.SECRET_KEY && !c.LOG_HMAC_KEY) ctx.addIssue({ code: 'custom', path: ['SECRET_KEY'], message: 'SECRET_KEY is required (32 bytes hex)' });
     if (c.LDAP_SERVERS.length) {
       for (const k of ['LDAP_DOMAIN', 'LDAP_BASE_DN']) {
         if (!c[k]) ctx.addIssue({ code: 'custom', path: [k], message: `${k} is required when LDAP_SERVERS is set` });
@@ -122,7 +125,7 @@ export function loadConfig(env = process.env) {
     const problems = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('\n  ');
     throw new Error(`Invalid configuration:\n  ${problems}`);
   }
-  return parsed.data;
+  return { ...parsed.data, SECRET_KEY: parsed.data.SECRET_KEY ?? parsed.data.LOG_HMAC_KEY };
 }
 
 /** True when LDAP sign-in is sent without encryption (password in clear text). */

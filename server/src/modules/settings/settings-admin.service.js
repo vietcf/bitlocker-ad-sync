@@ -84,8 +84,6 @@ const securityInput = z.object({
   lockAttempts: z.coerce.number().int().min(LOCKOUT_LIMITS.maxAttempts[0]).max(LOCKOUT_LIMITS.maxAttempts[1]).default(LOCKOUT_DEFAULTS.maxAttempts),
   lockMinutes: z.coerce.number().int().min(LOCKOUT_LIMITS.lockMinutes[0]).max(LOCKOUT_LIMITS.lockMinutes[1]).default(LOCKOUT_DEFAULTS.lockMinutes),
   lockAdmin: checkbox,
-  // Time of day of the daily check of the access log's hash chain.
-  chainCheckTime: z.string().trim().regex(TIME_OF_DAY, 'invalid_time').default(JOB_SCHEDULE.chainCheckTime.default),
 });
 
 const days = ([min, max]) => z.coerce.number().int().min(min).max(max);
@@ -159,7 +157,6 @@ export class SettingsAdminService {
       maxHours: Number(await this.settings.get('session.max_hours', this.sessionDefaults.maxHours)),
       defaults: this.sessionDefaults,
       limits: { ...SESSION_LIMITS, pwMinLength: PASSWORD_LENGTH_LIMITS },
-      chainCheckTime: await jobTime(this.settings, JOB_SCHEDULE.chainCheckTime),
       lockout: await loadLockoutPolicy(this.settings),
       lockoutLimits: LOCKOUT_LIMITS,
       password: await loadPasswordPolicy(this.settings),
@@ -177,10 +174,9 @@ export class SettingsAdminService {
     await this.settings.set('session.idle_minutes', input.idleMinutes);
     await this.settings.set('session.max_hours', input.maxHours);
     await this.settings.set('password.policy', password);
-    await this.settings.set(JOB_SCHEDULE.chainCheckTime.key, input.chainCheckTime);
     const lockout = { enabled: input.lockEnabled, maxAttempts: input.lockAttempts, lockMinutes: input.lockMinutes, applyToAdmin: input.lockAdmin };
     await this.settings.set('security.lockout', lockout);
-    await this.#log(scope, client, { op: 'settings_security', idleMinutes: input.idleMinutes, maxHours: input.maxHours, chainCheckTime: input.chainCheckTime, lockout, password });
+    await this.#log(scope, client, { op: 'settings_security', idleMinutes: input.idleMinutes, maxHours: input.maxHours, lockout, password });
   }
 
   /** Builds and queues the daily report now ("Gui thu ngay"); does not count as today's report. */

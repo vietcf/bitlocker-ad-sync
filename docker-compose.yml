@@ -84,7 +84,7 @@ services:
       INGEST_TRUST_PROXY: "1"
       COOKIE_SECURE: "true"
       SESSION_SECRET: dev-only-session-secret-change-me-0000000000
-      LOG_HMAC_KEY: "0000000000000000000000000000000000000000000000000000000000000001"
+      SECRET_KEY: "0000000000000000000000000000000000000000000000000000000000000001"
       # Backups (Quan tri > Sao luu): encrypted zip files in ./backups; pg_dump uses the read-only role blk_backup.
       BACKUP_DIR: /app/backups
       BACKUP_DATABASE_URL: postgres://blk_backup:${BLK_BACKUP_PASSWORD:-dev_backup_pw}@db:5432/blk

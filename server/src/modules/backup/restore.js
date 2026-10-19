@@ -89,29 +89,47 @@ export function readBackup(zipPath, password) {
   return { dump: files['bitlocker.dump'], manifest };
 }
 
-/** Counts of encrypted values (SMTP / backup passwords, 2-step secrets) this LOG_HMAC_KEY cannot read. */
-async function checkSecrets(pool, hmacKey) {
-  const key = secretKey(hmacKey);
+/**
+ * Encrypted values this server cannot read (SMTP and backup passwords, two-step keys: the backup was made on a server
+ * with another secret key) are cleared, so they can be entered again after signing in instead of failing later.
+ * Returns { settings: [names], totpUsers: n }.
+ */
+async function clearUnreadableSecrets(pool, secret) {
+  const key = secretKey(secret);
   const unreadable = (value) => { try { decryptSecret(key, value); return false; } catch { return true; } };
-  const settings = [];
-  const walk = (name, v) => {
-    if (typeof v === 'string' && v.startsWith('enc:v1:')) { if (unreadable(v)) settings.push(name); } else if (v && typeof v === 'object') for (const x of Object.values(v)) walk(name, x);
+  const cleared = new Set();
+  const scrub = (name, v) => {
+    if (typeof v === 'string' && v.startsWith('enc:v1:')) {
+      if (!unreadable(v)) return v;
+      cleared.add(name);
+      return null;
+    }
+    if (Array.isArray(v)) return v.map((x) => scrub(name, x));
+    if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, scrub(name, x)]));
+    return v;
   };
-  for (const r of (await pool.query('SELECT key, value FROM app_setting')).rows) walk(r.key, r.value);
-  let totp = 0;
-  for (const r of (await pool.query('SELECT totp_secret FROM app_user WHERE totp_secret IS NOT NULL')).rows) if (unreadable(r.totp_secret)) totp += 1;
-  return { settings: [...new Set(settings)], totpUsers: totp };
+  for (const r of (await pool.query('SELECT key, value FROM app_setting')).rows) {
+    const next = scrub(r.key, r.value);
+    if (cleared.has(r.key)) await pool.query('UPDATE app_setting SET value = $2::jsonb WHERE key = $1', [r.key, JSON.stringify(next)]);
+  }
+  let totpUsers = 0;
+  for (const r of (await pool.query('SELECT id, totp_secret FROM app_user WHERE totp_secret IS NOT NULL')).rows) {
+    if (!unreadable(r.totp_secret)) continue;
+    // Two-step sign-in stays required: the user scans a new QR code at the next sign-in.
+    await pool.query('UPDATE app_user SET totp_secret = NULL, totp_enrolled_at = NULL, totp_last_step = NULL WHERE id = $1', [r.id]);
+    totpUsers += 1;
+  }
+  return { settings: [...cleared], totpUsers };
 }
 
 /**
  * Restores a database backup (bitlocker-db-*.zip) into the database of ownerUrl (blk_owner), runs the migrations,
- * and reports what still needs attention. Empty target (a fresh schema is fine) restores directly; a target that
- * holds data needs force. newLogKey: LOG_HMAC_KEY is not the one the backup was made with, so the log chain is
- * re-anchored here. reset2fa: turn two-step sign-in off for everybody. resetAdmin: new one-time password for the
+ * and reports what still needs attention (passwords that must be entered again). Empty target (a fresh schema is fine) restores directly; a target that
+ * holds data needs force. reset2fa: turn two-step sign-in off for everybody. resetAdmin: new one-time password for the
  * original admin.
  */
 export async function restoreDatabase({
-  zipPath, password = null, ownerUrl, hmacKey, tz, force = false, newLogKey = false, reset2fa = false, resetAdmin = false,
+  zipPath, password = null, ownerUrl, secret, tz, force = false, reset2fa = false, resetAdmin = false,
   pgRestore = runPgRestore, say = () => {},
 }) {
   say('Reading the backup...');
@@ -145,15 +163,8 @@ export async function restoreDatabase({
 
   const pool = new pg.Pool({ connectionString: ownerUrl, max: 2 });
   try {
-    const audit = new AuditService({ pool, hmacKey, tz });
-    let chain = await audit.verify();
-    let reanchored = false;
-    if (!chain.ok && newLogKey) {
-      await audit.reanchor('restore (new LOG_HMAC_KEY)');
-      chain = await audit.verify();
-      reanchored = true;
-    }
-    const secrets = await checkSecrets(pool, hmacKey);
+    const audit = new AuditService({ pool, tz });
+    const secrets = await clearUnreadableSecrets(pool, secret);
 
     let twoFactorOff = 0;
     if (reset2fa) {
@@ -180,9 +191,9 @@ export async function restoreDatabase({
     const counts = { computers: await count('computer'), keys: await count('recovery_key'), users: await count('app_user') };
     await audit.log({
       userSid: 'cli', userUpn: 'cli', action: 'admin_change',
-      detail: { op: 'restore_database', file: path.basename(zipPath), backupCreatedAt: manifest?.createdAt ?? null, reset2fa, resetAdmin, newLogKey: reanchored },
+      detail: { op: 'restore_database', file: path.basename(zipPath), backupCreatedAt: manifest?.createdAt ?? null, reset2fa, resetAdmin, clearedSecrets: secrets.settings, twoFactorReenroll: secrets.totpUsers },
     });
-    return { backupCreatedAt: manifest?.createdAt ?? null, counts, migrated, chain, reanchored, secrets, twoFactorOff, adminReset };
+    return { backupCreatedAt: manifest?.createdAt ?? null, counts, migrated, secrets, twoFactorOff, adminReset };
   } finally {
     await pool.end();
   }

@@ -799,7 +799,7 @@ paths:
                 alertsAdEnabled: { type: boolean, description: Mail when the connection to AD or the sync has a problem. }
                 alertsAdAdmins: { type: boolean }
                 alertsAdExtra: { type: array, items: { type: string, format: email } }
-                alertsKeyEnabled: { type: boolean, description: Mail for keys revealed out of working hours, key exports, a broken log chain. }
+                alertsKeyEnabled: { type: boolean, description: Mail for keys revealed out of working hours and key exports. }
                 alertsKeyAdmins: { type: boolean }
                 alertsKeyExtra: { type: array, items: { type: string, format: email } }
                 alertsBackupEnabled: { type: boolean, description: Mail when a backup run fails. }

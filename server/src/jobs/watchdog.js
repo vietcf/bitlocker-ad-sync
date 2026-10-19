@@ -144,15 +144,3 @@ export async function runSyncWatchdog({ pool, alerts, settings }) {
   return { raised, workerOffline, problems: problems.map((p) => p.type) };
 }
 
-/** Daily audit-chain verification. */
-export async function runChainCheck({ audit, alerts, eventLog = null }) {
-  const r = await audit.verify();
-  // Event line with the result of the check.
-  eventLog?.emit('audit_chain_check', { ok: r.ok, rows_checked: r.checked, broken_at_id: r.brokenAtId ?? null, problem: r.problem ?? null });
-  if (r.ok) {
-    await alerts.clear('audit_chain_broken', { rows: r.checked });
-  } else {
-    await alerts.raise('audit_chain_broken', 'high', { rowId: r.brokenAtId, problem: r.problem }, { brokenAtId: r.brokenAtId });
-  }
-  return r;
-}

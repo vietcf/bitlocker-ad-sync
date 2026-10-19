@@ -68,7 +68,7 @@ export function buildApp(pool, { notifier: ownNotifier, logger: ownLogger } = {}
   const directory = fakeDirectory();
   const smtp = fakeMailTransport();
   const services = createServices({
-    config: { ...config, LDAP_DOMAIN: 'corp.local' }, pool, logger, hmacKey: HMAC_KEY, notifier, ldap: directory, mailTransport: smtp.create,
+    config: { ...config, LDAP_DOMAIN: 'corp.local' }, pool, logger, secret: HMAC_KEY, notifier, ldap: directory, mailTransport: smtp.create,
   });
   return {
     app: createUserApp({ config, pool, logger, services }),

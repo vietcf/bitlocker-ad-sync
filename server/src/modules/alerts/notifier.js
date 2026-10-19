@@ -8,7 +8,7 @@ export const ALERT_MAIL_DEFAULTS = {
  * The alert mails are in four groups, each with its own options (Quan tri > Thong bao):
  *  agent  the sync worker stopped (no heartbeat);
  *  ad     the connection to AD or the sync has a problem (failed / held runs, LDAPS, certificate, duplicate Key IDs...);
- *  key    keys seen out of working hours, key exports, a broken log chain;
+ *  key    keys seen out of working hours, key exports;
  *  backup a backup that failed.
  * A type not listed (and every "<type>_recovered") goes with its base type; an unknown type goes to 'ad'.
  */
@@ -25,8 +25,8 @@ export const ALERT_GROUPS = {
   },
   key: {
     label: 'Xem key ngoài giờ và bảo mật dữ liệu',
-    help: 'Hiện key ngoài giờ làm việc, xuất key hàng loạt, chuỗi hash nhật ký bị gãy.',
-    types: ['reveal_out_of_hours', 'key_export', 'audit_chain_broken'],
+    help: 'Hiện key ngoài giờ làm việc, xuất key hàng loạt.',
+    types: ['reveal_out_of_hours', 'key_export'],
   },
   backup: {
     label: 'Sao lưu',

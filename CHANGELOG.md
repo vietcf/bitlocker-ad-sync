@@ -13,6 +13,25 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.0.0] - 2026-10-19
+
+### Bỏ
+
+- **Chuỗi hash của nhật ký truy cập** và mọi thứ đi kèm: kiểm tra hằng ngày, cảnh báo "chuỗi hash nhật ký gãy", ô giờ kiểm tra ở
+  Quản trị > Bảo mật, lệnh `audit.js`. Nhật ký vẫn chỉ thêm (trigger chặn sửa và xóa; xóa theo hạn lưu trữ qua hàm riêng), chỉ
+  không còn ký HMAC từng dòng.
+
+### Đổi
+
+- Khóa `LOG_HMAC_KEY` đổi tên `SECRET_KEY` (tên cũ vẫn nhận). Khóa chỉ còn dùng mã hóa mật khẩu SMTP, mật khẩu sao lưu và khóa 2 bước.
+- Khôi phục database không còn nhắc tới khóa: các mật khẩu không đọc được bị xóa để nhập lại sau khi vào.
+
+### Khi nâng cấp
+
+- Migration 033 xóa cột `prev_hash`, `hash` của `access_log` và `last_hash` của `access_log_purge` (không hoàn tác được; sao lưu DB trước).
+- `server/.env`: đổi `LOG_HMAC_KEY` thành `SECRET_KEY` cùng giá trị (không bắt buộc, tên cũ vẫn chạy). Giữ nguyên giá trị để
+  các mật khẩu đã lưu vẫn đọc được.
+
 ## [1.1.0] - 2026-10-18
 
 ### Thêm
@@ -20,7 +39,7 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 - Khôi phục database một lệnh: `node src/cli/restore.js <file.zip>` (kiểm tra mật khẩu và SHA-256, nạp dữ liệu, chạy migration, báo
   nhật ký và các bí mật không đọc được). Tùy chọn `--force`, `--new-log-key`, `--reset-2fa`, `--reset-admin`. Không cần `LOG_HMAC_KEY`
   cũ để app chạy.
-- `node src/cli/audit.js verify | reanchor --yes`: kiểm tra chuỗi hash nhật ký và đặt mốc mới sau khi đổi `LOG_HMAC_KEY`.
+- `node src/cli/audit.js verify | reanchor --yes`: kiểm tra chuỗi hash nhật ký và đặt mốc mới sau khi đổi khóa (bỏ ở 2.0.0).
 
 ### Khi nâng cấp
 
@@ -76,6 +95,7 @@ mới được kiểm thử trên mô phỏng và kết nối thử, chưa qua m
 - `server/.env`: `LDAP_URL` đã bỏ, thay bằng `LDAP_SERVERS` và `LDAP_PROTOCOL` (ví dụ `LDAP_SERVERS=dc01.corp.local`).
 - Script gọi API bằng tài khoản AD phải chuyển sang tài khoản local.
 
-[Chưa phát hành]: https://github.com/vietcf/bitlocker-ad-sync/compare/v1.1.0...HEAD
+[Chưa phát hành]: https://github.com/vietcf/bitlocker-ad-sync/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v2.0.0
 [1.1.0]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v1.1.0
 [1.0.0]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v1.0.0

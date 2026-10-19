@@ -27,12 +27,12 @@ import { RetentionService } from './modules/settings/retention.service.js';
  * Builds every service once. Web routes, API routes, the ingest app, jobs and the CLI all
  * use these same instances: the business rules live here and nowhere else.
  */
-export function createServices({ config, pool, logger, hmacKey, notifier, ldap, mailTransport, eventWrite = null }) {
+export function createServices({ config, pool, logger, secret, notifier, ldap, mailTransport, eventWrite = null }) {
   // Event lines on stdout (audit, mail, sync_run, alert), in the background. Not in tests (they would flood the output).
   const eventLog = new EventLog({ write: eventWrite, enabled: config.NODE_ENV !== 'test' });
   const settings = new SettingsService(pool);
-  const audit = new AuditService({ pool, hmacKey, settings, eventLog, tz: config.APP_TZ });
-  const secretKey = deriveSecretKey(hmacKey);
+  const audit = new AuditService({ pool, settings, eventLog, tz: config.APP_TZ });
+  const secretKey = deriveSecretKey(secret);
   // Text of every mail: templates/mail-templates.yaml (or MAIL_TEMPLATES_FILE). Throws if it is broken.
   const templates = new MailTemplates({ file: config.MAIL_TEMPLATES_FILE ?? DEFAULT_TEMPLATES_FILE, logger });
   // Every e-mail goes through the outbox (mail_outbox); the mail-outbox job sends it.

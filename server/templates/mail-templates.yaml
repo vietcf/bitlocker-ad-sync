@@ -301,27 +301,6 @@ templates:
     body: |
       {{branches}}
 
-  audit_chain_broken:
-    kind: alert
-    used_by: Kiểm tra chuỗi hash nhật ký (job audit-chain-check, 02:00 hằng ngày)
-    sent_when: Chuỗi hash của nhật ký truy cập không khớp (có dòng bị sửa hoặc xóa).
-    recipients: Quản trị > Thông báo > Cảnh báo hệ thống
-    variables: [rowId, problem]
-    subject: "Chuỗi hash nhật ký truy cập bị gãy"
-    body: |
-      Phát hiện tại dòng #{{rowId}} ({{problem}}). Có thể nhật ký đã bị sửa hoặc xóa.
-      Đối chiếu với bản lưu trên SIEM.
-
-  audit_chain_broken_recovered:
-    kind: alert
-    used_by: Kiểm tra chuỗi hash nhật ký
-    sent_when: Chuỗi kiểm tra lại hợp lệ sau cảnh báo audit_chain_broken.
-    recipients: như audit_chain_broken
-    variables: [rows, alertSubject]
-    subject: "Đã khôi phục: {{alertSubject}}"
-    body: |
-      Chuỗi hash nhật ký truy cập hợp lệ ({{rows}} dòng).
-
   # Dung cho moi thong bao "da khoi phuc" khac (cac canh bao watchdog tu het).
   recovered:
     kind: alert

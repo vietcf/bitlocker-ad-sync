@@ -2,8 +2,7 @@ import { withScope } from '../../db/scoped.js';
 import { branchesFor } from '../../domain/scope.js';
 import { forbidden, featureDisabled } from '../../http/errors.js';
 import { csvCell } from '../../http/csv.js';
-import { appendLog, readChainPage, rowToEntry, searchLog } from './audit.repo.js';
-import { GENESIS_HASH, verifyChain } from './chain.js';
+import { appendLog, searchLog } from './audit.repo.js';
 
 export const AUDIT_ACTIONS = [
   'login',
@@ -43,10 +42,9 @@ import { PAGE_SIZES, pageSize } from '../settings/page-size.js';
 const CSV_MAX_ROWS = 50_000;
 
 export class AuditService {
-  constructor({ pool, hmacKey, settings = null, eventLog = null, tz = process.env.APP_TZ ?? 'Asia/Ho_Chi_Minh' }) {
+  constructor({ pool, settings = null, eventLog = null, tz = process.env.APP_TZ ?? 'Asia/Ho_Chi_Minh' }) {
     this.tz = tz;
     this.pool = pool;
-    this.hmacKey = hmacKey;
     this.settings = settings;
     this.eventLog = eventLog;
   }
@@ -57,7 +55,7 @@ export class AuditService {
    */
   async append(tx, entry) {
     const row = { ...EMPTY, ...entry };
-    const written = await appendLog(tx, this.hmacKey, row);
+    const written = await appendLog(tx, row);
     if (this.eventLog?.enabled) {
       if (tx.afterCommit) tx.afterCommit(() => this.#emit(written, row));
       else this.#emit(written, row);
@@ -144,48 +142,8 @@ export class AuditService {
     return logBranchOptions(this.pool, scope);
   }
 
-  /**
-   * Starts the chain again after the last row: used when LOG_HMAC_KEY changed (restore on a new server), so old rows
-   * can no longer be verified with the current key. They stay in the log; rows written from now on chain from here.
-   * Never use it to hide a break whose cause is unknown. Returns { upToId } (null when the log is empty).
-   */
-  async reanchor(by) {
-    // Row-Level Security hides the log from a session without a scope: read it as "all branches".
-    return withScope(this.pool, 'all', async (tx) => {
-      const last = (await tx.query('SELECT id, hash FROM access_log ORDER BY id DESC LIMIT 1')).rows[0];
-      if (!last) return { upToId: null };
-      await tx.query(
-        'INSERT INTO access_log_purge (purged_by, before_at, up_to_id, rows, last_hash) VALUES ($1, now(), $2, 0, $3)',
-        [by, last.id, last.hash],
-      );
-      return { upToId: Number(last.id) };
-    });
-  }
 
-  /**
-   * Verifies the whole hash chain. Returns { ok, checked, brokenAtId?, problem? }.
-   * After a retention purge the chain starts at the last checkpoint (access_log_purge): the first
-   * remaining row must point to the hash of the last deleted one.
-   */
-  async verify() {
-    return withScope(this.pool, 'all', async (tx) => {
-      const cp = (await tx.query('SELECT up_to_id, last_hash FROM access_log_purge ORDER BY id DESC LIMIT 1')).rows[0];
-      let prev = cp?.last_hash ?? GENESIS_HASH;
-      let afterId = cp ? Number(cp.up_to_id) : 0;
-      let checked = 0;
-      for (;;) {
-        const rows = await readChainPage(tx, afterId, 5000);
-        if (rows.length === 0) return { ok: true, checked };
-        const r = verifyChain(this.hmacKey, rows.map(rowToEntry), prev);
-        if (!r.ok) return { ...r, checked: checked + r.checked };
-        checked += r.checked;
-        prev = r.lastHash;
-        afterId = rows.at(-1).id;
-      }
-    });
-  }
 }
-
 
 /** Branches a reader may filter the log by: [{ id, code, name }]. */
 export async function logBranchOptions(pool, scope) {

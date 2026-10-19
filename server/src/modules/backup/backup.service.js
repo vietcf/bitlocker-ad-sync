@@ -24,7 +24,7 @@ export const BACKUP_DEFAULTS = {
 };
 export const BACKUP_PASSWORD_MIN = 16;
 
-const PASSWORD_KEY = 'backup.password'; // encrypted (AES-256-GCM, key from LOG_HMAC_KEY)
+const PASSWORD_KEY = 'backup.password'; // encrypted (AES-256-GCM, key from SECRET_KEY)
 const LAST_DAY_KEY = 'backup.last_day';
 const LAST_RESULT_KEY = 'backup.last_result';
 const PREFIX = { keys: 'bitlocker-keys', database: 'bitlocker-db' };
@@ -510,6 +510,6 @@ bitlocker.dump   Bản pg_dump định dạng custom (PostgreSQL 17). Khôi ph�
 manifest.json    Thời điểm tạo, kích thước và SHA-256 của bitlocker.dump.
 
 Lưu ý: một số giá trị trong DB (mật khẩu SMTP, khóa xác thực 2 bước, mật khẩu sao lưu) được mã hóa
-bằng khóa suy ra từ LOG_HMAC_KEY; nhật ký truy cập được ký bằng LOG_HMAC_KEY. Phải sao lưu
-LOG_HMAC_KEY (file .env) riêng, ở kho secret, để dùng được đầy đủ bản khôi phục.
+bằng khóa suy ra từ SECRET_KEY. Phải sao lưu SECRET_KEY (file .env) riêng, ở kho secret,
+để dùng được đầy đủ bản khôi phục.
 `;

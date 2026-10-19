@@ -5,7 +5,6 @@
 export const JOB_SCHEDULE = {
   mailIntervalMinutes: { key: 'jobs.mail_interval_minutes', default: 1, min: 1, max: 60 }, // Quan tri > Mail server
   watchdogIntervalMinutes: { key: 'jobs.watchdog_interval_minutes', default: 5, min: 1, max: 60 }, // Quan tri > Nguong canh bao
-  chainCheckTime: { key: 'jobs.chain_check_time', default: '02:00' }, // Quan tri > Bao mat
   retentionTime: { key: 'jobs.retention_time', default: '03:00' }, // Quan tri > Luu tru
 };
 
