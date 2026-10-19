@@ -13,6 +13,16 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.3.2] - 2026-10-19
+
+### Sửa
+
+- Worker Go (1.1.1): thư mục trạng thái `/var/lib/blk-sync` thiếu quyền khiến mỗi lượt đều chạy full (`Could not save the state file: ... permission denied`). `install.sh` luôn tạo thư mục đúng chủ sở hữu, kể cả khi `--update`, và `--update` cập nhật unit systemd khi khác bản trong gói.
+
+### Khi nâng cấp
+
+Trên máy worker: build gói 1.1.1 (README mục 4B.4), chép sang rồi chạy `sudo ./install.sh --update`. Chưa muốn cập nhật: `sudo install -d -m 0750 -o blk-sync -g blk-sync /var/lib/blk-sync && sudo systemctl restart blk-sync`.
+
 ## [2.3.1] - 2026-10-19
 
 ### Sửa
@@ -180,7 +190,8 @@ mới được kiểm thử trên mô phỏng và kết nối thử, chưa qua m
 - `server/.env`: `LDAP_URL` đã bỏ, thay bằng `LDAP_SERVERS` và `LDAP_PROTOCOL` (ví dụ `LDAP_SERVERS=dc01.corp.local`).
 - Script gọi API bằng tài khoản AD phải chuyển sang tài khoản local.
 
-[Chưa phát hành]: https://github.com/vietcf/bitlocker-ad-sync/compare/v2.3.1...HEAD
+[Chưa phát hành]: https://github.com/vietcf/bitlocker-ad-sync/compare/v2.3.2...HEAD
+[2.3.2]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v2.3.2
 [2.3.1]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v2.3.1
 [2.3.0]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v2.3.0
 [2.2.1]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v2.2.1

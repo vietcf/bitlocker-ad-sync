@@ -32,8 +32,8 @@ import (
 	"github.com/bitlocker-management/worker-go/internal/syncrun"
 )
 
-// version is set at build time: go build -ldflags "-X main.version=1.1.0".
-var version = "1.1.0"
+// version is set at build time: go build -ldflags "-X main.version=1.1.1".
+var version = "1.1.1"
 
 func main() { os.Exit(run(os.Args[1:])) }
 

@@ -3,6 +3,12 @@
 Định dạng theo [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/), phiên bản theo
 [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [1.1.1] - 2026-10-19
+
+### Sửa
+
+- Không còn mỗi lượt đều chạy full vì không lưu được trạng thái: `install.sh` (cả `--update`) luôn tạo `/var/lib/blk-sync` đúng chủ sở hữu, và `--update` cập nhật cả unit systemd khi khác bản trong gói (bản cũ giữ thành `blk-sync.service.previous`). Thông báo lỗi lưu trạng thái nay kèm lệnh tạo thư mục.
+
 ## [1.1.0] - 2026-10-19
 
 ### Thêm

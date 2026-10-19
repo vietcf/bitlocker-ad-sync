@@ -3,6 +3,7 @@ package syncrun
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -39,8 +40,9 @@ func (s *FileStateStore) Load() State {
 }
 
 func (s *FileStateStore) Save(st State) error {
-	if err := os.MkdirAll(filepath.Dir(s.Path), 0o750); err != nil {
-		return err
+	dir := filepath.Dir(s.Path)
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		return fmt.Errorf("%w (create the folder for the service user: install -d -m 0750 -o blk-sync -g blk-sync %s; without it every run is a full run)", err, dir)
 	}
 	b, err := json.MarshalIndent(st, "", "  ")
 	if err != nil {

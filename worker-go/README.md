@@ -139,7 +139,7 @@ cd worker-go
 go test ./...          # test đơn vị, port từ test của bản .NET
 make linux             # dist/blk-sync: Linux amd64, build tĩnh
 make linux-arm64       # dist/blk-sync-arm64
-make package           # dist/blk-sync-1.1.0-linux-amd64.tar.gz: binary + script + 2 bản unit (systemd mới/cũ) + cấu hình mẫu + README
+make package           # dist/blk-sync-1.1.1-linux-amd64.tar.gz: binary + script + 2 bản unit (systemd mới/cũ) + cấu hình mẫu + README
 ```
 
 Không có `make` (ví dụ Windows): `go build -o bin/ ./cmd/blk-sync`, hoặc build cho Linux:
@@ -228,7 +228,7 @@ dsacls "OU=Computers,DC=corp,DC=local" /I:S /G "CORP\svc-blk:CA;msFVE-RecoveryPa
 
 ```bash
 make package
-scp dist/blk-sync-1.1.0-linux-amd64.tar.gz admin@sync01:/tmp/
+scp dist/blk-sync-1.1.1-linux-amd64.tar.gz admin@sync01:/tmp/
 ssh admin@sync01
 mkdir /tmp/blk-sync && tar -C /tmp/blk-sync -xzf /tmp/blk-sync-1.0.0-linux-amd64.tar.gz
 cd /tmp/blk-sync
@@ -298,7 +298,7 @@ với version có đuôi `-go`.
 ## 7. Cập nhật phiên bản
 
 ```bash
-make package VERSION=1.1.0
+make package VERSION=1.1.1
 ```
 
 Chép gói lên máy chủ, giải nén, rồi:

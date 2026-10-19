@@ -684,22 +684,22 @@ Trên máy build (Linux, kể cả CentOS 7.6 đã cài Go; hoặc Windows):
 ```bash
 cd worker-go
 go test ./...
-make package VERSION=1.1.0
+make package VERSION=1.1.1
 ```
 
-Kết quả: `worker-go/dist/blk-sync-1.1.0-linux-amd64.tar.gz`. Gói gồm:
+Kết quả: `worker-go/dist/blk-sync-1.1.1-linux-amd64.tar.gz`. Gói gồm:
 - binary `blk-sync` (build tĩnh);
 - `install.sh`, `blk-sync.service` (systemd mới) và `blk-sync-legacy.service` (systemd cũ như CentOS 7);
 - `config.example.json`, `README.md`.
 
-Máy chủ đích là ARM thì dùng `make linux-arm64`. Không có `make` (Windows): chạy trực tiếp `CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "-s -w -X main.version=1.1.0" -o dist/blk-sync ./cmd/blk-sync` rồi chép binary cùng thư mục `deploy/` và `config.example.json` (xem mục 4 của [worker-go/README.md](worker-go/README.md)).
+Máy chủ đích là ARM thì dùng `make linux-arm64`. Không có `make` (Windows): chạy trực tiếp `CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "-s -w -X main.version=1.1.1" -o dist/blk-sync ./cmd/blk-sync` rồi chép binary cùng thư mục `deploy/` và `config.example.json` (xem mục 4 của [worker-go/README.md](worker-go/README.md)).
 
 ### 4B.5. Cài lên máy chủ
 
 ```bash
-scp worker-go/dist/blk-sync-1.1.0-linux-amd64.tar.gz admin@sync01:/tmp/
+scp worker-go/dist/blk-sync-1.1.1-linux-amd64.tar.gz admin@sync01:/tmp/
 ssh admin@sync01
-mkdir /tmp/blk-sync && tar -C /tmp/blk-sync -xzf /tmp/blk-sync-1.1.0-linux-amd64.tar.gz
+mkdir /tmp/blk-sync && tar -C /tmp/blk-sync -xzf /tmp/blk-sync-1.1.1-linux-amd64.tar.gz
 cd /tmp/blk-sync && sudo ./install.sh
 ```
 
@@ -797,7 +797,7 @@ sẽ tranh nhau mở lượt sync (409 `run_in_progress`; lượt của worker �
 
 ### 4B.9. Cập nhật và gỡ cài đặt
 
-Cập nhật: build gói mới (`make package VERSION=1.1.0`), chép lên máy chủ, giải nén, rồi:
+Cập nhật: build gói mới (`make package VERSION=1.1.1`), chép lên máy chủ, giải nén, rồi:
 
 ```bash
 sudo ./install.sh --update
