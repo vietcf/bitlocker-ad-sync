@@ -13,6 +13,17 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.2.1] - 2026-10-19
+
+### Sửa
+
+- `cert/generate-self-signed.sh` chạy được trên OpenSSL cũ (1.0.2 của CentOS/RHEL 7): không còn dùng `-addext` và `x509 -ext`.
+- README mục 3 (cài production, cách A, B, C): các bước điền `server/.env` viết lại bằng lệnh `set_env` (đổi giá trị nếu dòng đã có, thêm nếu chưa), tránh trùng dòng với `.env.example`. Sửa thiếu sót khiến cài bằng Docker Compose bị lỗi 502: `.env.example` đặt `USER_HOST` và `INGEST_HOST` là `127.0.0.1` nên nginx không nối được tới app; hướng dẫn nay đặt `0.0.0.0`.
+
+### Khi nâng cấp
+
+Không có migration. Hệ thống đã cài bằng Docker Compose theo README bản cũ mà gặp lỗi 502: trong `server/.env` đặt `USER_HOST=0.0.0.0` và `INGEST_HOST=0.0.0.0`, rồi `docker compose -f docker-compose.prod.yml up -d` (thêm `--profile db` nếu DB trong Docker).
+
 ## [2.2.0] - 2026-10-19
 
 ### Thêm
@@ -143,7 +154,8 @@ mới được kiểm thử trên mô phỏng và kết nối thử, chưa qua m
 - `server/.env`: `LDAP_URL` đã bỏ, thay bằng `LDAP_SERVERS` và `LDAP_PROTOCOL` (ví dụ `LDAP_SERVERS=dc01.corp.local`).
 - Script gọi API bằng tài khoản AD phải chuyển sang tài khoản local.
 
-[Chưa phát hành]: https://github.com/vietcf/bitlocker-ad-sync/compare/v2.2.0...HEAD
+[Chưa phát hành]: https://github.com/vietcf/bitlocker-ad-sync/compare/v2.2.1...HEAD
+[2.2.1]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v2.2.1
 [2.2.0]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v2.2.0
 [2.1.0]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v2.1.0
 [2.0.2]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v2.0.2

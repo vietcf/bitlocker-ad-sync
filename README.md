@@ -152,40 +152,40 @@ GRANT USAGE ON SCHEMA public TO app_node;
 
 ```bash
 cp server/.env.example server/.env && chmod 600 server/.env
-for k in SESSION_SECRET SECRET_KEY INGEST_API_KEY; do
-  v=$(openssl rand -hex 32)
-  if grep -q "^$k=" server/.env; then sed -i "s/^$k=.*/$k=$v/" server/.env; else echo "$k=$v" >> server/.env; fi
-done
+set_env() { if grep -q "^$2=" "$1"; then sed -i "s|^$2=.*|$2=$3|" "$1"; else echo "$2=$3" >> "$1"; fi; }
+for k in SESSION_SECRET SECRET_KEY INGEST_API_KEY; do set_env server/.env $k $(openssl rand -hex 32); done
 ```
 
-Không có `openssl`: dùng `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` rồi dán từng giá trị. Ý nghĩa: `SESSION_SECRET` ký cookie đăng nhập; `SECRET_KEY` mã hóa mật khẩu mail, mật khẩu sao lưu và khóa 2 bước lưu trong DB (**cất một bản riêng**, mất khóa thì chỉ phải nhập lại các mật khẩu đó); `INGEST_API_KEY` là khóa của worker (dán cùng giá trị vào cấu hình worker ở phần cài worker).
+Không có `openssl`: dùng `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` rồi `set_env server/.env SESSION_SECRET <giá-trị>` cho từng khóa. Ý nghĩa: `SESSION_SECRET` ký cookie đăng nhập; `SECRET_KEY` mã hóa mật khẩu mail, mật khẩu sao lưu và khóa 2 bước lưu trong DB (**cất một bản riêng**, mất khóa thì chỉ phải nhập lại các mật khẩu đó); `INGEST_API_KEY` là khóa của worker (dán cùng giá trị vào cấu hình worker ở phần cài worker).
 
-**Bước 4. Sửa `server/.env`.** Mở file, sửa các dòng sau cho đúng môi trường (các biến không nhắc tới đã có giá trị mặc định dùng được):
+**Bước 4. Điền cấu hình vào `server/.env`.** `server/.env.example` đã có sẵn nhiều dòng với giá trị dùng cho máy dev (ví dụ `NODE_ENV=development`, `USER_HOST=127.0.0.1`). Vì vậy **không dán thêm vào cuối file** (sẽ bị trùng dòng): hàm `set_env <file> <KHÓA> <giá-trị>` dưới đây **đổi giá trị nếu dòng đã có, thêm dòng mới nếu chưa có**. Cứ dán nguyên khối lệnh vào terminal. Sửa các giá trị ở phần "đổi cho đúng môi trường" (IP worker, địa chỉ database, mật khẩu, AD) rồi dán cả khối:
 
-```ini
-NODE_ENV=production
-TRUST_PROXY=1
-INGEST_TRUST_PROXY=1
-COOKIE_SECURE=true
-APP_TZ=Asia/Ho_Chi_Minh
-
-# IP của máy chạy worker (chỉ IP này gọi được cổng 8443); nhiều IP thì cách nhau dấu phẩy
-INGEST_ALLOWED_IPS=10.0.5.21
-
-# Database ngoài: đổi host cho đúng; DB_SSL=true nếu PostgreSQL bật TLS
-DATABASE_URL=postgres://app_node:<mật-khẩu-app>@db.corp.local:5432/blk
-MIGRATION_DATABASE_URL=postgres://blk_owner:<mật-khẩu-owner>@db.corp.local:5432/blk
-DB_SSL=true
-
-# Đăng nhập bằng tài khoản AD
-LDAP_SERVERS=dc01.corp.local,dc02.corp.local
-LDAP_PROTOCOL=ldap          # ldap (389, không mã hóa) | starttls (389 + TLS) | ldaps (636 + TLS)
-LDAP_DOMAIN=corp.local
-LDAP_BASE_DN=DC=corp,DC=local
-LOCAL_LOGIN_ENABLED=true    # giữ để còn admin local khi AD lỗi
+```bash
+E=server/.env
+# --- bắt buộc khi chạy trong Docker (giữ nguyên) ---
+set_env $E NODE_ENV production
+set_env $E USER_HOST 0.0.0.0          # để nginx (container khác) nối được tới app
+set_env $E INGEST_HOST 0.0.0.0
+set_env $E USER_PORT 3000
+set_env $E INGEST_PORT 8443
+set_env $E TRUST_PROXY 1
+set_env $E INGEST_TRUST_PROXY 1
+set_env $E COOKIE_SECURE true
+set_env $E APP_TZ Asia/Ho_Chi_Minh
+set_env $E BACKUP_DIR /app/backups
+# --- đổi cho đúng môi trường của bạn ---
+set_env $E INGEST_ALLOWED_IPS 10.0.5.21        # IP máy chạy worker; nhiều IP cách nhau dấu phẩy
+set_env $E DATABASE_URL "postgres://app_node:MẬT_KHẨU_APP@db.corp.local:5432/blk"
+set_env $E MIGRATION_DATABASE_URL "postgres://blk_owner:MẬT_KHẨU_OWNER@db.corp.local:5432/blk"
+set_env $E DB_SSL true                         # false nếu PostgreSQL không bật TLS
+set_env $E LDAP_SERVERS dc01.corp.local,dc02.corp.local
+set_env $E LDAP_PROTOCOL ldap                  # ldap (389) | starttls (389 + TLS) | ldaps (636 + TLS)
+set_env $E LDAP_DOMAIN corp.local
+set_env $E LDAP_BASE_DN "DC=corp,DC=local"
+set_env $E LOCAL_LOGIN_ENABLED true            # giữ để còn admin local khi AD lỗi
 ```
 
-Ba khóa ở bước 3 đã tự điền, không cần sửa. App từ chối khởi động nếu thiếu thông tin quan trọng và in tên biến lỗi (không in giá trị).
+Mật khẩu database nên là chuỗi chữ-số (ví dụ `openssl rand -hex 24`) để khỏi gặp ký tự đặc biệt trong URL. Kiểm tra lại: `grep -c . server/.env` và mở file xem không còn dòng nào trùng khóa. Các biến không nhắc tới đã có giá trị mặc định dùng được. App từ chối khởi động nếu thiếu thông tin quan trọng và in tên biến lỗi (không in giá trị).
 
 **Bước 5. Chứng chỉ HTTPS.** nginx cần hai file trong thư mục `cert/`: `server.crt` (kèm chuỗi CA trung gian nếu có) và `server.key`. Chọn một:
 
@@ -229,7 +229,7 @@ git clone git@github.com:vietcf/bitlocker-ad-sync.git blk && cd blk
 ```bash
 cp server/.env.example server/.env && chmod 600 server/.env
 cp server/db.env.example server/db.env && chmod 600 server/db.env
-set_env() { if grep -q "^$2=" "$1"; then sed -i "s/^$2=.*/$2=$3/" "$1"; else echo "$2=$3" >> "$1"; fi; }
+set_env() { if grep -q "^$2=" "$1"; then sed -i "s|^$2=.*|$2=$3|" "$1"; else echo "$2=$3" >> "$1"; fi; }
 for k in SESSION_SECRET SECRET_KEY INGEST_API_KEY; do set_env server/.env $k $(openssl rand -hex 32); done
 for k in POSTGRES_PASSWORD BLK_OWNER_PASSWORD APP_NODE_PASSWORD BLK_BACKUP_PASSWORD; do set_env server/db.env $k $(openssl rand -hex 24); done
 ```
@@ -238,29 +238,35 @@ Rồi điền hai chuỗi kết nối database vào `server/.env` (host là `db`
 
 ```bash
 A=$(grep '^APP_NODE_PASSWORD=' server/db.env | cut -d= -f2); O=$(grep '^BLK_OWNER_PASSWORD=' server/db.env | cut -d= -f2)
-sed -i "s|^DATABASE_URL=.*|DATABASE_URL=postgres://app_node:$A@db:5432/blk|; s|^MIGRATION_DATABASE_URL=.*|MIGRATION_DATABASE_URL=postgres://blk_owner:$O@db:5432/blk|; s|^DB_SSL=.*|DB_SSL=false|" server/.env
+set_env server/.env DATABASE_URL "postgres://app_node:$A@db:5432/blk"
+set_env server/.env MIGRATION_DATABASE_URL "postgres://blk_owner:$O@db:5432/blk"
+set_env server/.env DB_SSL false
 ```
 
-Ba khóa đầu dài 64 ký tự hex, bốn mật khẩu database dài 48. Không có `openssl`: dùng `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` (đổi 32 thành 24 cho mật khẩu database) và dán từng giá trị. `SECRET_KEY` mã hóa mật khẩu mail, mật khẩu sao lưu và khóa 2 bước lưu trong DB: **cất một bản riêng**. Mật khẩu superuser `postgres` nằm trong `server/db.env`; cất nó ở kho mật khẩu rồi có thể xóa file (xem Bước 5).
+Ba khóa đầu dài 64 ký tự hex, bốn mật khẩu database dài 48. Không có `openssl`: dùng `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` (đổi 32 thành 24 cho mật khẩu database) rồi `set_env` từng giá trị. `SECRET_KEY` mã hóa mật khẩu mail, mật khẩu sao lưu và khóa 2 bước lưu trong DB: **cất một bản riêng**. Mật khẩu superuser `postgres` nằm trong `server/db.env`; cất nó ở kho mật khẩu rồi có thể xóa file (xem Bước 5).
 
-**Bước 3. Sửa `server/.env`.** Mở file, thêm hoặc sửa các dòng sau (phần database và ba khóa đã được điền ở bước 2, không cần sửa):
+**Bước 3. Điền phần cấu hình còn lại vào `server/.env`.** `server/.env.example` đã có sẵn nhiều dòng với giá trị dùng cho máy dev (ví dụ `NODE_ENV=development`, `USER_HOST=127.0.0.1`). Vì vậy **không dán thêm vào cuối file** (sẽ bị trùng dòng): hàm `set_env <file> <KHÓA> <giá-trị>` dưới đây **đổi giá trị nếu dòng đã có, thêm dòng mới nếu chưa có**. Cứ dán nguyên khối lệnh vào terminal. Sửa các giá trị ở phần "đổi cho đúng môi trường" (IP worker, AD) rồi dán cả khối (phần database và ba khóa đã điền ở bước 2, không đụng tới):
 
-```ini
-NODE_ENV=production
-TRUST_PROXY=1
-INGEST_TRUST_PROXY=1
-COOKIE_SECURE=true
-APP_TZ=Asia/Ho_Chi_Minh
-
-# IP của máy chạy worker (chỉ IP này gọi được cổng 8443)
-INGEST_ALLOWED_IPS=10.0.5.21
-
-# Đăng nhập bằng tài khoản AD
-LDAP_SERVERS=dc01.corp.local,dc02.corp.local
-LDAP_PROTOCOL=ldap          # ldap (389, không mã hóa) | starttls (389 + TLS) | ldaps (636 + TLS)
-LDAP_DOMAIN=corp.local
-LDAP_BASE_DN=DC=corp,DC=local
-LOCAL_LOGIN_ENABLED=true    # giữ để còn admin local khi AD lỗi
+```bash
+E=server/.env
+# --- bắt buộc khi chạy trong Docker (giữ nguyên) ---
+set_env $E NODE_ENV production
+set_env $E USER_HOST 0.0.0.0          # để nginx (container khác) nối được tới app
+set_env $E INGEST_HOST 0.0.0.0
+set_env $E USER_PORT 3000
+set_env $E INGEST_PORT 8443
+set_env $E TRUST_PROXY 1
+set_env $E INGEST_TRUST_PROXY 1
+set_env $E COOKIE_SECURE true
+set_env $E APP_TZ Asia/Ho_Chi_Minh
+set_env $E BACKUP_DIR /app/backups
+# --- đổi cho đúng môi trường của bạn ---
+set_env $E INGEST_ALLOWED_IPS 10.0.5.21        # IP máy chạy worker; nhiều IP cách nhau dấu phẩy
+set_env $E LDAP_SERVERS dc01.corp.local,dc02.corp.local
+set_env $E LDAP_PROTOCOL ldap                  # ldap (389) | starttls (389 + TLS) | ldaps (636 + TLS)
+set_env $E LDAP_DOMAIN corp.local
+set_env $E LDAP_BASE_DN "DC=corp,DC=local"
+set_env $E LOCAL_LOGIN_ENABLED true            # giữ để còn admin local khi AD lỗi
 ```
 
 **Bước 4. Chứng chỉ HTTPS.** nginx cần hai file trong thư mục `cert/`: `server.crt` (kèm chuỗi CA trung gian nếu có) và `server.key`. Chọn một:
@@ -306,37 +312,35 @@ cd /opt/blk/server && sudo npm ci --omit=dev
 
 ```bash
 cd /opt/blk && sudo cp server/.env.example server/.env && sudo chmod 600 server/.env
-for k in SESSION_SECRET SECRET_KEY INGEST_API_KEY; do
-  v=$(openssl rand -hex 32)
-  if sudo grep -q "^$k=" server/.env; then sudo sed -i "s/^$k=.*/$k=$v/" server/.env; else echo "$k=$v" | sudo tee -a server/.env >/dev/null; fi
-done
+set_env() { if sudo grep -q "^$2=" "$1"; then sudo sed -i "s|^$2=.*|$2=$3|" "$1"; else echo "$2=$3" | sudo tee -a "$1" >/dev/null; fi; }
+for k in SESSION_SECRET SECRET_KEY INGEST_API_KEY; do set_env server/.env $k $(openssl rand -hex 32); done
 ```
 
-**Bước 4. Sửa `server/.env`.** Khác cách A ở chỗ app chỉ nghe trên `127.0.0.1` (nginx đứng trước) và cổng ingest là 8444 (để nhường cổng 8443 cho nginx):
+**Bước 4. Điền cấu hình vào `server/.env`.** `server/.env.example` đã có sẵn nhiều dòng với giá trị dùng cho máy dev (ví dụ `NODE_ENV=development`, `USER_HOST=127.0.0.1`). Vì vậy **không dán thêm vào cuối file** (sẽ bị trùng dòng): hàm `set_env <file> <KHÓA> <giá-trị>` dưới đây **đổi giá trị nếu dòng đã có, thêm dòng mới nếu chưa có**. Cứ dán nguyên khối lệnh vào terminal. Khác cách A ở chỗ app chỉ nghe trên `127.0.0.1` (nginx đứng trước, cùng máy) và cổng ingest là 8444 (để nhường cổng 8443 cho nginx). Sửa các giá trị ở phần "đổi cho đúng môi trường" rồi dán cả khối:
 
-```ini
-NODE_ENV=production
-USER_HOST=127.0.0.1
-USER_PORT=3000
-INGEST_HOST=127.0.0.1
-INGEST_PORT=8444
-TRUST_PROXY=1
-INGEST_TRUST_PROXY=1
-COOKIE_SECURE=true
-APP_TZ=Asia/Ho_Chi_Minh
-BACKUP_DIR=/opt/blk/backups
-
-INGEST_ALLOWED_IPS=10.0.5.21
-
-DATABASE_URL=postgres://app_node:<mật-khẩu-app>@db.corp.local:5432/blk
-MIGRATION_DATABASE_URL=postgres://blk_owner:<mật-khẩu-owner>@db.corp.local:5432/blk
-DB_SSL=true
-
-LDAP_SERVERS=dc01.corp.local,dc02.corp.local
-LDAP_PROTOCOL=ldap          # ldap (389, không mã hóa) | starttls (389 + TLS) | ldaps (636 + TLS)
-LDAP_DOMAIN=corp.local
-LDAP_BASE_DN=DC=corp,DC=local
-LOCAL_LOGIN_ENABLED=true
+```bash
+E=server/.env
+# --- cách C (giữ nguyên) ---
+set_env $E NODE_ENV production
+set_env $E USER_HOST 127.0.0.1
+set_env $E USER_PORT 3000
+set_env $E INGEST_HOST 127.0.0.1
+set_env $E INGEST_PORT 8444
+set_env $E TRUST_PROXY 1
+set_env $E INGEST_TRUST_PROXY 1
+set_env $E COOKIE_SECURE true
+set_env $E APP_TZ Asia/Ho_Chi_Minh
+set_env $E BACKUP_DIR /opt/blk/backups
+# --- đổi cho đúng môi trường của bạn ---
+set_env $E INGEST_ALLOWED_IPS 10.0.5.21
+set_env $E DATABASE_URL "postgres://app_node:MẬT_KHẨU_APP@db.corp.local:5432/blk"
+set_env $E MIGRATION_DATABASE_URL "postgres://blk_owner:MẬT_KHẨU_OWNER@db.corp.local:5432/blk"
+set_env $E DB_SSL true
+set_env $E LDAP_SERVERS dc01.corp.local,dc02.corp.local
+set_env $E LDAP_PROTOCOL ldap
+set_env $E LDAP_DOMAIN corp.local
+set_env $E LDAP_BASE_DN "DC=corp,DC=local"
+set_env $E LOCAL_LOGIN_ENABLED true
 ```
 
 **Bước 5. Tạo bảng (migration)**

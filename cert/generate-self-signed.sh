@@ -6,6 +6,7 @@
 # Chay tu thu muc goc cua repo:   bash cert/generate-self-signed.sh [ten-them ...]
 # Vi du them ten may / IP:        bash cert/generate-self-signed.sh blk.example.local 192.168.11.10
 # Mac dinh co: localhost, 127.0.0.1, blk.local, va ten may hien tai.
+# Chay duoc voi OpenSSL tu 1.0.2 (CentOS/RHEL 7) tro len.
 # Chay lai se tao chung chi server moi (giu CA cu neu da co, de worker / trinh duyet khong phai tin lai).
 set -euo pipefail
 export MSYS_NO_PATHCONV=1   # Git Bash tren Windows: khong doi "/CN=..." thanh duong dan
@@ -23,9 +24,20 @@ done
 
 if [[ ! -f ca.key || ! -f ca.crt ]]; then
   echo "Tao CA dev (ca.crt, ca.key)..."
-  openssl req -x509 -newkey rsa:3072 -nodes -sha256 -days "$DAYS_CA" \
-    -keyout ca.key -out ca.crt -subj "/CN=BitLocker Key Mgmt DEV CA" \
-    -addext "basicConstraints=critical,CA:TRUE" -addext "keyUsage=critical,keyCertSign,cRLSign"
+  # Dung file cau hinh thay cho -addext: OpenSSL cu (CentOS 7 / RHEL 7, ban 1.0.2) khong co -addext.
+  cat > ca.cnf <<'EOF'
+[req]
+distinguished_name = dn
+x509_extensions = ca_ext
+prompt = no
+[dn]
+CN = BitLocker Key Mgmt DEV CA
+[ca_ext]
+basicConstraints = critical, CA:TRUE
+keyUsage = critical, keyCertSign, cRLSign
+EOF
+  openssl req -x509 -newkey rsa:3072 -nodes -sha256 -days "$DAYS_CA" -keyout ca.key -out ca.crt -config ca.cnf
+  rm -f ca.cnf
 fi
 
 san=""
@@ -48,5 +60,7 @@ openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -days 
 rm -f server.csr server.ext ca.srl
 chmod 600 ca.key server.key 2>/dev/null || true
 
-openssl x509 -in server.crt -noout -subject -enddate -ext subjectAltName
+# Khong dung "x509 -ext" (OpenSSL < 1.1.1 khong co): doc SAN tu -text
+openssl x509 -in server.crt -noout -subject -enddate
+openssl x509 -in server.crt -noout -text | grep -A1 "Subject Alternative Name" || true
 echo "Xong. Khoi dong lai nginx de nhan chung chi moi: docker compose restart nginx"
