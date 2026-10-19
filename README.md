@@ -9,7 +9,7 @@ chỉ thêm, không sửa hay xóa được.
 | `server/` | Ứng dụng Node.js (Express, JavaScript thuần): trang web (EJS), JSON API, ingest API cho worker, job nền |
 | `worker/` | Sync worker .NET (Windows Service): đọc AD qua LDAP(S) rồi đẩy dữ liệu lên ingest API |
 | `worker-go/` | Sync worker Go (Linux, systemd): cùng chức năng và giao thức với bản .NET. Chọn **một** trong hai |
-| `docker-compose.yml`, `docker-compose.prod.yml` | Dev (secret dev, có `--watch`) và production (mọi cấu hình ở `server/.env`, DB trong Docker tùy chọn bằng `--profile db`) |
+| `docker-compose.yml`, `docker-compose.prod.yml` | Dev (secret dev, có `--watch`) và production (cấu hình ở `server/.env`, mật khẩu tạo DB ở `server/db.env`, DB trong Docker tùy chọn bằng `--profile db`) |
 
 Mục lục:
 
@@ -221,25 +221,29 @@ Phải trả HTTP 200 và có `"dbOk": true`. Rồi mở `https://<tên máy ch�
 git clone git@github.com:vietcf/bitlocker-ad-sync.git blk && cd blk
 ```
 
-**Bước 2. Tạo file `.env` và các khóa bí mật** (lệnh tự điền, không in giá trị ra màn hình):
+**Bước 2. Tạo các file cấu hình và mật khẩu ngẫu nhiên** (lệnh tự điền, không in giá trị ra màn hình). Có hai file:
+
+- `server/.env`: cấu hình của app, gồm ba khóa bí mật và hai chuỗi kết nối database.
+- `server/db.env`: bốn mật khẩu dùng để tạo database ở lần đầu, **chỉ container database đọc**, app không thấy (kể cả mật khẩu superuser `postgres`).
 
 ```bash
 cp server/.env.example server/.env && chmod 600 server/.env
-set_env() { if grep -q "^$1=" server/.env; then sed -i "s/^$1=.*/$1=$2/" server/.env; else echo "$1=$2" >> server/.env; fi; }
-for k in SESSION_SECRET SECRET_KEY INGEST_API_KEY; do set_env $k $(openssl rand -hex 32); done
-for k in POSTGRES_PASSWORD BLK_OWNER_PASSWORD APP_NODE_PASSWORD BLK_BACKUP_PASSWORD; do set_env $k $(openssl rand -hex 24); done
+cp server/db.env.example server/db.env && chmod 600 server/db.env
+set_env() { if grep -q "^$2=" "$1"; then sed -i "s/^$2=.*/$2=$3/" "$1"; else echo "$2=$3" >> "$1"; fi; }
+for k in SESSION_SECRET SECRET_KEY INGEST_API_KEY; do set_env server/.env $k $(openssl rand -hex 32); done
+for k in POSTGRES_PASSWORD BLK_OWNER_PASSWORD APP_NODE_PASSWORD BLK_BACKUP_PASSWORD; do set_env server/db.env $k $(openssl rand -hex 24); done
 ```
 
-Ba khóa đầu dài 64 ký tự hex; lệnh còn sinh bốn mật khẩu của database. Điền luôn hai chuỗi kết nối database (host là `db`, tên container PostgreSQL) từ các mật khẩu vừa sinh:
+Rồi điền hai chuỗi kết nối database vào `server/.env` (host là `db`, tên container PostgreSQL) từ hai mật khẩu vừa sinh trong `server/db.env`:
 
 ```bash
-A=$(grep '^APP_NODE_PASSWORD=' server/.env | cut -d= -f2); O=$(grep '^BLK_OWNER_PASSWORD=' server/.env | cut -d= -f2)
+A=$(grep '^APP_NODE_PASSWORD=' server/db.env | cut -d= -f2); O=$(grep '^BLK_OWNER_PASSWORD=' server/db.env | cut -d= -f2)
 sed -i "s|^DATABASE_URL=.*|DATABASE_URL=postgres://app_node:$A@db:5432/blk|; s|^MIGRATION_DATABASE_URL=.*|MIGRATION_DATABASE_URL=postgres://blk_owner:$O@db:5432/blk|; s|^DB_SSL=.*|DB_SSL=false|" server/.env
 ```
 
-Không có `openssl`: dùng `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` cho ba khóa (đổi 32 thành 24 cho các mật khẩu database) và dán từng giá trị. `SECRET_KEY` mã hóa mật khẩu mail, mật khẩu sao lưu và khóa 2 bước lưu trong DB: **cất một bản riêng**.
+Ba khóa đầu dài 64 ký tự hex, bốn mật khẩu database dài 48. Không có `openssl`: dùng `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` (đổi 32 thành 24 cho mật khẩu database) và dán từng giá trị. `SECRET_KEY` mã hóa mật khẩu mail, mật khẩu sao lưu và khóa 2 bước lưu trong DB: **cất một bản riêng**. Mật khẩu superuser `postgres` nằm trong `server/db.env`; cất nó ở kho mật khẩu rồi có thể xóa file (xem Bước 5).
 
-**Bước 3. Sửa `server/.env`.** Mở file, thêm hoặc sửa các dòng sau (phần database đã được điền ở bước 2, không cần sửa):
+**Bước 3. Sửa `server/.env`.** Mở file, thêm hoặc sửa các dòng sau (phần database và ba khóa đã được điền ở bước 2, không cần sửa):
 
 ```ini
 NODE_ENV=production
@@ -259,8 +263,6 @@ LDAP_BASE_DN=DC=corp,DC=local
 LOCAL_LOGIN_ENABLED=true    # giữ để còn admin local khi AD lỗi
 ```
 
-Các mật khẩu database chỉ có tác dụng ở **lần đầu** tạo volume. Muốn đổi sau này phải đổi bằng `ALTER ROLE` trong PostgreSQL rồi sửa `.env`.
-
 **Bước 4. Chứng chỉ HTTPS.** nginx cần hai file trong thư mục `cert/`: `server.crt` (kèm chuỗi CA trung gian nếu có) và `server.key`. Chọn một:
 
 - Thử nghiệm nhanh (chứng chỉ tự ký, trình duyệt sẽ cảnh báo; worker phải dùng `cert/ca.crt` làm `CaFile`): `bash cert/generate-self-signed.sh blk.corp.local 10.0.5.10` (thêm tên và IP máy chủ).
@@ -270,10 +272,12 @@ Các mật khẩu database chỉ có tác dụng ở **lần đầu** tạo volu
 
 ```bash
 mkdir -p backups && sudo chown 1000:1000 backups && chmod 700 backups
-docker compose -f docker-compose.prod.yml --profile db --env-file server/.env up -d --build
+docker compose -f docker-compose.prod.yml --profile db up -d --build
 ```
 
-Lệnh dựng PostgreSQL (tự tạo database và các tài khoản ở lần đầu), chạy migration rồi khởi động app và nginx. Xem log: `docker compose -f docker-compose.prod.yml logs -f server`. Từ nay mọi lệnh `docker compose` của cách này đều cần thêm `--profile db --env-file server/.env`.
+Lệnh dựng PostgreSQL (tự tạo database và các tài khoản ở lần đầu), chạy migration rồi khởi động app và nginx. Xem log: `docker compose -f docker-compose.prod.yml logs -f server`. Từ nay mọi lệnh `docker compose` của cách này chỉ cần thêm `--profile db`.
+
+Khi `docker compose ps` cho thấy database đã chạy ổn, bạn có thể **xóa `server/db.env`** (`rm server/db.env`): các mật khẩu chỉ cần ở lần tạo database đầu tiên, app chạy bằng hai chuỗi kết nối trong `server/.env`. Muốn đổi mật khẩu sau này thì đổi trong PostgreSQL (`ALTER ROLE ... PASSWORD ...`) rồi sửa `server/.env`.
 
 **Bước 6. Kiểm tra**
 
@@ -430,7 +434,7 @@ git pull
 # Cách A (DB ngoài):
 docker compose -f docker-compose.prod.yml up -d --build
 # Cách B (DB trong Docker):
-docker compose -f docker-compose.prod.yml --profile db --env-file server/.env up -d --build
+docker compose -f docker-compose.prod.yml --profile db up -d --build
 ```
 
 Mỗi bản có ghi chú trong `CHANGELOG.md`, mục **Khi nâng cấp** cho biết có cần sửa `.env` hay không.

@@ -13,6 +13,16 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.0.2] - 2026-10-19
+
+### Đổi
+
+- DB trong Docker (`--profile db`): bốn mật khẩu tạo database chuyển sang file riêng `server/db.env` (mẫu `server/db.env.example`), chỉ container database đọc. App không còn thấy mật khẩu superuser `postgres` trong biến môi trường. Lệnh chạy không cần `--env-file server/.env` nữa.
+
+### Khi nâng cấp
+
+Chỉ cần với cách cài **DB trong Docker**: chuyển bốn dòng `POSTGRES_PASSWORD`, `BLK_OWNER_PASSWORD`, `APP_NODE_PASSWORD`, `BLK_BACKUP_PASSWORD` khỏi `server/.env` sang `server/db.env` (hoặc xóa chúng, vì database đã khởi tạo xong), rồi chạy `docker compose -f docker-compose.prod.yml --profile db up -d --build`. DB ngoài không cần làm gì.
+
 ## [2.0.1] - 2026-10-19
 
 ### Sửa
@@ -109,7 +119,8 @@ mới được kiểm thử trên mô phỏng và kết nối thử, chưa qua m
 - `server/.env`: `LDAP_URL` đã bỏ, thay bằng `LDAP_SERVERS` và `LDAP_PROTOCOL` (ví dụ `LDAP_SERVERS=dc01.corp.local`).
 - Script gọi API bằng tài khoản AD phải chuyển sang tài khoản local.
 
-[Chưa phát hành]: https://github.com/vietcf/bitlocker-ad-sync/compare/v2.0.1...HEAD
+[Chưa phát hành]: https://github.com/vietcf/bitlocker-ad-sync/compare/v2.0.2...HEAD
+[2.0.2]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v2.0.2
 [2.0.1]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v2.0.1
 [2.0.0]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v2.0.0
 [1.1.0]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v1.1.0

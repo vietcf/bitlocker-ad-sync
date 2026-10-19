@@ -3,6 +3,7 @@ test
 coverage
 .env
 .env.*
+db.env
 *.pem
 *.key
 *.pfx

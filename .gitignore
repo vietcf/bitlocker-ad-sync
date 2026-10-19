@@ -4,6 +4,8 @@ coverage/
 .env
 .env.*
 !.env.example
+db.env
+!db.env.example
 *.pem
 *.key
 *.pfx

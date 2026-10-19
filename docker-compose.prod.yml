@@ -1,6 +1,8 @@
-# Production: toan bo cau hinh nam trong server/.env (khong co secret nao ghi cung o day).
+# Production: cau hinh cua app nam trong server/.env (khong co secret nao ghi cung o day).
 #   DB ngoai Docker:  docker compose -f docker-compose.prod.yml up -d --build
-#   DB trong Docker:  docker compose -f docker-compose.prod.yml --profile db --env-file server/.env up -d --build
+#   DB trong Docker:  docker compose -f docker-compose.prod.yml --profile db up -d --build
+# Mat khau tao DB lan dau (POSTGRES_PASSWORD...) nam rieng trong server/db.env, chi service db doc;
+# app khong thay mat khau superuser. Sau khi DB da khoi tao xong co the xoa server/db.env.
 # Xem README muc 3.
 
 x-logging: &logging
@@ -10,18 +12,17 @@ x-logging: &logging
     max-file: "20"
 
 services:
-  # Chi chay khi co --profile db. Mat khau lay tu server/.env (POSTGRES_PASSWORD, BLK_OWNER_PASSWORD,
-  # APP_NODE_PASSWORD, BLK_BACKUP_PASSWORD); script server/db/init tao cac tai khoan o lan dau.
+  # Chi chay khi co --profile db. Mat khau (POSTGRES_PASSWORD, BLK_OWNER_PASSWORD, APP_NODE_PASSWORD,
+  # BLK_BACKUP_PASSWORD) lay tu server/db.env; script server/db/init tao cac tai khoan o lan dau.
   db:
     profiles: ["db"]
     image: postgres:17.6
+    env_file:
+      - path: ./server/db.env
+        required: false
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
       POSTGRES_DB: blk
-      BLK_OWNER_PASSWORD: ${BLK_OWNER_PASSWORD:-}
-      APP_NODE_PASSWORD: ${APP_NODE_PASSWORD:-}
-      BLK_BACKUP_PASSWORD: ${BLK_BACKUP_PASSWORD:-}
     volumes:
       - ./server/db/init:/docker-entrypoint-initdb.d:ro
       - blk-pg:/var/lib/postgresql/data
