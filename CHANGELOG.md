@@ -13,6 +13,20 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.0.1] - 2026-10-19
+
+### Sửa
+
+- `docker-compose.prod.yml` với DB trong Docker (`--profile db`): `migrate` đợi database sẵn sàng trước khi chạy, trước đây lần cài đầu có thể lỗi vì database chưa kịp khởi động.
+
+### Đổi
+
+- README mục 3 (cài production) viết lại theo từng trường hợp, mỗi cách tự đủ từng bước: A Compose + DB ngoài, B Compose + DB trong Docker, C không Docker. Bỏ hướng dẫn `docker run`. Lệnh tự sinh và điền các khóa bí mật vào `.env`.
+
+### Khi nâng cấp
+
+Không có migration và không đổi `.env`.
+
 ## [2.0.0] - 2026-10-19
 
 ### Bỏ
@@ -95,7 +109,8 @@ mới được kiểm thử trên mô phỏng và kết nối thử, chưa qua m
 - `server/.env`: `LDAP_URL` đã bỏ, thay bằng `LDAP_SERVERS` và `LDAP_PROTOCOL` (ví dụ `LDAP_SERVERS=dc01.corp.local`).
 - Script gọi API bằng tài khoản AD phải chuyển sang tài khoản local.
 
-[Chưa phát hành]: https://github.com/vietcf/bitlocker-ad-sync/compare/v2.0.0...HEAD
+[Chưa phát hành]: https://github.com/vietcf/bitlocker-ad-sync/compare/v2.0.1...HEAD
+[2.0.1]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v2.0.1
 [2.0.0]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v2.0.0
 [1.1.0]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v1.1.0
 [1.0.0]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v1.0.0

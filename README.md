@@ -63,7 +63,7 @@ Docker Desktop (Windows/macOS) hoặc Docker Engine + Compose v2.24 trở lên (
 
 ```bash
 cd bitlocker-management
-bash cert/generate-self-signed.sh      # lần đầu: chứng chỉ tự ký cho HTTPS (mục 3.6)
+bash cert/generate-self-signed.sh      # lần đầu: chứng chỉ tự ký cho HTTPS (thử nghiệm: chứng chỉ tự ký)
 docker compose up --build --watch
 ```
 
@@ -73,7 +73,7 @@ Compose dựng `db` (PostgreSQL 17, có DB `blk` và `blk_test`; lần đầu t�
 - https://localhost:8443/api/ingest: ingest API cho worker. https://localhost:8443/docs: Swagger ingest (cần API key).
 - `localhost:5432`: PostgreSQL, tài khoản dev `postgres` / `dev_postgres_pw`.
 
-Trình duyệt báo "không an toàn" vì chứng chỉ tự ký, tới khi bạn tin `cert/ca.crt` (mục 3.6). Cổng 443/80 bị chiếm thì đổi: `HTTPS_PORT=8444 HTTP_PORT=8080 docker compose up -d`. Mặc định chỉ máy này truy cập được; cho máy khác vào: `BIND_ADDR=0.0.0.0`.
+Trình duyệt báo "không an toàn" vì chứng chỉ tự ký, tới khi bạn tin `cert/ca.crt` (mục 3.5 nói cách dùng chứng chỉ thật). Cổng 443/80 bị chiếm thì đổi: `HTTPS_PORT=8444 HTTP_PORT=8080 docker compose up -d`. Mặc định chỉ máy này truy cập được; cho máy khác vào: `BIND_ADDR=0.0.0.0`.
 
 ### 2.3. Đăng nhập lần đầu
 
@@ -114,21 +114,27 @@ cd ../worker && dotnet test
 
 ### 3.1. Chọn cách cài
 
-| Chọn | Phương án | Khi nào |
-| --- | --- | --- |
-| **App** | **A. docker-compose** (`docker-compose.prod.yml`) | Khuyên dùng: một lệnh dựng app, migration và nginx |
-| | B. `docker run` | Không có Compose |
-| | C. Không Docker | Chạy Node.js bằng systemd/pm2; vẫn cần nginx hoặc proxy HTTPS khác |
-| **Database** | **1. Trong Docker** (chỉ với phương án A) | Máy nhỏ, đã có quy trình sao lưu volume |
-| | 2. PostgreSQL ngoài | Khuyên dùng: máy riêng, bật TLS, sao lưu hằng ngày |
+Chọn **một** trong ba cách, rồi làm lần lượt từng bước của cách đó (mỗi cách tự đủ, không cần đọc cách khác).
 
-Yêu cầu chung: Linux có Docker (phương án C: Node.js 24), mở cổng 443 cho người dùng và 8443 cho worker; PostgreSQL 17; một chứng chỉ server có tên máy chủ trong SAN (mục 3.6); AD có LDAPS (cổng 636); máy worker Windows hoặc Linux (mục 4, 4B). SMTP/Teams không bắt buộc (mail cấu hình trong app, Teams qua webhook trong `.env`).
+| Cách | App chạy bằng | Database | Dùng khi |
+| --- | --- | --- | --- |
+| **A** | Docker Compose | PostgreSQL 17 **ngoài** (máy riêng) | Khuyên dùng cho production |
+| **B** | Docker Compose | PostgreSQL **trong Docker** cùng máy | Máy nhỏ, thử nghiệm, đã có cách sao lưu volume |
+| **C** | Node.js + systemd (không Docker) | PostgreSQL 17 ngoài | Không dùng được Docker |
 
-### 3.2. Database
+Cổng cần mở: **443** cho người dùng, **8443** chỉ cho IP máy worker. Cần một tên miền nội bộ trỏ về máy chủ (ví dụ `blk.corp.local`).
 
-**Trong Docker (A + 1):** không cần làm gì thêm. Đặt 4 mật khẩu trong `server/.env` (mục 3.4); lần đầu tạo volume, `server/db/init/01-roles.sh` tự tạo DB `blk` và các tài khoản `blk_owner`, `app_node`, `blk_backup`.
+### 3.2. Cách A: Docker Compose + PostgreSQL ngoài
 
-**PostgreSQL ngoài:** đăng nhập superuser, chạy (thay hai mật khẩu):
+**Chuẩn bị:** máy chủ Linux đã cài Docker (có `docker compose`) và `git`; một máy PostgreSQL 17 mà máy chủ này truy cập được.
+
+**Bước 1. Lấy mã nguồn**
+
+```bash
+git clone git@github.com:vietcf/bitlocker-ad-sync.git blk && cd blk
+```
+
+**Bước 2. Tạo database.** Đăng nhập PostgreSQL bằng superuser, chạy (thay hai mật khẩu bằng mật khẩu mạnh của bạn, ghi lại để dùng ở bước 4):
 
 ```sql
 CREATE ROLE blk_owner LOGIN NOSUPERUSER NOCREATEROLE NOBYPASSRLS PASSWORD '<mật-khẩu-owner>';
@@ -140,11 +146,9 @@ REVOKE ALL ON SCHEMA public FROM PUBLIC;
 GRANT USAGE ON SCHEMA public TO app_node;
 ```
 
-`blk_owner` sở hữu bảng, chỉ dùng khi chạy migration. `app_node` là tài khoản duy nhất app dùng khi chạy, không sở hữu bảng nên luôn bị Row-Level Security giới hạn theo chi nhánh. **Không** cấp SUPERUSER hay BYPASSRLS cho hai tài khoản này. Tài khoản sao lưu `blk_backup`: mục 6.8.
+`blk_owner` chỉ dùng để tạo bảng khi nâng cấp. `app_node` là tài khoản duy nhất app dùng khi chạy, và luôn bị giới hạn theo chi nhánh. Đừng cho `app_node` quyền superuser.
 
-### 3.3. Tạo secret
-
-Cần ba chuỗi ngẫu nhiên, mỗi chuỗi 64 ký tự hex. Lệnh dưới tạo `server/.env` từ file mẫu và **tự điền** cả ba (không in giá trị ra màn hình):
+**Bước 3. Tạo file `.env` và các khóa bí mật** (lệnh tự điền, không in giá trị ra màn hình):
 
 ```bash
 cp server/.env.example server/.env && chmod 600 server/.env
@@ -154,140 +158,250 @@ for k in SESSION_SECRET SECRET_KEY INGEST_API_KEY; do
 done
 ```
 
-Máy không có `openssl` (hoặc Windows): thay `openssl rand -hex 32` bằng `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`; tạo từng chuỗi rồi dán vào `.env`.
+Không có `openssl`: dùng `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` rồi dán từng giá trị. Ý nghĩa: `SESSION_SECRET` ký cookie đăng nhập; `SECRET_KEY` mã hóa mật khẩu mail, mật khẩu sao lưu và khóa 2 bước lưu trong DB (**cất một bản riêng**, mất khóa thì chỉ phải nhập lại các mật khẩu đó); `INGEST_API_KEY` là khóa của worker (dán cùng giá trị vào cấu hình worker ở phần cài worker).
 
-- `SESSION_SECRET`: ký cookie phiên.
-- `SECRET_KEY` (64 ký tự hex, trước đây tên `LOG_HMAC_KEY`, tên cũ vẫn dùng được): khóa mã hóa mật khẩu SMTP, mật khẩu sao lưu và khóa 2 bước lưu trong DB. Không lưu trong DB. Mất khóa thì app vẫn chạy, chỉ phải nhập lại các mật khẩu đó.
-- `INGEST_API_KEY`: API key của worker.
-
-### 3.4. File `server/.env`
-
-```bash
-cp server/.env.example server/.env && chmod 600 server/.env
-```
+**Bước 4. Sửa `server/.env`.** Mở file, sửa các dòng sau cho đúng môi trường (các biến không nhắc tới đã có giá trị mặc định dùng được):
 
 ```ini
 NODE_ENV=production
-LOG_LEVEL=info
-USER_HOST=0.0.0.0
-USER_PORT=3000
-INGEST_HOST=0.0.0.0
-INGEST_PORT=8443
-TRUST_PROXY=1            # tin đúng 1 lớp proxy (nginx)
+TRUST_PROXY=1
 INGEST_TRUST_PROXY=1
 COOKIE_SECURE=true
+APP_TZ=Asia/Ho_Chi_Minh
 
-# Worker: HTTPS + API key (cùng giá trị trong cấu hình worker) + IP được phép
-INGEST_API_KEY=<hex 64>      # đã tự điền ở mục 3.3
+# IP của máy chạy worker (chỉ IP này gọi được cổng 8443); nhiều IP thì cách nhau dấu phẩy
 INGEST_ALLOWED_IPS=10.0.5.21
 
-# Database. PostgreSQL ngoài: đổi host, bật DB_SSL. DB trong Docker: host "db", DB_SSL=false
+# Database ngoài: đổi host cho đúng; DB_SSL=true nếu PostgreSQL bật TLS
 DATABASE_URL=postgres://app_node:<mật-khẩu-app>@db.corp.local:5432/blk
 MIGRATION_DATABASE_URL=postgres://blk_owner:<mật-khẩu-owner>@db.corp.local:5432/blk
 DB_SSL=true
-# Chỉ khi DB trong Docker (A + 1): mật khẩu để tạo tài khoản lần đầu
-# POSTGRES_PASSWORD=...  BLK_OWNER_PASSWORD=...  APP_NODE_PASSWORD=...  BLK_BACKUP_PASSWORD=...
 
-# Đăng nhập AD: danh sách DC (thử lần lượt) và cách kết nối, giống Ldap.Servers / Ldap.Protocol của worker
+# Đăng nhập bằng tài khoản AD
 LDAP_SERVERS=dc01.corp.local,dc02.corp.local
-LDAP_PROTOCOL=ldap        # ldap (389, không mã hóa, mặc định) | starttls (389 + TLS) | ldaps (636 + TLS)
+LDAP_PROTOCOL=ldap          # ldap (389, không mã hóa) | starttls (389 + TLS) | ldaps (636 + TLS)
 LDAP_DOMAIN=corp.local
 LDAP_BASE_DN=DC=corp,DC=local
-# LDAP_CA_FILE=/app/certs/corp-root-ca.pem   # nếu máy chủ chưa tin CA của DC
-LOCAL_LOGIN_ENABLED=true                     # giữ để còn admin local khi AD lỗi
-
-SESSION_SECRET=<hex 64>      # đã tự điền ở mục 3.3
-SECRET_KEY=<hex 64>          # đã tự điền ở mục 3.3, nhớ cất một bản riêng
-SESSION_IDLE_MINUTES=15
-SESSION_MAX_HOURS=8
-
-# Sao lưu (mục 6.8): BACKUP_DATABASE_URL dùng tài khoản blk_backup
-BACKUP_DIR=/app/backups
-# BACKUP_DATABASE_URL=postgres://blk_backup:<mk>@db.corp.local:5432/blk
-
-# Cảnh báo (mail server thường cấu hình trong app, Quản trị > Mail server)
-NOTIFY_FROM=bitlocker-keys@corp.local
-NOTIFY_TO=it-hq@corp.local,security@corp.local
-# TEAMS_WEBHOOK_URL=https://...
-# MAIL_TEMPLATES_FILE=/app/config/mail-templates.yaml   # mẫu email ngoài image (mục 6.6)
-
-JOBS_ENABLED=true
-APP_TZ=Asia/Ho_Chi_Minh
+LOCAL_LOGIN_ENABLED=true    # giữ để còn admin local khi AD lỗi
 ```
 
-Khi `NODE_ENV=production`, app **từ chối khởi động** và in tên biến lỗi (không in giá trị) nếu: ingest không có HTTPS (thiếu `INGEST_TRUST_PROXY` và cả `INGEST_TLS_CERT`/`INGEST_TLS_KEY`); thiếu `INGEST_API_KEY`; `INGEST_ALLOWED_IPS` trống; `SESSION_SECRET` còn giá trị dev.
+Ba khóa ở bước 3 đã tự điền, không cần sửa. App từ chối khởi động nếu thiếu thông tin quan trọng và in tên biến lỗi (không in giá trị).
 
-### 3.5. Chạy
+**Bước 5. Chứng chỉ HTTPS.** nginx cần hai file trong thư mục `cert/`: `server.crt` (kèm chuỗi CA trung gian nếu có) và `server.key`. Chọn một:
 
-Trước hết có chứng chỉ trong `cert/` (mục 3.6). Tường lửa: 443 cho người dùng; 8443 chỉ cho IP máy worker. Trên Linux, Docker giữ IP thật của client nên whitelist IP worker hoạt động đúng.
+- Thử nghiệm nhanh (chứng chỉ tự ký, trình duyệt sẽ cảnh báo; worker phải dùng `cert/ca.crt` làm `CaFile`): `bash cert/generate-self-signed.sh blk.corp.local 10.0.5.10` (thêm tên và IP máy chủ).
+- Production: xin chứng chỉ từ CA của công ty theo hướng dẫn ở mục 3.5 rồi chép `server.crt`, `server.key` vào `cert/`.
 
-**A. docker-compose** (dựng app + migration + nginx; thêm DB nếu chọn DB trong Docker):
+**Bước 6. Chạy**
 
 ```bash
-# DB ngoài
+mkdir -p backups && sudo chown 1000:1000 backups && chmod 700 backups
 docker compose -f docker-compose.prod.yml up -d --build
-# DB trong Docker
+```
+
+Lệnh dựng app, chạy migration (tạo bảng) rồi khởi động nginx. Xem log: `docker compose -f docker-compose.prod.yml logs -f server`.
+
+**Bước 7. Kiểm tra**
+
+```bash
+curl -k https://localhost/healthz
+```
+
+Phải trả HTTP 200 và có `"dbOk": true`. Rồi mở `https://<tên máy chủ>/` bằng trình duyệt, đăng nhập `admin` / `admin` (mật khẩu mặc định, **bắt buộc đổi ngay** ở lần đầu).
+
+**Bước 8. Làm tiếp:** cài sync worker (mục 4 cho Windows hoặc 4B cho Linux) và cấu hình chi nhánh, người dùng, mail trong ứng dụng (mục 5).
+
+### 3.3. Cách B: Docker Compose + PostgreSQL trong Docker
+
+**Chuẩn bị:** máy chủ Linux đã cài Docker (có `docker compose`) và `git`. Không cần PostgreSQL riêng: Compose tự dựng một container PostgreSQL 17 và lưu dữ liệu trong volume `blk-pg`.
+
+**Bước 1. Lấy mã nguồn**
+
+```bash
+git clone git@github.com:vietcf/bitlocker-ad-sync.git blk && cd blk
+```
+
+**Bước 2. Tạo file `.env` và các khóa bí mật** (lệnh tự điền, không in giá trị ra màn hình):
+
+```bash
+cp server/.env.example server/.env && chmod 600 server/.env
+set_env() { if grep -q "^$1=" server/.env; then sed -i "s/^$1=.*/$1=$2/" server/.env; else echo "$1=$2" >> server/.env; fi; }
+for k in SESSION_SECRET SECRET_KEY INGEST_API_KEY; do set_env $k $(openssl rand -hex 32); done
+for k in POSTGRES_PASSWORD BLK_OWNER_PASSWORD APP_NODE_PASSWORD BLK_BACKUP_PASSWORD; do set_env $k $(openssl rand -hex 24); done
+```
+
+Ba khóa đầu dài 64 ký tự hex; lệnh còn sinh bốn mật khẩu của database. Điền luôn hai chuỗi kết nối database (host là `db`, tên container PostgreSQL) từ các mật khẩu vừa sinh:
+
+```bash
+A=$(grep '^APP_NODE_PASSWORD=' server/.env | cut -d= -f2); O=$(grep '^BLK_OWNER_PASSWORD=' server/.env | cut -d= -f2)
+sed -i "s|^DATABASE_URL=.*|DATABASE_URL=postgres://app_node:$A@db:5432/blk|; s|^MIGRATION_DATABASE_URL=.*|MIGRATION_DATABASE_URL=postgres://blk_owner:$O@db:5432/blk|; s|^DB_SSL=.*|DB_SSL=false|" server/.env
+```
+
+Không có `openssl`: dùng `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` cho ba khóa (đổi 32 thành 24 cho các mật khẩu database) và dán từng giá trị. `SECRET_KEY` mã hóa mật khẩu mail, mật khẩu sao lưu và khóa 2 bước lưu trong DB: **cất một bản riêng**.
+
+**Bước 3. Sửa `server/.env`.** Mở file, thêm hoặc sửa các dòng sau (phần database đã được điền ở bước 2, không cần sửa):
+
+```ini
+NODE_ENV=production
+TRUST_PROXY=1
+INGEST_TRUST_PROXY=1
+COOKIE_SECURE=true
+APP_TZ=Asia/Ho_Chi_Minh
+
+# IP của máy chạy worker (chỉ IP này gọi được cổng 8443)
+INGEST_ALLOWED_IPS=10.0.5.21
+
+# Đăng nhập bằng tài khoản AD
+LDAP_SERVERS=dc01.corp.local,dc02.corp.local
+LDAP_PROTOCOL=ldap          # ldap (389, không mã hóa) | starttls (389 + TLS) | ldaps (636 + TLS)
+LDAP_DOMAIN=corp.local
+LDAP_BASE_DN=DC=corp,DC=local
+LOCAL_LOGIN_ENABLED=true    # giữ để còn admin local khi AD lỗi
+```
+
+Các mật khẩu database chỉ có tác dụng ở **lần đầu** tạo volume. Muốn đổi sau này phải đổi bằng `ALTER ROLE` trong PostgreSQL rồi sửa `.env`.
+
+**Bước 4. Chứng chỉ HTTPS.** nginx cần hai file trong thư mục `cert/`: `server.crt` (kèm chuỗi CA trung gian nếu có) và `server.key`. Chọn một:
+
+- Thử nghiệm nhanh (chứng chỉ tự ký, trình duyệt sẽ cảnh báo; worker phải dùng `cert/ca.crt` làm `CaFile`): `bash cert/generate-self-signed.sh blk.corp.local 10.0.5.10` (thêm tên và IP máy chủ).
+- Production: xin chứng chỉ từ CA của công ty theo hướng dẫn ở mục 3.5 rồi chép `server.crt`, `server.key` vào `cert/`.
+
+**Bước 5. Chạy**
+
+```bash
+mkdir -p backups && sudo chown 1000:1000 backups && chmod 700 backups
 docker compose -f docker-compose.prod.yml --profile db --env-file server/.env up -d --build
 ```
 
-Sao lưu nằm ở `./backups` (cấp quyền ghi cho uid 1000, mục 6.8). Log: `docker compose -f docker-compose.prod.yml logs -f server`.
+Lệnh dựng PostgreSQL (tự tạo database và các tài khoản ở lần đầu), chạy migration rồi khởi động app và nginx. Xem log: `docker compose -f docker-compose.prod.yml logs -f server`. Từ nay mọi lệnh `docker compose` của cách này đều cần thêm `--profile db --env-file server/.env`.
 
-**B. `docker run`** (DB ngoài):
-
-```bash
-cd server && docker build -t blk-server:1.0 .
-docker run --rm --env-file .env blk-server:1.0 node src/db/migrate.js      # migration
-docker network create blk
-docker run -d --name blk-server --network blk --network-alias server --restart unless-stopped \
-  --log-driver local --log-opt max-size=50m --log-opt max-file=20 \
-  -v /opt/blk/backups:/app/backups --env-file .env blk-server:1.0
-docker run -d --name blk-nginx --network blk --restart unless-stopped \
-  --log-driver local --log-opt max-size=50m --log-opt max-file=20 \
-  -p 443:443 -p 8443:8443 -p 80:80 \
-  -v /opt/blk/nginx/nginx.conf:/etc/nginx/nginx.conf:ro -v /opt/blk/cert:/etc/nginx/cert:ro \
-  nginx:1.28.0-alpine
-```
-
-`/opt/blk/nginx/nginx.conf` chép từ `nginx/nginx.conf` của repo; `/opt/blk/cert` chứa `server.crt`, `server.key`.
-
-**C. Không Docker** (Node.js 24; cần nginx hoặc proxy HTTPS tự dựng, cấu hình mẫu ở `nginx/nginx.conf`):
+**Bước 6. Kiểm tra**
 
 ```bash
-cd server && npm ci --omit=dev && npm run migrate
-npm start            # chạy bằng systemd hoặc pm2 để tự khởi động lại
+curl -k https://localhost/healthz
 ```
 
-Kiểm tra: `curl -k https://localhost/healthz` trả HTTP 200 với `"dbOk": true`; `degraded: true` nghĩa là chưa có lượt sync thành công trong 60 phút qua. Rồi đăng nhập và làm tiếp mục 5.
+Phải trả HTTP 200 và có `"dbOk": true`. Rồi mở `https://<tên máy chủ>/` bằng trình duyệt, đăng nhập `admin` / `admin` (mật khẩu mặc định, **bắt buộc đổi ngay** ở lần đầu).
 
-### 3.6. HTTPS và chứng chỉ
+**Bước 7. Làm tiếp:** cài sync worker (mục 4 cho Windows hoặc 4B cho Linux) và cấu hình chi nhánh, người dùng, mail trong ứng dụng (mục 5). Dữ liệu nằm trong volume `blk-pg` trên chính máy này: bật sao lưu trong ứng dụng (mục 6.8) và chép file sao lưu sang máy khác.
 
-nginx giữ **một chứng chỉ** cho cả web (443) và ingest API (8443), đọc từ `cert/` (dev, compose) hoặc `/opt/blk/cert` (`docker run`), mount vào `/etc/nginx/cert`: `server.crt` (PEM, **kèm chuỗi CA trung gian**) và `server.key` (không mật khẩu, quyền 600). Chứng chỉ phải có tên truy cập (ví dụ `blk.corp.local`) trong **SAN** và EKU *Server Authentication*.
+### 3.4. Cách C: Không Docker (Node.js + systemd + nginx)
 
-**Dev: chứng chỉ tự ký**
+**Chuẩn bị:** máy chủ Linux có quyền root; một máy PostgreSQL 17 mà máy chủ này truy cập được; cài **Node.js 24**, **nginx** và `git`. Muốn dùng chức năng sao lưu database thì cài thêm `pg_dump` bản 17 (gói `postgresql-client-17`).
+
+**Bước 1. Lấy mã nguồn và cài thư viện**
 
 ```bash
-bash cert/generate-self-signed.sh                               # localhost, 127.0.0.1, blk.local, tên máy
-bash cert/generate-self-signed.sh blk.example.local 10.0.5.10   # thêm tên / IP khác
-docker compose restart nginx
+sudo git clone git@github.com:vietcf/bitlocker-ad-sync.git /opt/blk
+cd /opt/blk/server && sudo npm ci --omit=dev
 ```
 
-Script tạo CA dev (`cert/ca.crt`) và ký `server.crt` (825 ngày); chạy lại thì giữ CA cũ. Trình duyệt cảnh báo cho tới khi bạn tin CA đó (Windows: mở `ca.crt` > Install Certificate > Trusted Root Certification Authorities). Worker tin CA dev qua `CaFile` (worker Go: `"../cert/ca.crt"` đã đặt sẵn trong `worker-go/config.json`; worker .NET: `appsettings.Development.json`). Chỉ cho lab: `"Ingest": { "SkipCertificateValidation": true }` bỏ kiểm tra chứng chỉ (kết nối vẫn mã hóa nhưng chấp nhận cả server giả; worker cảnh báo mỗi lần chạy). Production luôn để `false`.
+**Bước 2. Tạo database:** làm đúng như Bước 2 của cách A (cùng đoạn SQL, chạy bằng superuser trên PostgreSQL ngoài).
 
-**Production: chứng chỉ thật**
+**Bước 3. Tạo `server/.env` và khóa bí mật**
 
-1. Tạo bản ghi DNS cho tên truy cập, rồi tạo khóa và CSR **trên máy chủ app** (khóa không rời máy):
+```bash
+cd /opt/blk && sudo cp server/.env.example server/.env && sudo chmod 600 server/.env
+for k in SESSION_SECRET SECRET_KEY INGEST_API_KEY; do
+  v=$(openssl rand -hex 32)
+  if sudo grep -q "^$k=" server/.env; then sudo sed -i "s/^$k=.*/$k=$v/" server/.env; else echo "$k=$v" | sudo tee -a server/.env >/dev/null; fi
+done
+```
+
+**Bước 4. Sửa `server/.env`.** Khác cách A ở chỗ app chỉ nghe trên `127.0.0.1` (nginx đứng trước) và cổng ingest là 8444 (để nhường cổng 8443 cho nginx):
+
+```ini
+NODE_ENV=production
+USER_HOST=127.0.0.1
+USER_PORT=3000
+INGEST_HOST=127.0.0.1
+INGEST_PORT=8444
+TRUST_PROXY=1
+INGEST_TRUST_PROXY=1
+COOKIE_SECURE=true
+APP_TZ=Asia/Ho_Chi_Minh
+BACKUP_DIR=/opt/blk/backups
+
+INGEST_ALLOWED_IPS=10.0.5.21
+
+DATABASE_URL=postgres://app_node:<mật-khẩu-app>@db.corp.local:5432/blk
+MIGRATION_DATABASE_URL=postgres://blk_owner:<mật-khẩu-owner>@db.corp.local:5432/blk
+DB_SSL=true
+
+LDAP_SERVERS=dc01.corp.local,dc02.corp.local
+LDAP_PROTOCOL=ldap          # ldap (389, không mã hóa) | starttls (389 + TLS) | ldaps (636 + TLS)
+LDAP_DOMAIN=corp.local
+LDAP_BASE_DN=DC=corp,DC=local
+LOCAL_LOGIN_ENABLED=true
+```
+
+**Bước 5. Tạo bảng (migration)**
+
+```bash
+cd /opt/blk/server && sudo npm run migrate
+```
+
+**Bước 6. Chạy app bằng systemd.** Tạo `/etc/systemd/system/blk.service`:
+
+```ini
+[Unit]
+Description=BitLocker Key Management
+After=network-online.target
+
+[Service]
+WorkingDirectory=/opt/blk/server
+# Đường dẫn node: kiểm tra bằng which node
+ExecStart=/usr/bin/node --env-file=.env src/index.js
+Restart=always
+User=blk
+Group=blk
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo useradd --system --home /opt/blk --shell /usr/sbin/nologin blk
+sudo mkdir -p /opt/blk/backups && sudo chown -R blk:blk /opt/blk/backups /opt/blk/server/.env
+sudo systemctl daemon-reload && sudo systemctl enable --now blk
+```
+
+**Bước 7. Chứng chỉ HTTPS và nginx.** Đặt `server.crt` (kèm chuỗi CA trung gian) và `server.key` vào `/etc/nginx/cert/`. Chưa có chứng chỉ thật thì tạo tạm bằng `bash /opt/blk/cert/generate-self-signed.sh blk.corp.local 10.0.5.10` rồi chép hai file `server.crt`, `server.key` trong `/opt/blk/cert/` sang `/etc/nginx/cert/`. Dùng cấu hình mẫu của dự án, đổi hai địa chỉ app:
+
+```bash
+sudo mkdir -p /etc/nginx/cert
+sudo cp /opt/blk/nginx/nginx.conf /etc/nginx/nginx.conf
+sudo sed -i 's/server server:3000;/server 127.0.0.1:3000;/; s/server server:8443;/server 127.0.0.1:8444;/; s|access_log /dev/stdout main;|access_log /var/log/nginx/blk-access.log main;|; s|error_log  /dev/stderr warn;|error_log /var/log/nginx/blk-error.log warn;|' /etc/nginx/nginx.conf
+sudo nginx -t && sudo systemctl enable --now nginx && sudo systemctl reload nginx
+```
+
+**Bước 8. Kiểm tra**
+
+```bash
+curl -k https://localhost/healthz
+```
+
+Phải trả HTTP 200 và có `"dbOk": true`. Rồi mở `https://<tên máy chủ>/`, đăng nhập `admin` / `admin` (**bắt buộc đổi ngay**). Log app: `journalctl -u blk -f`.
+
+**Bước 9. Làm tiếp:** cài sync worker (mục 4 cho Windows hoặc 4B cho Linux) và cấu hình trong ứng dụng (mục 5). Cách này cập nhật phiên bản bằng tay (`git pull`, `npm ci --omit=dev`, `npm run migrate`, `systemctl restart blk`); đây là cách ít được hỗ trợ nhất, nên ưu tiên cách A.
+
+### 3.5. Chứng chỉ HTTPS thật
+
+nginx dùng **một chứng chỉ** cho cả web (cổng 443) và ingest API (cổng 8443), gồm hai file: `server.crt` (PEM, **kèm chuỗi CA trung gian** nếu có) và `server.key`. Làm lần lượt:
+
+1. Tạo bản ghi DNS cho tên truy cập, rồi tạo khóa và yêu cầu chứng chỉ (CSR) **trên máy chủ app** (khóa không rời máy):
 
    ```bash
    openssl req -new -newkey rsa:3072 -nodes -keyout server.key -out server.csr \
      -subj "/CN=blk.corp.local" -addext "subjectAltName=DNS:blk.corp.local"
    ```
 
-2. Gửi `server.csr` cho CA (AD CS template *Web Server*, hoặc CA công cộng). Nhận về chứng chỉ; nếu có chứng chỉ trung gian riêng thì ghép fullchain: `cat blk.corp.local.crt intermediate.crt > server.crt`. Có file `.pfx`: `openssl pkcs12 -in blk.pfx -nokeys -out server.crt` và `openssl pkcs12 -in blk.pfx -nocerts -nodes -out server.key`.
-3. Chép vào thư mục cert, đặt quyền (`chmod 644 server.crt && chmod 600 server.key`), rồi nạp lại nginx không gián đoạn:
+2. Gửi `server.csr` cho CA (AD CS template *Web Server*, hoặc CA công cộng). Nhận về chứng chỉ; nếu có chứng chỉ trung gian riêng thì ghép: `cat blk.corp.local.crt intermediate.crt > server.crt`.
+3. Chép `server.crt`, `server.key` vào thư mục `cert/` (cách C: `/etc/nginx/cert/`), đặt quyền `chmod 644 server.crt && chmod 600 server.key`, rồi nạp lại nginx không gián đoạn:
 
    ```bash
-   docker exec blk-nginx nginx -t && docker exec blk-nginx nginx -s reload
-   # compose: docker compose exec nginx nginx -t && docker compose exec nginx nginx -s reload
+   docker compose -f docker-compose.prod.yml exec nginx nginx -t && docker compose -f docker-compose.prod.yml exec nginx nginx -s reload   # cách A, B
+   sudo nginx -t && sudo systemctl reload nginx                                                                                              # cách C
    ```
 
 4. Kiểm tra từ máy khác, cả hai cổng phải in `Verify return code: 0 (ok)`:
@@ -297,25 +411,29 @@ Script tạo CA dev (`cert/ca.crt`) và ký `server.crt` (825 ngày); chạy l�
    openssl s_client -connect blk.corp.local:8443 -servername blk.corp.local </dev/null | grep "Verify return"
    ```
 
-5. Worker: `Ingest.BaseUrl` = `https://blk.corp.local:8443/api/ingest` (đúng tên trong chứng chỉ, không dùng IP). CA nội bộ mà máy worker đã tin (thường là CA của AD CS): để trống `CaFile`; chưa tin: đặt `CaFile` là PEM của CA gốc. Bỏ `CaFile` trỏ tới CA dev.
-6. **Gia hạn**: lặp lại từ bước 1 trước ngày hết hạn (`openssl x509 -in server.crt -noout -enddate`); chỉ cần reload nginx, không khởi động lại app hay worker.
+5. Worker: đặt `Ingest.BaseUrl` = `https://blk.corp.local:8443/api/ingest` (đúng tên trong chứng chỉ, không dùng IP). Máy worker đã tin CA của công ty (thường là CA của AD CS) thì để trống `CaFile`; chưa tin thì đặt `CaFile` là file CA.
+6. **Gia hạn:** lặp lại từ bước 1 trước ngày hết hạn (xem ngày: `openssl x509 -in server.crt -noout -enddate`); chỉ cần nạp lại nginx, không khởi động lại app hay worker.
 
 | Lỗi | Nguyên nhân / cách xử lý |
 | --- | --- |
 | `nginx -t`: `key values mismatch` | `server.key` không khớp chứng chỉ: dùng đúng khóa đã tạo CSR |
-| Trình duyệt báo sai tên | Tên truy cập không có trong SAN: cấp lại |
+| Trình duyệt báo sai tên | Tên truy cập không có trong SAN: xin cấp lại |
 | Worker `x509: unknown authority` / .NET `RemoteCertificateChainErrors` | Máy worker không tin CA: đặt `Ingest.CaFile` |
-| `s_client`: `unable to get local issuer certificate` | `server.crt` thiếu chứng chỉ trung gian: ghép fullchain |
+| `s_client`: `unable to get local issuer certificate` | `server.crt` thiếu chứng chỉ trung gian: ghép lại cho đủ chuỗi |
 
-### 3.7. Cập nhật phiên bản
+### 3.6. Cập nhật phiên bản
 
-Sao lưu DB trước (mục 6.8). Dùng docker-compose thì **migration tự chạy**: service `migrate` áp dụng các file mới rồi `server` mới khởi động; migration lỗi thì server không lên và bản cũ giữ nguyên. Migration chỉ thêm, không sửa file cũ.
+Sao lưu database trước (trong ứng dụng: Quản trị > Sao lưu). Dùng Docker Compose thì **migration tự chạy**: bản mới được dựng, tạo bảng mới xong mới khởi động; migration lỗi thì server không lên và bản cũ giữ nguyên. Migration chỉ thêm, không sửa file cũ. Làm trong thư mục dự án:
 
 ```bash
-# thêm --profile db --env-file server/.env nếu DB trong Docker
+git pull
+# Cách A (DB ngoài):
 docker compose -f docker-compose.prod.yml up -d --build
+# Cách B (DB trong Docker):
+docker compose -f docker-compose.prod.yml --profile db --env-file server/.env up -d --build
 ```
 
+Mỗi bản có ghi chú trong `CHANGELOG.md`, mục **Khi nâng cấp** cho biết có cần sửa `.env` hay không.
 
 **Phiên bản.** Theo [Semantic Versioning](https://semver.org/lang/vi/) (`MAJOR.MINOR.PATCH`), ghi trong [CHANGELOG.md](CHANGELOG.md) và hiện ở chân trang. Phát hành (người bảo trì):
 
@@ -325,7 +443,6 @@ docker compose -f docker-compose.prod.yml up -d --build
 git commit -am "release: 1.0.0" && git tag -a v1.0.0 -m "1.0.0" && git push origin main v1.0.0
 ```
 
-Migration chỉ thêm, nên nâng từ bản nào lên bản nào cũng chạy được; đổi `.env` hay cách dùng thì ghi ở mục **Khi nâng cấp** của CHANGELOG.
 ---
 
 ## 4. Cài sync worker trên Windows
@@ -658,7 +775,7 @@ Các khóa cần sửa:
 
 **Xác thực với server: HTTPS + API key** (`INGEST_API_KEY` trong `server/.env`), và server chỉ nhận từ IP
 máy worker: thêm IP đó vào `INGEST_ALLOWED_IPS`. Máy worker chưa tin CA của chứng chỉ server thì đặt
-`Ingest.CaFile` (mục 3.6).
+`Ingest.CaFile` (mục 3.5).
 
 ### 4B.7. Lưu bí mật
 
@@ -954,7 +1071,7 @@ Thêm vào `server/.env`: `BACKUP_DATABASE_URL=postgres://blk_backup:<mk>@<db-ho
 **Tra key khi hệ thống không chạy.** Giải nén `bitlocker-keys-*.zip` bằng 7-Zip vào thư mục chỉ mình bạn đọc được, mở `recovery_keys.csv` bằng Excel
 (Data > From Text/CSV, UTF-8), lọc cột `key_id_first8` theo 8 ký tự trên màn hình BitLocker, đọc `recovery_password`. Xong thì **xóa** file giải nén.
 
-**Khôi phục database (một lệnh).** Cần DB `blk` (trong Docker hay ngoài đều được) và hai tài khoản `blk_owner`, `app_node` (mục 3.2). Chép file `bitlocker-db-....zip` vào `./backups`, rồi:
+**Khôi phục database (một lệnh).** Cần DB `blk` (trong Docker hay ngoài đều được) và hai tài khoản `blk_owner`, `app_node` (mục 3.2 hoặc 3.3). Chép file `bitlocker-db-....zip` vào `./backups`, rồi:
 
 ```bash
 docker compose run --rm --no-deps server node src/cli/restore.js backups/bitlocker-db-20261018-013000.zip
@@ -1000,7 +1117,6 @@ docker compose exec server node src/cli/users.js enable <user>           # bật
 | App xác thực hỏng, cần vào ngay | `disable-2fa` (bật lại ở Quản trị > Người dùng) |
 | Tài khoản AD | mật khẩu do AD quản lý; `reset-password` không áp dụng |
 
-Nếu chạy bằng `docker run`, thay `docker compose exec server` bằng `docker exec blk-server`.
 
 ### 6.10. Truy vết sync trong log
 
@@ -1035,8 +1151,7 @@ App không tự ghi file: mọi log (kể cả sync) in ra **stdout** dạng JSO
 | Cách chạy | Log nằm ở | Rotate |
 | --- | --- | --- |
 | `docker compose` | `docker compose logs server` | Đã cấu hình sẵn trong file compose (driver `local`, có nén) |
-| `docker run` | `docker logs blk-server` | Đã có `--log-driver local --log-opt max-size=50m --log-opt max-file=20` ở mục 3.5; hoặc đặt cho mọi container trong `/etc/docker/daemon.json` |
-| Node bằng systemd | `journalctl -u blk-server` | journald tự xoay vòng; giới hạn bằng `SystemMaxUse=2G` |
+| Node bằng systemd | `journalctl -u blk` | journald tự xoay vòng; giới hạn bằng `SystemMaxUse=2G` |
 | Node ghi ra file | File bạn chọn | logrotate với `copytruncate` |
 
 Trên Linux, Docker mặc định dùng `json-file` **không rotate**, log lớn mãi tới khi đầy đĩa: luôn đặt một cấu hình ở trên. Muốn giữ lâu và tìm kiếm, đẩy log JSON về hệ thống tập trung (Loki, ELK / OpenSearch, Graylog, SIEM; mục 6.15). Nhật ký truy cập (ai xem key) nằm trong database, không phải log này.
@@ -1151,7 +1266,7 @@ Giờ đọc AD của **worker** (delta 15 phút, full 01:00, heartbeat 5 phút)
 
 | Hiện tượng | Nguyên nhân thường gặp | Cách xử lý |
 | --- | --- | --- |
-| App không khởi động, log ghi `Invalid configuration` | Thiếu hoặc sai biến trong `.env` | Đọc tên biến trong log, sửa `.env` (xem mục 3.4) |
+| App không khởi động, log ghi `Invalid configuration` | Thiếu hoặc sai biến trong `.env` | Đọc tên biến trong log, sửa `.env` (mục 3 có đủ các biến cần sửa) |
 | `/healthz` trả 503 | Không kết nối được DB | Kiểm tra `DATABASE_URL`, tường lửa, `DB_SSL` |
 | Đăng nhập báo tài khoản bị khóa (kể cả Admin) | Nhập sai mật khẩu quá số lần cho phép (Quản trị > Bảo mật) | Chờ hết thời gian khóa, hoặc Admin khác mở khóa; không còn Admin nào thì `docker compose exec server node src/cli/users.js unlock <tên>` (mục 6.14) |
 | Đăng nhập AD báo không kết nối được máy chủ AD | Sai `LDAP_SERVERS` / `LDAP_PROTOCOL`, chặn cổng 389 hoặc 636, hoặc app không tin CA của DC | Thử `openssl s_client -connect dc01.corp.local:636`, đặt `LDAP_CA_FILE` |
@@ -1180,7 +1295,7 @@ Giờ đọc AD của **worker** (delta 15 phút, full 01:00, heartbeat 5 phút)
 
 | Biến | Mặc định | Ý nghĩa |
 | --- | --- | --- |
-| `NODE_ENV` | `development` | `production` bật các kiểm tra bảo mật ở mục 3.4 |
+| `NODE_ENV` | `development` | `production` bật các kiểm tra bảo mật khi khởi động |
 | `USER_HOST`, `USER_PORT` | `127.0.0.1`, `3000` | Cổng web + `/api` |
 | `TRUST_PROXY` | `loopback` | Proxy được tin cho IP người dùng: `1` = một lớp (nginx, khuyến nghị), hoặc IP/dải IP |
 | `INGEST_HOST`, `INGEST_PORT` | `0.0.0.0`, `8443` | Cổng ingest API |
@@ -1269,7 +1384,7 @@ Endpoint (chi tiết trong đặc tả): `GET /sync-runs/last`, `POST /sync-runs
 
 | Lớp | Cấu hình | Lỗi khi sai |
 | --- | --- | --- |
-| HTTPS | nginx cổng 8443 (mục 3.6) | Lỗi TLS; `http://` vào 8443 nhận 400 |
+| HTTPS | nginx cổng 8443 (mục 3.5) | Lỗi TLS; `http://` vào 8443 nhận 400 |
 | IP được phép | `INGEST_ALLOWED_IPS` (IP nginx ghi vào `X-Forwarded-For`, client không giả được) | 403 `forbidden` |
 | API key | `INGEST_API_KEY`, header `Authorization: Bearer <key>` | 401 `bad_api_key` |
 

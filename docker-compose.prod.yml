@@ -38,6 +38,11 @@ services:
     command: ["node", "src/db/migrate.js"]
     env_file: ./server/.env
     restart: "no"
+    # DB trong Docker (--profile db): doi DB san sang truoc khi migrate; DB ngoai thi bo qua.
+    depends_on:
+      db:
+        condition: service_healthy
+        required: false
 
   server:
     build: ./server
