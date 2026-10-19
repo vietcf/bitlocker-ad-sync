@@ -164,9 +164,10 @@ public sealed class LdapDirectoryReader(LdapOptions options, ILogger<LdapDirecto
 
     public IEnumerable<AdComputer> ReadComputers(long? sinceUsn, CancellationToken ct)
     {
+        var computers = LdapValues.ComputerFilter(options.ExcludeOperatingSystems);
         var filter = sinceUsn is { } usn
-            ? $"(&(objectCategory=computer)(uSNChanged>={usn + 1}))"
-            : "(objectCategory=computer)";
+            ? $"(&{computers}(uSNChanged>={usn + 1}))"
+            : computers;
         foreach (var searchBase in options.EffectiveSearchBases)
         {
             var count = 0;
@@ -181,16 +182,35 @@ public sealed class LdapDirectoryReader(LdapOptions options, ILogger<LdapDirecto
         }
     }
 
+    /// <summary>
+    /// DNs (lower case) of the computers left out by ExcludeOperatingSystems, in every search base. Read in
+    /// full even in a delta run: a changed key may belong to an unchanged excluded server.
+    /// </summary>
+    private HashSet<string>? ExcludedComputerDns(CancellationToken ct)
+    {
+        var patterns = LdapValues.CleanOsPatterns(options.ExcludeOperatingSystems);
+        if (patterns.Count == 0) return null;
+        var set = new HashSet<string>(StringComparer.Ordinal);
+        var filter = LdapValues.ExcludedComputerFilter(patterns);
+        foreach (var searchBase in options.EffectiveSearchBases)
+            foreach (var e in PagedSearch(searchBase, filter, ["distinguishedName"], ct))
+                set.Add(e.DistinguishedName.ToLowerInvariant());
+        log.LogInformation("Leaving out {Count} computers whose operating system matches {Patterns} (and their recovery keys)", set.Count, string.Join(", ", patterns));
+        return set;
+    }
+
     public IEnumerable<AdRecoveryKey> ReadRecoveryKeys(long? sinceUsn, CancellationToken ct)
     {
         var filter = sinceUsn is { } usn
             ? $"(&(objectClass=msFVE-RecoveryInformation)(uSNChanged>={usn + 1}))"
             : "(objectClass=msFVE-RecoveryInformation)";
+        var excluded = ExcludedComputerDns(ct);
         foreach (var searchBase in options.EffectiveSearchBases)
         {
             var count = 0;
             foreach (var e in PagedSearch(searchBase, filter, KeyAttributes, ct))
             {
+                if (LdapValues.IsKeyOfExcluded(excluded, e.DistinguishedName)) continue;
                 var guid = GetBytes(e, "msFVE-RecoveryGuid");
                 var created = LdapValues.ParseGeneralizedTime(GetString(e, "whenCreated"));
                 if (guid is null || created is null)
@@ -223,7 +243,7 @@ public sealed class LdapDirectoryReader(LdapOptions options, ILogger<LdapDirecto
         {
             try
             {
-                var computers = PagedSearch(searchBase, "(objectCategory=computer)", ComputerAttributes, ct).Take(sample).Count();
+                var computers = PagedSearch(searchBase, LdapValues.ComputerFilter(options.ExcludeOperatingSystems), ComputerAttributes, ct).Take(sample).Count();
                 var keys = PagedSearch(searchBase, "(objectClass=msFVE-RecoveryInformation)", KeyAttributes, ct).Take(sample).ToList();
                 results.Add(new SearchBaseProbe(searchBase, computers, keys.Count,
                     keys.Count(k => GetString(k, "msFVE-RecoveryPassword") is null), null));

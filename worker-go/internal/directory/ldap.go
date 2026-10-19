@@ -36,8 +36,11 @@ type LdapConfig struct {
 	Password    string // already revealed
 	BaseDN      string
 	SearchBases []string // effective (see EffectiveSearchBases)
-	PageSize    int
-	Timeout     time.Duration
+	// ExcludeOperatingSystems: patterns ("Windows Server*") of operatingSystem to leave out, with their keys.
+	// Empty (default) = read every computer.
+	ExcludeOperatingSystems []string
+	PageSize                int
+	Timeout                 time.Duration
 	// RootCAs: extra trusted CAs (Ldap.CaFile) on top of the system store; nil = system store only.
 	RootCAs *x509.CertPool
 	// SkipCertificateValidation: lab only, accept any DC certificate (still encrypted, but no
@@ -247,7 +250,7 @@ func usnFilter(class string, sinceUSN *int64) string {
 }
 
 func (r *LdapReader) ReadComputers(ctx context.Context, sinceUSN *int64, yield func(Computer) error) error {
-	filter := usnFilter("(objectCategory=computer)", sinceUSN)
+	filter := usnFilter(ComputerFilter(r.cfg.ExcludeOperatingSystems), sinceUSN)
 	for _, base := range r.cfg.SearchBases {
 		count := 0
 		err := r.pagedSearch(ctx, base, filter, computerAttributes, func(e *ldap.Entry) error {
@@ -266,11 +269,41 @@ func (r *LdapReader) ReadComputers(ctx context.Context, sinceUSN *int64, yield f
 	return nil
 }
 
+// excludedComputerDNs: DNs (lower case) of the computers left out by ExcludeOperatingSystems, in every
+// search base. Read in full even in a delta run: a changed key may belong to an unchanged excluded server.
+func (r *LdapReader) excludedComputerDNs(ctx context.Context) (map[string]struct{}, error) {
+	patterns := CleanOSPatterns(r.cfg.ExcludeOperatingSystems)
+	if len(patterns) == 0 {
+		return nil, nil
+	}
+	set := map[string]struct{}{}
+	filter := ExcludedComputerFilter(patterns)
+	for _, base := range r.cfg.SearchBases {
+		err := r.pagedSearch(ctx, base, filter, []string{"distinguishedName"}, func(e *ldap.Entry) error {
+			set[strings.ToLower(e.DN)] = struct{}{}
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+	r.log.Info(fmt.Sprintf("Leaving out %d computers whose operating system matches %v (and their recovery keys)", len(set), patterns))
+	return set, nil
+}
+
 func (r *LdapReader) ReadRecoveryKeys(ctx context.Context, sinceUSN *int64, yield func(RecoveryKey) error) error {
 	filter := usnFilter("(objectClass=msFVE-RecoveryInformation)", sinceUSN)
+	excluded, err := r.excludedComputerDNs(ctx)
+	if err != nil {
+		return err
+	}
 	for _, base := range r.cfg.SearchBases {
-		count := 0
+		count, skipped := 0, 0
 		err := r.pagedSearch(ctx, base, filter, keyAttributes, func(e *ldap.Entry) error {
+			if IsKeyOfExcluded(excluded, e.DN) {
+				skipped++
+				return nil
+			}
 			k := r.toKey(e)
 			if k == nil {
 				return nil
@@ -281,7 +314,7 @@ func (r *LdapReader) ReadRecoveryKeys(ctx context.Context, sinceUSN *int64, yiel
 		if err != nil {
 			return err
 		}
-		r.log.Info(fmt.Sprintf("Read %d recovery keys from %s", count, base), "count", count, "searchBase", base)
+		r.log.Info(fmt.Sprintf("Read %d recovery keys from %s", count, base), "count", count, "searchBase", base, "skippedExcludedOS", skipped)
 	}
 	return nil
 }
@@ -342,7 +375,7 @@ func (r *LdapReader) ProbeSearchBases(ctx context.Context, sample int) []SearchB
 	errStop := errors.New("enough")
 	for _, base := range r.cfg.SearchBases {
 		p := SearchBaseProbe{SearchBase: base}
-		err := r.pagedSearch(ctx, base, "(objectCategory=computer)", computerAttributes, func(*ldap.Entry) error {
+		err := r.pagedSearch(ctx, base, ComputerFilter(r.cfg.ExcludeOperatingSystems), computerAttributes, func(*ldap.Entry) error {
 			p.Computers++
 			if p.Computers >= sample {
 				return errStop

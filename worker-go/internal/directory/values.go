@@ -148,6 +148,68 @@ func ParentDN(dn string) string {
 	return ""
 }
 
+// CleanOSPatterns trims the operating-system patterns, drops empty ones and duplicates (case-insensitive).
+func CleanOSPatterns(list []string) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, p := range list {
+		p = strings.TrimSpace(p)
+		if p == "" || seen[strings.ToLower(p)] {
+			continue
+		}
+		seen[strings.ToLower(p)] = true
+		out = append(out, p)
+	}
+	return out
+}
+
+// EscapeFilterPattern escapes a filter value but keeps "*" as the wildcard ("Windows Server*").
+func EscapeFilterPattern(p string) string {
+	parts := strings.Split(p, "*")
+	for i := range parts {
+		parts[i] = EscapeFilterValue(parts[i])
+	}
+	return strings.Join(parts, "*")
+}
+
+// ComputerFilter selects computer objects, leaving out those whose operatingSystem matches a pattern.
+// A computer with no operatingSystem attribute is kept. No patterns: every computer.
+func ComputerFilter(excludeOS []string) string {
+	excludeOS = CleanOSPatterns(excludeOS)
+	if len(excludeOS) == 0 {
+		return "(objectCategory=computer)"
+	}
+	var b strings.Builder
+	b.WriteString("(&(objectCategory=computer)")
+	for _, p := range excludeOS {
+		b.WriteString("(!(operatingSystem=" + EscapeFilterPattern(p) + "))")
+	}
+	b.WriteString(")")
+	return b.String()
+}
+
+// ExcludedComputerFilter selects the computers ComputerFilter leaves out (used to drop their recovery keys).
+func ExcludedComputerFilter(excludeOS []string) string {
+	excludeOS = CleanOSPatterns(excludeOS)
+	var b strings.Builder
+	b.WriteString("(&(objectCategory=computer)(|")
+	for _, p := range excludeOS {
+		b.WriteString("(operatingSystem=" + EscapeFilterPattern(p) + ")")
+	}
+	b.WriteString("))")
+	return b.String()
+}
+
+// IsKeyOfExcluded reports whether a recovery object (a child of its computer) belongs to a computer in the
+// excluded set (keys of DNs in lower case).
+func IsKeyOfExcluded(excluded map[string]struct{}, keyDN string) bool {
+	if len(excluded) == 0 {
+		return false
+	}
+	_, ok := excluded[strings.ToLower(ParentDN(keyDN))]
+	return ok
+}
+
 // EscapeFilterValue escapes a value for use inside an LDAP filter (RFC 4515).
 func EscapeFilterValue(v string) string {
 	var b strings.Builder

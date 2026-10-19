@@ -32,8 +32,8 @@ import (
 	"github.com/bitlocker-management/worker-go/internal/syncrun"
 )
 
-// version is set at build time: go build -ldflags "-X main.version=1.0.0".
-var version = "1.0.0"
+// version is set at build time: go build -ldflags "-X main.version=1.1.0".
+var version = "1.1.0"
 
 func main() { os.Exit(run(os.Args[1:])) }
 
@@ -150,6 +150,7 @@ func build(cfg *config.Config, log *slog.Logger) (*app, error) {
 			Password:                  password,
 			BaseDN:                    cfg.Ldap.BaseDn,
 			SearchBases:               cfg.Ldap.EffectiveSearchBases(),
+			ExcludeOperatingSystems:   cfg.Ldap.EffectiveExcludeOS(),
 			PageSize:                  cfg.Ldap.PageSize,
 			Timeout:                   time.Duration(cfg.Ldap.TimeoutSeconds) * time.Second,
 			RootCAs:                   pool,

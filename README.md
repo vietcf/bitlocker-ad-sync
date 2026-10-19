@@ -573,6 +573,7 @@ vì gMSA.
     "Password": "",               // "dpapi:..." nếu có Username
     "BaseDn": "DC=corp,DC=local",
     "SearchBases": [],            // để trống = cả BaseDn; hoặc danh sách OU được cấp quyền đọc (xem dưới)
+    "ExcludeOperatingSystems": [],  // tùy chọn: bỏ qua máy theo hệ điều hành, ví dụ ["Windows Server*"] (xem dưới)
     "PageSize": 1000,
     "TimeoutSeconds": 60,
     "AllowInsecure": false
@@ -598,6 +599,14 @@ vì gMSA.
 ```jsonc
 "SearchBases": [ "OU=Computers,OU=HN,DC=corp,DC=local", "OU=Computers,OU=HCM,DC=corp,DC=local" ]
 ```
+
+**Bỏ qua Server (tùy chọn, `ExcludeOperatingSystems`).** Mặc định worker đọc mọi computer object trong phạm vi, kể cả Windows Server. Muốn chỉ theo dõi máy trạm mà các Server nằm lẫn trong cùng OU, liệt kê mẫu hệ điều hành cần bỏ qua (`*` là ký tự đại diện, không phân biệt hoa thường):
+
+```jsonc
+"ExcludeOperatingSystems": [ "Windows Server*" ]
+```
+
+Máy khớp mẫu bị bỏ qua cùng key của nó; máy chưa có thuộc tính hệ điều hành trong AD vẫn được đọc. Để trống (mặc định) là đọc tất cả. Cách đơn giản hơn là chỉ đưa các OU máy trạm vào `SearchBases`. Lưu ý khi bật tùy chọn trên hệ thống đã chạy: Server đã đồng bộ trước đó sẽ bị coi là "Không còn trong phạm vi giám sát" ở lượt full kế tiếp (dữ liệu và key vẫn được giữ), và nếu có nhiều máy thì lượt đó có thể bị giữ lại chờ duyệt: vào Quản trị > Đồng bộ AD để chấp nhận. Tùy chọn này không áp dụng cho nguồn `JsonFile` (chỉ dùng khi phát triển).
 
 - Mỗi lượt đọc lần lượt từng OU và gửi server như một lượt.
 - Một OU không đọc được (không tồn tại, thiếu quyền) thì **cả lượt dừng** với `ldap_search_base_failed` và tên OU trong log, không bỏ qua, vì bỏ qua sẽ làm lượt full coi mọi máy trong OU là "ngoài phạm vi".
@@ -823,6 +832,7 @@ Các khóa cần sửa:
   "Password": "cred:ldap-password",       // systemd credential, tạo ở 4B.7
   "BaseDn": "DC=corp,DC=local",
   "SearchBases": [],                      // hoặc danh sách OU tài khoản được đọc
+  "ExcludeOperatingSystems": [],          // tùy chọn: bỏ qua máy theo hệ điều hành, ví dụ ["Windows Server*"]
   "CaFile": ""                            // file PEM của CA, nếu máy chưa tin CA của DC
 },
 "Ingest": {

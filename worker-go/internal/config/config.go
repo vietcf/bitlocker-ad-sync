@@ -35,11 +35,15 @@ type Ldap struct {
 	// UPN (svc-blk@corp.local), DOMAIN\user or DN.
 	Username string
 	// Plain text (development), or "file:/path", "env:NAME", "cred:NAME" (see Reveal).
-	Password       string
-	BaseDn         string
-	SearchBases    []string
-	PageSize       int
-	TimeoutSeconds int
+	Password    string
+	BaseDn      string
+	SearchBases []string
+	// Optional. Patterns of the AD attribute operatingSystem to leave out, with their recovery keys, e.g.
+	// ["Windows Server*"]. "*" is the wildcard, case-insensitive. Empty (default) = read every computer.
+	// A computer with no operatingSystem is always kept.
+	ExcludeOperatingSystems []string
+	PageSize                int
+	TimeoutSeconds          int
 	// Deprecated, ignored: plain LDAP is allowed (and the default) since 1.0.0. Kept so old files still load.
 	AllowInsecure bool
 	// Lab only: accept any DC certificate.
@@ -152,6 +156,11 @@ func (l Ldap) EffectiveSearchBases() []string {
 	return directory.EffectiveSearchBases(l.SearchBases, l.BaseDn)
 }
 
+// EffectiveExcludeOS: ExcludeOperatingSystems trimmed, without empty entries or duplicates.
+func (l Ldap) EffectiveExcludeOS() []string {
+	return directory.CleanOSPatterns(l.ExcludeOperatingSystems)
+}
+
 var fullAtRe = regexp.MustCompile(`^([01]\d|2[0-3]):[0-5]\d$`)
 
 // FullAtMinutes is FullAt as minutes after midnight.
@@ -188,6 +197,14 @@ func (c *Config) Validate() []string {
 				if strings.TrimSpace(b) != "" && !directory.IsWithin(b, l.BaseDn) {
 					errs = append(errs, fmt.Sprintf("Ldap.SearchBases: %q is not inside Ldap.BaseDn (%s).", b, l.BaseDn))
 				}
+			}
+		}
+		if n := len(l.EffectiveExcludeOS()); n > 50 {
+			errs = append(errs, "Ldap.ExcludeOperatingSystems has too many entries (at most 50).")
+		}
+		for _, p := range l.EffectiveExcludeOS() {
+			if len(p) > 128 || strings.ContainsAny(p, "\x00\r\n") || strings.Trim(p, "*") == "" {
+				errs = append(errs, fmt.Sprintf("Ldap.ExcludeOperatingSystems: %q is not a valid pattern (text up to 128 characters, not only \"*\").", p))
 			}
 		}
 		// Plain Ldap (the default) sends the bind password and every recovery key in clear text: the

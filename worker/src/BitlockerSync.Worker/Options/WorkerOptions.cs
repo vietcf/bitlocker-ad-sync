@@ -64,6 +64,13 @@ public sealed class LdapOptions
     /// </summary>
     public List<string> SearchBases { get; set; } = [];
 
+    /// <summary>
+    /// Optional. Patterns of the AD attribute operatingSystem to leave out, with their recovery keys, for
+    /// example ["Windows Server*"]. "*" is the wildcard, case-insensitive. Empty (default) = read every
+    /// computer. A computer with no operatingSystem is always kept.
+    /// </summary>
+    public List<string> ExcludeOperatingSystems { get; set; } = [];
+
     [Range(1, 1000)]
     public int PageSize { get; set; } = 1000;
 

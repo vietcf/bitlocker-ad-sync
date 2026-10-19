@@ -22,6 +22,11 @@ public sealed class LdapOptionsValidator : IValidateOptions<LdapOptions>
                 errors.Add($"Ldap:SearchBases: \"{sb}\" is not inside Ldap:BaseDn ({o.BaseDn}).");
         }
 
+        var excludeOs = Directory.LdapValues.CleanOsPatterns(o.ExcludeOperatingSystems);
+        if (excludeOs.Count > 50) errors.Add("Ldap:ExcludeOperatingSystems has too many entries (at most 50).");
+        foreach (var p in excludeOs.Where(p => p.Length > 128 || p.IndexOfAny(['\0', '\r', '\n']) >= 0 || p.Trim('*').Length == 0))
+            errors.Add($"Ldap:ExcludeOperatingSystems: \"{p}\" is not a valid pattern (text up to 128 characters, not only \"*\").");
+
         var hasUser = !string.IsNullOrWhiteSpace(o.Username);
         var hasPassword = !string.IsNullOrEmpty(o.Password);
         if (o.Auth == LdapAuth.Basic && (!hasUser || !hasPassword))

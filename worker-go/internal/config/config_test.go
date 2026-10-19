@@ -157,3 +157,48 @@ func TestRevealsSecretsFromFilesEnvironmentAndSystemdCredentials(t *testing.T) {
 		t.Error("missing env must fail")
 	}
 }
+
+func TestExcludeOperatingSystemsIsOptionalAndValidated(t *testing.T) {
+	c := valid()
+	if errs := c.Validate(); len(errs) > 0 || len(c.Ldap.EffectiveExcludeOS()) != 0 {
+		t.Errorf("default must be empty and valid: %v", errs)
+	}
+	c.Ldap.ExcludeOperatingSystems = []string{" Windows Server* ", "windows server*", ""}
+	if errs := c.Validate(); len(errs) > 0 {
+		t.Errorf("valid patterns refused: %v", errs)
+	}
+	if got := c.Ldap.EffectiveExcludeOS(); len(got) != 1 || got[0] != "Windows Server*" {
+		t.Errorf("EffectiveExcludeOS = %v", got)
+	}
+	c.Ldap.ExcludeOperatingSystems = []string{"*"}
+	if errs := c.Validate(); !has(errs, "ExcludeOperatingSystems") {
+		t.Errorf("a lone * would exclude every computer: %v", errs)
+	}
+	c.Ldap.ExcludeOperatingSystems = []string{strings.Repeat("a", 129)}
+	if errs := c.Validate(); !has(errs, "ExcludeOperatingSystems") {
+		t.Errorf("a too long pattern must be refused: %v", errs)
+	}
+}
+
+func TestReadsExcludeOperatingSystemsFromJSONAndEnvironment(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	json := `{ "Ldap": { "Source": "Ldap", "Servers": ["dc01"], "BaseDn": "DC=corp,DC=local", "Username": "u", "Password": "p",
+	  "ExcludeOperatingSystems": ["Windows Server*"] }, "Ingest": { "BaseUrl": "https://blk.corp.local:8443/api/ingest", "ApiKey": "k" } }`
+	if err := os.WriteFile(path, []byte(json), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	c, err := Load(path, []string{"PATH=/bin"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := c.Ldap.EffectiveExcludeOS(); len(got) != 1 || got[0] != "Windows Server*" {
+		t.Errorf("from JSON: %v", got)
+	}
+	c, err = Load(path, []string{"Ldap__ExcludeOperatingSystems=Ubuntu*, Windows Server*", "PATH=/bin"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := c.Ldap.EffectiveExcludeOS(); len(got) != 2 || got[0] != "Ubuntu*" {
+		t.Errorf("from environment: %v", got)
+	}
+}

@@ -41,6 +41,7 @@ Giống nhau hoàn toàn:
 - trình tự một lượt sync: mở lượt, chụp USN trước khi đọc, gửi máy, gửi key, xử lý orphan, đóng lượt;
 - chuyển delta sang full khi DC bị restore (invocationId đổi) hoặc USN lùi;
 - đọc lần lượt từng OU của `SearchBases`; OU không đọc được thì dừng cả lượt với `ldap_search_base_failed`;
+- tùy chọn `Ldap.ExcludeOperatingSystems` (ví dụ `["Windows Server*"]`) bỏ qua máy theo hệ điều hành, kèm key của chúng;
 - retry với backoff, heartbeat, mã lỗi, đóng lượt `cancelled` khi service dừng;
 - chuyển GUID nhị phân của AD (thứ tự byte như Windows; có test so khớp với bản .NET).
 

@@ -42,6 +42,7 @@ scripts/update-worker.ps1     cập nhật lên bản mới, giữ nguyên appse
 | `Ldap:Protocol` | `Ldaps` (636, mặc định) · `StartTls` (389 + TLS) · `Ldap` (389, không TLS) |
 | `Ldap:Auth` | `Negotiate` (mặc định: tài khoản chạy service/gMSA, hoặc `Username` + `Password`) · `Basic` (simple bind bằng `Username` + `Password`) |
 | `Ldap:Username` / `Ldap:Password` | `CORP\svc-blk` hoặc `svc-blk@corp.local`; mật khẩu dạng `dpapi:...` (xem bên dưới) |
+| `Ldap:ExcludeOperatingSystems` | Tùy chọn: mẫu hệ điều hành cần bỏ qua cùng key của máy, ví dụ `["Windows Server*"]` (`*` là ký tự đại diện). Mặc định `[]` = đọc tất cả |
 | `Ldap:BaseDn`, `Ldap:SearchBases` | DN của domain; danh sách OU cần đọc (để trống = cả `BaseDn`). Các OU được đọc **lần lượt** trong cùng một lượt sync; OU phải nằm trong `BaseDn`; OU trùng hoặc OU con của OU đã có được bỏ qua. Một OU không đọc được (không tồn tại, thiếu quyền) làm cả lượt dừng với mã `ldap_search_base_failed`, để lượt full không coi máy trong OU đó là "Không còn trong phạm vi giám sát" |
 | `Ldap:AllowInsecure` | `Ldap` + `Basic` gửi mật khẩu và mọi key dạng rõ, nên worker từ chối chạy trừ khi đặt `true` (chỉ dùng cho lab). `Ldap` + `Negotiate` được chấp nhận vì Kerberos signing + sealing mã hóa phiên |
 | `Ingest:BaseUrl` | `https://blk.corp.local:8443/api/ingest` (chỉ localhost mới được dùng http) |

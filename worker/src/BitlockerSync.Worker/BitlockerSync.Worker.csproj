@@ -6,7 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>BitlockerSync.Worker</RootNamespace>
     <AssemblyName>BitlockerSync.Worker</AssemblyName>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <!-- Windows Service using Windows-only APIs (DPAPI, certificate store). -->
     <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-x64</RuntimeIdentifier>

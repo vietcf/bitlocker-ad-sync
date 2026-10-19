@@ -74,6 +74,35 @@ public static class LdapValues
         return "";
     }
 
+    /// <summary>Trims the operating-system patterns, drops empty ones and duplicates (case-insensitive).</summary>
+    public static IReadOnlyList<string> CleanOsPatterns(IEnumerable<string>? patterns) =>
+        (patterns ?? []).Select(p => p?.Trim() ?? "").Where(p => p.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
+    /// <summary>Escapes a filter value but keeps "*" as the wildcard ("Windows Server*").</summary>
+    public static string EscapeFilterPattern(string pattern) =>
+        string.Join("*", pattern.Split('*').Select(EscapeFilterValue));
+
+    /// <summary>
+    /// Computer objects, leaving out those whose operatingSystem matches a pattern. A computer with no
+    /// operatingSystem is kept. No patterns: every computer.
+    /// </summary>
+    public static string ComputerFilter(IEnumerable<string>? excludeOs)
+    {
+        var patterns = CleanOsPatterns(excludeOs);
+        return patterns.Count == 0
+            ? "(objectCategory=computer)"
+            : "(&(objectCategory=computer)" + string.Concat(patterns.Select(p => $"(!(operatingSystem={EscapeFilterPattern(p)}))")) + ")";
+    }
+
+    /// <summary>The computers <see cref="ComputerFilter"/> leaves out (used to drop their recovery keys).</summary>
+    public static string ExcludedComputerFilter(IEnumerable<string>? excludeOs) =>
+        "(&(objectCategory=computer)(|" + string.Concat(CleanOsPatterns(excludeOs).Select(p => $"(operatingSystem={EscapeFilterPattern(p)})")) + "))";
+
+    /// <summary>A recovery object is a child of its computer: true when that computer is in the excluded set (DNs in lower case).</summary>
+    public static bool IsKeyOfExcluded(ISet<string>? excluded, string keyDn) =>
+        excluded is { Count: > 0 } && excluded.Contains(ParentDn(keyDn).ToLowerInvariant());
+
     /// <summary>Escapes a value for use inside an LDAP filter (RFC 4515).</summary>
     public static string EscapeFilterValue(string value)
     {

@@ -23,6 +23,7 @@ hoặc giá trị thường (chỉ khi thử nhanh).
 | `Password` 🔒 | (bắt buộc) | | Mật khẩu của `Username` |
 | `BaseDn` | (bắt buộc) | DN | Ví dụ `DC=corp,DC=local` |
 | `SearchBases` | `[]` | danh sách DN | Rỗng = cả `BaseDn`. Đọc lần lượt; OU trùng hoặc OU con bị bỏ; phải nằm trong `BaseDn` |
+| `ExcludeOperatingSystems` | `[]` | danh sách mẫu | Tùy chọn. Bỏ qua máy (và key của máy) có `operatingSystem` khớp mẫu, `*` là ký tự đại diện, không phân biệt hoa thường, ví dụ `["Windows Server*"]`. Máy không có thuộc tính này vẫn được đọc. Tối đa 50 mẫu. Biến môi trường (cách nhau dấu phẩy): `Ldap__ExcludeOperatingSystems=Windows Server*,Ubuntu*` |
 | `PageSize` | 1000 | 1–1000 | Số object mỗi trang (paged search) |
 | `TimeoutSeconds` | 60 | 5–600 | Thời gian chờ mỗi thao tác LDAP |
 | `CaFile` | | file PEM | `Ldaps`/`StartTls`: CA đã cấp chứng chỉ cho DC, thêm vào kho hệ thống |

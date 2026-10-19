@@ -3,6 +3,12 @@
 Định dạng theo [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/), phiên bản theo
 [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [1.1.0] - 2026-10-19
+
+### Thêm
+
+- Tùy chọn `Ldap.ExcludeOperatingSystems`: bỏ qua máy có `operatingSystem` khớp mẫu (ví dụ `["Windows Server*"]`) cùng key của chúng. Mặc định rỗng (đọc tất cả); máy không có thuộc tính hệ điều hành vẫn được đọc.
+
 ## [1.0.0] - 2026-10-14
 
 ### Thêm

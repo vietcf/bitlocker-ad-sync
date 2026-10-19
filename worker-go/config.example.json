@@ -57,6 +57,8 @@
       "OU=Computers,OU=HO,DC=corp,DC=local",
       "OU=Computers,OU=HN,DC=corp,DC=local"
     ],
+    // Tuy chon: bo qua may theo he dieu hanh (va key cua may), vi du ["Windows Server*"]. [] = doc tat ca.
+    "ExcludeOperatingSystems": [],
     "PageSize": 1000,               // 1-1000 object moi trang
     "TimeoutSeconds": 60,           // 5-600
     // Chi cho Ldaps / StartTls. CaFile: file PEM cua CA cap chung chi cho DC, vi du "/etc/blk-sync/corp-ca.pem".

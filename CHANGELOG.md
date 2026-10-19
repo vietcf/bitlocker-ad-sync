@@ -13,6 +13,16 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.2.0] - 2026-10-19
+
+### Thêm
+
+- Worker (cả bản .NET và Go, lên 1.1.0): tùy chọn `Ldap:ExcludeOperatingSystems` bỏ qua máy theo hệ điều hành, ví dụ `["Windows Server*"]`, cùng key của chúng. Mặc định rỗng nên không đổi hành vi. README mục 4.4.
+
+### Khi nâng cấp
+
+Không có migration và không đổi `.env`. Cập nhật worker lên 1.1.0 nếu muốn dùng tùy chọn mới; bật tùy chọn trên hệ thống đã chạy thì lượt full kế tiếp coi các Server đã đồng bộ là "ngoài phạm vi" và có thể bị giữ lại chờ duyệt.
+
 ## [2.1.0] - 2026-10-19
 
 ### Thêm
@@ -133,7 +143,8 @@ mới được kiểm thử trên mô phỏng và kết nối thử, chưa qua m
 - `server/.env`: `LDAP_URL` đã bỏ, thay bằng `LDAP_SERVERS` và `LDAP_PROTOCOL` (ví dụ `LDAP_SERVERS=dc01.corp.local`).
 - Script gọi API bằng tài khoản AD phải chuyển sang tài khoản local.
 
-[Chưa phát hành]: https://github.com/vietcf/bitlocker-ad-sync/compare/v2.1.0...HEAD
+[Chưa phát hành]: https://github.com/vietcf/bitlocker-ad-sync/compare/v2.2.0...HEAD
+[2.2.0]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v2.2.0
 [2.1.0]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v2.1.0
 [2.0.2]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v2.0.2
 [2.0.1]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v2.0.1

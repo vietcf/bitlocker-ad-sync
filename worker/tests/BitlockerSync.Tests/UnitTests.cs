@@ -31,6 +31,32 @@ public class LdapValuesTests
     public void Finds_the_parent_dn(string dn, string parent) => Assert.Equal(parent, LdapValues.ParentDn(dn));
 
     [Fact]
+    public void Computer_filter_leaves_out_the_chosen_operating_systems()
+    {
+        Assert.Equal("(objectCategory=computer)", LdapValues.ComputerFilter(null));
+        Assert.Equal("(objectCategory=computer)", LdapValues.ComputerFilter([" ", ""]));
+        Assert.Equal(
+            "(&(objectCategory=computer)(!(operatingSystem=Windows Server*))(!(operatingSystem=Linux \\28x\\29)))",
+            LdapValues.ComputerFilter([" Windows Server* ", "windows server*", "", "Linux (x)"]));
+        Assert.Equal(
+            "(&(objectCategory=computer)(|(operatingSystem=Windows Server*)(operatingSystem=Ubuntu*)))",
+            LdapValues.ExcludedComputerFilter(["Windows Server*", "Ubuntu*"]));
+    }
+
+    [Fact]
+    public void Pattern_escaping_keeps_the_wildcard() =>
+        Assert.Equal(@"Win*dows \28R\29\5cx", LdapValues.EscapeFilterPattern(@"Win*dows (R)\x"));
+
+    [Fact]
+    public void Keys_of_excluded_computers_are_recognised()
+    {
+        var excluded = new HashSet<string> { "cn=srv01,ou=servers,dc=corp,dc=local" };
+        Assert.True(LdapValues.IsKeyOfExcluded(excluded, "CN=2026-10-18T10:00:00+07:00{ABCDEF},CN=SRV01,OU=Servers,DC=corp,DC=local"));
+        Assert.False(LdapValues.IsKeyOfExcluded(excluded, "CN=2026{X},CN=HN-LT-01,OU=Computers,DC=corp,DC=local"));
+        Assert.False(LdapValues.IsKeyOfExcluded(null, "CN=2026{X},CN=SRV01,OU=Servers,DC=corp,DC=local"));
+    }
+
+    [Fact]
     public void Escapes_ldap_filter_values() => Assert.Equal(@"a\2a\28b\29\5c", LdapValues.EscapeFilterValue(@"a*(b)\"));
 }
 
@@ -78,6 +104,15 @@ public class OptionsValidatorTests
 
     [Fact]
     public void Accepts_ldaps_with_the_service_account() => Assert.True(Valid(Ldap(_ => { })));
+
+    [Fact]
+    public void Validates_the_optional_operating_system_exclusions()
+    {
+        Assert.True(Valid(Ldap(o => o.ExcludeOperatingSystems = ["Windows Server*", "  ", "ubuntu*"])));
+        Assert.False(Valid(Ldap(o => o.ExcludeOperatingSystems = ["*"])));
+        Assert.False(Valid(Ldap(o => o.ExcludeOperatingSystems = [new string('a', 129)])));
+        Assert.False(Valid(Ldap(o => o.ExcludeOperatingSystems = Enumerable.Range(0, 51).Select(i => "os" + i).ToList())));
+    }
 
     [Fact]
     public void Accepts_ldaps_or_starttls_with_username_and_password()

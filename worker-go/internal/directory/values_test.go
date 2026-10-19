@@ -99,3 +99,37 @@ func TestAnUnreadableOUHasItsOwnErrorCode(t *testing.T) {
 		t.Error("error codes")
 	}
 }
+
+func TestComputerFilterLeavesOutChosenOperatingSystems(t *testing.T) {
+	if got := ComputerFilter(nil); got != "(objectCategory=computer)" {
+		t.Errorf("no patterns: %q", got)
+	}
+	got := ComputerFilter([]string{" Windows Server* ", "windows server*", "", "Linux (x)"})
+	want := "(&(objectCategory=computer)(!(operatingSystem=Windows Server*))(!(operatingSystem=Linux \\28x\\29)))"
+	if got != want {
+		t.Errorf("ComputerFilter = %q, want %q", got, want)
+	}
+	if got := ExcludedComputerFilter([]string{"Windows Server*", "Ubuntu*"}); got != "(&(objectCategory=computer)(|(operatingSystem=Windows Server*)(operatingSystem=Ubuntu*)))" {
+		t.Errorf("ExcludedComputerFilter = %q", got)
+	}
+}
+
+func TestPatternEscapingKeepsTheWildcard(t *testing.T) {
+	if got := EscapeFilterPattern("Win*dows (R)\\x"); got != "Win*dows \\28R\\29\\5cx" {
+		t.Errorf("got %q", got)
+	}
+}
+
+func TestKeysOfExcludedComputersAreRecognised(t *testing.T) {
+	excluded := map[string]struct{}{"cn=srv01,ou=servers,dc=corp,dc=local": {}}
+	key := "CN=2026-10-18T10:00:00+07:00{ABCDEF},CN=SRV01,OU=Servers,DC=corp,DC=local"
+	if !IsKeyOfExcluded(excluded, key) {
+		t.Error("a key under an excluded computer must be skipped")
+	}
+	if IsKeyOfExcluded(excluded, "CN=2026{X},CN=HN-LT-01,OU=Computers,DC=corp,DC=local") {
+		t.Error("a key of another computer must be kept")
+	}
+	if IsKeyOfExcluded(nil, key) {
+		t.Error("no excluded set: nothing is skipped")
+	}
+}
