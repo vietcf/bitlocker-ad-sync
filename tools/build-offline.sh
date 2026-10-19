@@ -65,6 +65,7 @@ if [[ $WITH_DB -eq 1 ]]; then
 fi
 cp cert/generate-self-signed.sh "$STAGE/cert/"
 cp tools/offline-load.sh "$STAGE/load.sh"
+cp tools/install.sh "$STAGE/install.sh"
 cp CHANGELOG.md README.md "$STAGE/"
 
 cat > "$STAGE/INSTALL.txt" <<EOF
@@ -72,15 +73,15 @@ BitLocker Key Management $VERSION - cai offline
 
 1. Chep ca thu muc nay len may chu (USB, scp...). Giai nen: tar xzf blk-offline-$VERSION.tar.gz
 2. Trong thu muc vua giai nen:   bash load.sh        (kiem tra SHA-256 roi nap image vao Docker)
-3. Tao server/.env (va server/db.env neu DB trong Docker) theo README.md muc 3.2 (DB ngoai) hoac 3.3 (DB trong Docker), dat chung chi vao cert/
-4. Chay:
-     DB ngoai:           docker compose -f docker-compose.prod.yml up -d --no-build
-     DB trong Docker:    docker compose -f docker-compose.prod.yml --profile db up -d --no-build
-Cap nhat ban moi: giai nen goi moi, chay load.sh, chay lai lenh o buoc 4 (migration tu chay).
+3. Cai dat (hoi vai thong tin, tao server/.env dung, tao chung chi tu ky tam neu chua co, khoi dong):
+     DB trong Docker:    bash install.sh --db docker
+     DB ngoai:           bash install.sh --db external      (da tao DB blk, blk_owner, app_node theo README.md muc 3.2)
+   Muon dung chung chi that: dat server.crt va server.key vao cert/ truoc khi chay. Xem: bash install.sh --help
+Cap nhat ban moi: giai nen goi moi, chay load.sh, chay lai install.sh --db ... --up (khoa cu duoc giu, migration tu chay).
 Rollback: nap goi cu roi: BLK_VERSION=<ban-cu> docker compose -f docker-compose.prod.yml up -d --no-build
 EOF
 
-( cd "$STAGE" && sha256sum images.tar.gz load.sh docker-compose.prod.yml nginx/nginx.conf > SHA256SUMS )
+( cd "$STAGE" && sha256sum images.tar.gz load.sh install.sh docker-compose.prod.yml nginx/nginx.conf > SHA256SUMS )
 
 TAR="$OUT/blk-offline-$VERSION.tar.gz"
 tar -C "$OUT" -czf "$TAR" "blk-offline-$VERSION"

@@ -20,8 +20,8 @@ vet:
 	go vet ./...
 
 package: linux    ## dist/blk-sync-$(VERSION)-linux-amd64.tar.gz: binary + install script + unit + config + docs
-	cp deploy/install.sh deploy/blk-sync.service config.example.json README.md dist/
-	tar -C dist -czf dist/blk-sync-$(VERSION)-linux-amd64.tar.gz blk-sync install.sh blk-sync.service config.example.json README.md
+	cp deploy/install.sh deploy/blk-sync.service deploy/blk-sync-legacy.service config.example.json README.md dist/
+	tar -C dist -czf dist/blk-sync-$(VERSION)-linux-amd64.tar.gz blk-sync install.sh blk-sync.service blk-sync-legacy.service config.example.json README.md
 
 clean:
 	rm -rf bin dist

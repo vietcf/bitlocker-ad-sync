@@ -52,6 +52,18 @@ services:
     build: ./server
     image: blk-server:${BLK_VERSION:-latest}
     env_file: ./server/.env
+    # Cai dat cua chinh Docker/nginx: ghi de len server/.env (environment thang env_file), de .env sai cung khong
+    # lam nginx mat ket noi toi app (loi 502). Chi can dat trong .env: DB, khoa bi mat, IP worker, AD.
+    environment:
+      NODE_ENV: production
+      USER_HOST: 0.0.0.0
+      USER_PORT: "3000"
+      INGEST_HOST: 0.0.0.0
+      INGEST_PORT: "8443"
+      TRUST_PROXY: "1"
+      INGEST_TRUST_PROXY: "1"
+      COOKIE_SECURE: "true"
+      BACKUP_DIR: /app/backups
     volumes:
       - ./backups:/app/backups
     expose:

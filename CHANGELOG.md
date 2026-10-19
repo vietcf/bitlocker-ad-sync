@@ -13,6 +13,22 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.3.0] - 2026-10-19
+
+### Thêm
+
+- `tools/install.sh`: cài production bằng Docker Compose trong một lệnh (DB trong Docker hoặc PostgreSQL ngoài). Tạo `server/.env` và `server/db.env` đúng giá trị, sinh khóa bí mật (chạy lại không đổi khóa cũ), điền chuỗi kết nối, tạo chứng chỉ tự ký tạm nếu chưa có, kiểm tra cấu hình rồi khởi động và chờ `healthz`. Có sẵn trong gói cài offline.
+- Worker Go (1.1.0) chạy được trên systemd cũ như CentOS/RHEL 7: `install.sh` tự cài `deploy/blk-sync-legacy.service`; binary tĩnh nên máy đích không cần cài thư viện (đã thử trên CentOS 7.9).
+
+### Đổi
+
+- `docker-compose.prod.yml`: cài đặt riêng của Docker (`NODE_ENV`, `USER_HOST`, `INGEST_HOST`, cổng, cờ proxy, `COOKIE_SECURE`, `BACKUP_DIR`) nằm trong compose và ghi đè `server/.env`, nên `.env` sai cũng không còn gây lỗi 502.
+- README mục 3: cách A và B rút gọn thành các bước dùng `install.sh`; mục 4B: build một lần chạy mọi nơi, hỗ trợ CentOS 7.
+
+### Khi nâng cấp
+
+Không có migration. Hệ thống đang chạy bằng Docker Compose: `docker compose -f docker-compose.prod.yml up -d --build` (thêm `--profile db` nếu DB trong Docker); `server/.env` cũ vẫn dùng được.
+
 ## [2.2.1] - 2026-10-19
 
 ### Sửa
@@ -154,7 +170,8 @@ mới được kiểm thử trên mô phỏng và kết nối thử, chưa qua m
 - `server/.env`: `LDAP_URL` đã bỏ, thay bằng `LDAP_SERVERS` và `LDAP_PROTOCOL` (ví dụ `LDAP_SERVERS=dc01.corp.local`).
 - Script gọi API bằng tài khoản AD phải chuyển sang tài khoản local.
 
-[Chưa phát hành]: https://github.com/vietcf/bitlocker-ad-sync/compare/v2.2.1...HEAD
+[Chưa phát hành]: https://github.com/vietcf/bitlocker-ad-sync/compare/v2.3.0...HEAD
+[2.3.0]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v2.3.0
 [2.2.1]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v2.2.1
 [2.2.0]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v2.2.0
 [2.1.0]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v2.1.0

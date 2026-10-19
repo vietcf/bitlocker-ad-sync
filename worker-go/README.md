@@ -139,7 +139,7 @@ cd worker-go
 go test ./...          # test đơn vị, port từ test của bản .NET
 make linux             # dist/blk-sync: Linux amd64, build tĩnh
 make linux-arm64       # dist/blk-sync-arm64
-make package           # dist/blk-sync-1.0.0-linux-amd64.tar.gz: binary + script + unit + cấu hình mẫu + README
+make package           # dist/blk-sync-1.1.0-linux-amd64.tar.gz: binary + script + 2 bản unit (systemd mới/cũ) + cấu hình mẫu + README
 ```
 
 Không có `make` (ví dụ Windows): `go build -o bin/ ./cmd/blk-sync`, hoặc build cho Linux:
@@ -228,7 +228,7 @@ dsacls "OU=Computers,DC=corp,DC=local" /I:S /G "CORP\svc-blk:CA;msFVE-RecoveryPa
 
 ```bash
 make package
-scp dist/blk-sync-1.0.0-linux-amd64.tar.gz admin@sync01:/tmp/
+scp dist/blk-sync-1.1.0-linux-amd64.tar.gz admin@sync01:/tmp/
 ssh admin@sync01
 mkdir /tmp/blk-sync && tar -C /tmp/blk-sync -xzf /tmp/blk-sync-1.0.0-linux-amd64.tar.gz
 cd /tmp/blk-sync
@@ -259,8 +259,9 @@ sudo sh -c 'systemd-ask-password -n "Ingest API key:" | systemd-creds encrypt --
 ```
 
 Trong `config.json` đặt `"Password": "cred:ldap-password"` và `"ApiKey": "cred:ingest-api-key"`. Unit
-`blk-sync.service` đã khai báo hai credential này (`LoadCredentialEncrypted=`). systemd quá cũ, không có
-`systemd-creds`: dùng `file:` với file `chmod 0400`, chủ sở hữu `blk-sync`.
+`blk-sync.service` đã khai báo hai credential này (`LoadCredentialEncrypted=`). **systemd cũ** (CentOS/RHEL 7 là systemd 219, không có `systemd-creds`): `install.sh` tự cài `blk-sync-legacy.service` (không có `LoadCredentialEncrypted` và `StateDirectory`) và tạo sẵn `/var/lib/blk-sync`; bí mật để trong file `chmod 0400`, chủ sở hữu `blk-sync`, cấu hình `"Password": "file:/etc/blk-sync/ldap-password"` và `"ApiKey": "file:/etc/blk-sync/ingest-api-key"`.
+
+Binary là bản tĩnh (`CGO_ENABLED=0`): build một lần ở máy có Go 1.26+ rồi chép sang máy chủ chạy ngay, không cần cài Go hay thư viện (đã thử chạy trên CentOS 7.9).
 
 ### 6.4. Kiểm tra rồi bật service
 

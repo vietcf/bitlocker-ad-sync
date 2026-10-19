@@ -1,0 +1,34 @@
+[Unit]
+Description=BitLocker recovery key sync worker (AD -> blk server)
+Documentation=file:///opt/blk-sync/README.md
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=blk-sync
+Group=blk-sync
+ExecStart=/opt/blk-sync/blk-sync --config /etc/blk-sync/config.json
+Restart=on-failure
+RestartSec=30
+# On stop the worker closes the open sync run as "cancelled" (up to 10 s).
+TimeoutStopSec=30
+
+# Ban nay danh cho systemd cu (CentOS/RHEL 7 la systemd 219): khong co LoadCredentialEncrypted, StateDirectory
+# va nhieu tuy chon bao mat moi. Bi mat de trong file: config dung "file:/etc/blk-sync/ldap-password" va
+# "file:/etc/blk-sync/ingest-api-key" (chmod 0400, chu so huu blk-sync). install.sh tao san /var/lib/blk-sync.
+
+# Hardening con dung duoc tren systemd 219 (ReadWriteDirectories la ten cu cua ReadWritePaths, ban moi van nhan).
+NoNewPrivileges=yes
+ProtectSystem=full
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ReadWriteDirectories=/var/lib/blk-sync
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target

@@ -134,7 +134,7 @@ Cổng cần mở: **443** cho người dùng, **8443** chỉ cho IP máy worker
 git clone git@github.com:vietcf/bitlocker-ad-sync.git blk && cd blk
 ```
 
-**Bước 2. Tạo database.** Đăng nhập PostgreSQL bằng superuser, chạy (thay hai mật khẩu bằng mật khẩu mạnh của bạn, ghi lại để dùng ở bước 4):
+**Bước 2. Tạo database.** Đăng nhập PostgreSQL bằng superuser, chạy (thay hai mật khẩu bằng mật khẩu mạnh của bạn, ghi lại để nhập khi chạy script ở Bước 3):
 
 ```sql
 CREATE ROLE blk_owner LOGIN NOSUPERUSER NOCREATEROLE NOBYPASSRLS PASSWORD '<mật-khẩu-owner>';
@@ -148,68 +148,21 @@ GRANT USAGE ON SCHEMA public TO app_node;
 
 `blk_owner` chỉ dùng để tạo bảng khi nâng cấp. `app_node` là tài khoản duy nhất app dùng khi chạy, và luôn bị giới hạn theo chi nhánh. Đừng cho `app_node` quyền superuser.
 
-**Bước 3. Tạo file `.env` và các khóa bí mật** (lệnh tự điền, không in giá trị ra màn hình):
+**Bước 3. Cài đặt**
 
 ```bash
-cp server/.env.example server/.env && chmod 600 server/.env
-set_env() { if grep -q "^$2=" "$1"; then sed -i "s|^$2=.*|$2=$3|" "$1"; else echo "$2=$3" >> "$1"; fi; }
-for k in SESSION_SECRET SECRET_KEY INGEST_API_KEY; do set_env server/.env $k $(openssl rand -hex 32); done
+bash tools/install.sh --db external
 ```
 
-Không có `openssl`: dùng `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` rồi `set_env server/.env SESSION_SECRET <giá-trị>` cho từng khóa. Ý nghĩa: `SESSION_SECRET` ký cookie đăng nhập; `SECRET_KEY` mã hóa mật khẩu mail, mật khẩu sao lưu và khóa 2 bước lưu trong DB (**cất một bản riêng**, mất khóa thì chỉ phải nhập lại các mật khẩu đó); `INGEST_API_KEY` là khóa của worker (dán cùng giá trị vào cấu hình worker ở phần cài worker).
+Script hỏi lần lượt: máy chủ PostgreSQL (ví dụ `db.corp.local`), cổng, tên database, bật TLS tới PostgreSQL hay không, mật khẩu `app_node` và `blk_owner` (đã đặt ở Bước 2, gõ không hiện), IP máy chạy worker, máy chủ AD (để trống nếu chỉ dùng tài khoản nội bộ), múi giờ; rồi hỏi có khởi động ngay không. Script `tools/install.sh` làm thay bạn các việc dễ sai: tạo `server/.env` đúng giá trị, sinh các khóa bí mật (chỉ sinh khi chưa có, chạy lại không đổi khóa cũ), điền chuỗi kết nối database, tạo chứng chỉ tự ký tạm nếu chưa có chứng chỉ, kiểm tra đủ cấu hình, rồi khởi động và chờ `healthz`. Cài đặt riêng của Docker (`NODE_ENV`, `USER_HOST`, `INGEST_HOST`, cờ proxy, `BACKUP_DIR`...) đã nằm sẵn trong `docker-compose.prod.yml` nên không cần điền vào `.env`.
 
-**Bước 4. Điền cấu hình vào `server/.env`.** `server/.env.example` đã có sẵn nhiều dòng với giá trị dùng cho máy dev (ví dụ `NODE_ENV=development`, `USER_HOST=127.0.0.1`). Vì vậy **không dán thêm vào cuối file** (sẽ bị trùng dòng): hàm `set_env <file> <KHÓA> <giá-trị>` dưới đây **đổi giá trị nếu dòng đã có, thêm dòng mới nếu chưa có**. Cứ dán nguyên khối lệnh vào terminal. Sửa các giá trị ở phần "đổi cho đúng môi trường" (IP worker, địa chỉ database, mật khẩu, AD) rồi dán cả khối:
+- **Chứng chỉ thật:** đặt `server.crt` (kèm chuỗi CA trung gian) và `server.key` vào `cert/` **trước khi** chạy script (cách xin chứng chỉ ở mục 3.5); script thấy đã có thì không tạo chứng chỉ tự ký.
+- **Chạy không cần gõ** (tự động hóa): `BLK_APP_PASSWORD=... BLK_OWNER_PASSWORD=... bash tools/install.sh --db external --db-host db.corp.local --worker-ips 10.0.5.21 --yes --up`. Xem `bash tools/install.sh --help`.
+- Chạy lại script bất cứ lúc nào (đổi IP worker, thêm AD...) là an toàn: khóa bí mật cũ được giữ nguyên.
 
-```bash
-E=server/.env
-# --- bắt buộc khi chạy trong Docker (giữ nguyên) ---
-set_env $E NODE_ENV production
-set_env $E USER_HOST 0.0.0.0          # để nginx (container khác) nối được tới app
-set_env $E INGEST_HOST 0.0.0.0
-set_env $E USER_PORT 3000
-set_env $E INGEST_PORT 8443
-set_env $E TRUST_PROXY 1
-set_env $E INGEST_TRUST_PROXY 1
-set_env $E COOKIE_SECURE true
-set_env $E APP_TZ Asia/Ho_Chi_Minh
-set_env $E BACKUP_DIR /app/backups
-# --- đổi cho đúng môi trường của bạn ---
-set_env $E INGEST_ALLOWED_IPS 10.0.5.21        # IP máy chạy worker; nhiều IP cách nhau dấu phẩy
-set_env $E DATABASE_URL "postgres://app_node:MẬT_KHẨU_APP@db.corp.local:5432/blk"
-set_env $E MIGRATION_DATABASE_URL "postgres://blk_owner:MẬT_KHẨU_OWNER@db.corp.local:5432/blk"
-set_env $E DB_SSL true                         # false nếu PostgreSQL không bật TLS
-set_env $E LDAP_SERVERS dc01.corp.local,dc02.corp.local
-set_env $E LDAP_PROTOCOL ldap                  # ldap (389) | starttls (389 + TLS) | ldaps (636 + TLS)
-set_env $E LDAP_DOMAIN corp.local
-set_env $E LDAP_BASE_DN "DC=corp,DC=local"
-set_env $E LOCAL_LOGIN_ENABLED true            # giữ để còn admin local khi AD lỗi
-```
+**Bước 4. Kiểm tra.** Script tự gọi `https://localhost/healthz` sau khi khởi động và in `OK` khi `"dbOk": true`. Rồi mở `https://<tên máy chủ>/` bằng trình duyệt, đăng nhập `admin` / `admin` (mật khẩu mặc định, **bắt buộc đổi ngay** ở lần đầu). Xem log: `docker compose -f docker-compose.prod.yml logs -f server`.
 
-Mật khẩu database nên là chuỗi chữ-số (ví dụ `openssl rand -hex 24`) để khỏi gặp ký tự đặc biệt trong URL. Kiểm tra lại: `grep -c . server/.env` và mở file xem không còn dòng nào trùng khóa. Các biến không nhắc tới đã có giá trị mặc định dùng được. App từ chối khởi động nếu thiếu thông tin quan trọng và in tên biến lỗi (không in giá trị).
-
-**Bước 5. Chứng chỉ HTTPS.** nginx cần hai file trong thư mục `cert/`: `server.crt` (kèm chuỗi CA trung gian nếu có) và `server.key`. Chọn một:
-
-- Thử nghiệm nhanh (chứng chỉ tự ký, trình duyệt sẽ cảnh báo; worker phải dùng `cert/ca.crt` làm `CaFile`): `bash cert/generate-self-signed.sh blk.corp.local 10.0.5.10` (thêm tên và IP máy chủ).
-- Production: xin chứng chỉ từ CA của công ty theo hướng dẫn ở mục 3.5 rồi chép `server.crt`, `server.key` vào `cert/`.
-
-**Bước 6. Chạy**
-
-```bash
-mkdir -p backups && sudo chown 1000:1000 backups && chmod 700 backups
-docker compose -f docker-compose.prod.yml up -d --build
-```
-
-Lệnh dựng app, chạy migration (tạo bảng) rồi khởi động nginx. Xem log: `docker compose -f docker-compose.prod.yml logs -f server`.
-
-**Bước 7. Kiểm tra**
-
-```bash
-curl -k https://localhost/healthz
-```
-
-Phải trả HTTP 200 và có `"dbOk": true`. Rồi mở `https://<tên máy chủ>/` bằng trình duyệt, đăng nhập `admin` / `admin` (mật khẩu mặc định, **bắt buộc đổi ngay** ở lần đầu).
-
-**Bước 8. Làm tiếp:** cài sync worker (mục 4 cho Windows hoặc 4B cho Linux) và cấu hình chi nhánh, người dùng, mail trong ứng dụng (mục 5).
+**Bước 5. Làm tiếp:** cài sync worker (mục 4 cho Windows hoặc 4B cho Linux) và cấu hình chi nhánh, người dùng, mail trong ứng dụng (mục 5). **Cất một bản `SECRET_KEY`** (`grep ^SECRET_KEY= server/.env`) ở kho mật khẩu: nó mã hóa mật khẩu mail, mật khẩu sao lưu và khóa 2 bước lưu trong DB; `INGEST_API_KEY` (`grep ^INGEST_API_KEY= server/.env`) là khóa dán vào cấu hình worker.
 
 ### 3.3. Cách B: Docker Compose + PostgreSQL trong Docker
 
@@ -221,79 +174,23 @@ Phải trả HTTP 200 và có `"dbOk": true`. Rồi mở `https://<tên máy ch�
 git clone git@github.com:vietcf/bitlocker-ad-sync.git blk && cd blk
 ```
 
-**Bước 2. Tạo các file cấu hình và mật khẩu ngẫu nhiên** (lệnh tự điền, không in giá trị ra màn hình). Có hai file:
-
-- `server/.env`: cấu hình của app, gồm ba khóa bí mật và hai chuỗi kết nối database.
-- `server/db.env`: bốn mật khẩu dùng để tạo database ở lần đầu, **chỉ container database đọc**, app không thấy (kể cả mật khẩu superuser `postgres`).
+**Bước 2. Cài đặt**
 
 ```bash
-cp server/.env.example server/.env && chmod 600 server/.env
-cp server/db.env.example server/db.env && chmod 600 server/db.env
-set_env() { if grep -q "^$2=" "$1"; then sed -i "s|^$2=.*|$2=$3|" "$1"; else echo "$2=$3" >> "$1"; fi; }
-for k in SESSION_SECRET SECRET_KEY INGEST_API_KEY; do set_env server/.env $k $(openssl rand -hex 32); done
-for k in POSTGRES_PASSWORD BLK_OWNER_PASSWORD APP_NODE_PASSWORD BLK_BACKUP_PASSWORD; do set_env server/db.env $k $(openssl rand -hex 24); done
+bash tools/install.sh --db docker
 ```
 
-Rồi điền hai chuỗi kết nối database vào `server/.env` (host là `db`, tên container PostgreSQL) từ hai mật khẩu vừa sinh trong `server/db.env`:
+Script hỏi: IP máy chạy worker, máy chủ AD (để trống nếu chỉ dùng tài khoản nội bộ), múi giờ; rồi hỏi có khởi động ngay không. Script `tools/install.sh` làm thay bạn các việc dễ sai: tạo `server/.env` đúng giá trị, sinh các khóa bí mật (chỉ sinh khi chưa có, chạy lại không đổi khóa cũ), điền chuỗi kết nối database, tạo chứng chỉ tự ký tạm nếu chưa có chứng chỉ, kiểm tra đủ cấu hình, rồi khởi động và chờ `healthz`. Cài đặt riêng của Docker (`NODE_ENV`, `USER_HOST`, `INGEST_HOST`, cờ proxy, `BACKUP_DIR`...) đã nằm sẵn trong `docker-compose.prod.yml` nên không cần điền vào `.env`.
 
-```bash
-A=$(grep '^APP_NODE_PASSWORD=' server/db.env | cut -d= -f2); O=$(grep '^BLK_OWNER_PASSWORD=' server/db.env | cut -d= -f2)
-set_env server/.env DATABASE_URL "postgres://app_node:$A@db:5432/blk"
-set_env server/.env MIGRATION_DATABASE_URL "postgres://blk_owner:$O@db:5432/blk"
-set_env server/.env DB_SSL false
-```
+- Mật khẩu database do script **tự sinh** và lưu ở `server/db.env` (chỉ container database đọc; gồm cả mật khẩu superuser `postgres`). Hai chuỗi kết nối trong `server/.env` được điền khớp với các mật khẩu đó (host là `db`), bạn không phải sửa tay.
+- **Chứng chỉ thật:** đặt `server.crt` và `server.key` vào `cert/` trước khi chạy script (mục 3.5); chưa có thì script đề nghị tạo chứng chỉ tự ký tạm.
+- Chạy không cần gõ: `bash tools/install.sh --db docker --worker-ips 10.0.5.21 --yes --up`. Xem `bash tools/install.sh --help`.
+- Chạy lại script là an toàn: các khóa và mật khẩu đã có được giữ nguyên.
+- Từ nay mọi lệnh `docker compose` của cách này cần thêm `--profile db`, ví dụ `docker compose -f docker-compose.prod.yml --profile db logs -f server`.
 
-Ba khóa đầu dài 64 ký tự hex, bốn mật khẩu database dài 48. Không có `openssl`: dùng `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` (đổi 32 thành 24 cho mật khẩu database) rồi `set_env` từng giá trị. `SECRET_KEY` mã hóa mật khẩu mail, mật khẩu sao lưu và khóa 2 bước lưu trong DB: **cất một bản riêng**. Mật khẩu superuser `postgres` nằm trong `server/db.env`; cất nó ở kho mật khẩu rồi có thể xóa file (xem Bước 5).
+**Bước 3. Kiểm tra.** Script tự gọi `https://localhost/healthz` và in `OK` khi `"dbOk": true`. Rồi mở `https://<tên máy chủ>/`, đăng nhập `admin` / `admin` (**bắt buộc đổi ngay** ở lần đầu).
 
-**Bước 3. Điền phần cấu hình còn lại vào `server/.env`.** `server/.env.example` đã có sẵn nhiều dòng với giá trị dùng cho máy dev (ví dụ `NODE_ENV=development`, `USER_HOST=127.0.0.1`). Vì vậy **không dán thêm vào cuối file** (sẽ bị trùng dòng): hàm `set_env <file> <KHÓA> <giá-trị>` dưới đây **đổi giá trị nếu dòng đã có, thêm dòng mới nếu chưa có**. Cứ dán nguyên khối lệnh vào terminal. Sửa các giá trị ở phần "đổi cho đúng môi trường" (IP worker, AD) rồi dán cả khối (phần database và ba khóa đã điền ở bước 2, không đụng tới):
-
-```bash
-E=server/.env
-# --- bắt buộc khi chạy trong Docker (giữ nguyên) ---
-set_env $E NODE_ENV production
-set_env $E USER_HOST 0.0.0.0          # để nginx (container khác) nối được tới app
-set_env $E INGEST_HOST 0.0.0.0
-set_env $E USER_PORT 3000
-set_env $E INGEST_PORT 8443
-set_env $E TRUST_PROXY 1
-set_env $E INGEST_TRUST_PROXY 1
-set_env $E COOKIE_SECURE true
-set_env $E APP_TZ Asia/Ho_Chi_Minh
-set_env $E BACKUP_DIR /app/backups
-# --- đổi cho đúng môi trường của bạn ---
-set_env $E INGEST_ALLOWED_IPS 10.0.5.21        # IP máy chạy worker; nhiều IP cách nhau dấu phẩy
-set_env $E LDAP_SERVERS dc01.corp.local,dc02.corp.local
-set_env $E LDAP_PROTOCOL ldap                  # ldap (389) | starttls (389 + TLS) | ldaps (636 + TLS)
-set_env $E LDAP_DOMAIN corp.local
-set_env $E LDAP_BASE_DN "DC=corp,DC=local"
-set_env $E LOCAL_LOGIN_ENABLED true            # giữ để còn admin local khi AD lỗi
-```
-
-**Bước 4. Chứng chỉ HTTPS.** nginx cần hai file trong thư mục `cert/`: `server.crt` (kèm chuỗi CA trung gian nếu có) và `server.key`. Chọn một:
-
-- Thử nghiệm nhanh (chứng chỉ tự ký, trình duyệt sẽ cảnh báo; worker phải dùng `cert/ca.crt` làm `CaFile`): `bash cert/generate-self-signed.sh blk.corp.local 10.0.5.10` (thêm tên và IP máy chủ).
-- Production: xin chứng chỉ từ CA của công ty theo hướng dẫn ở mục 3.5 rồi chép `server.crt`, `server.key` vào `cert/`.
-
-**Bước 5. Chạy**
-
-```bash
-mkdir -p backups && sudo chown 1000:1000 backups && chmod 700 backups
-docker compose -f docker-compose.prod.yml --profile db up -d --build
-```
-
-Lệnh dựng PostgreSQL (tự tạo database và các tài khoản ở lần đầu), chạy migration rồi khởi động app và nginx. Xem log: `docker compose -f docker-compose.prod.yml logs -f server`. Từ nay mọi lệnh `docker compose` của cách này chỉ cần thêm `--profile db`.
-
-Khi `docker compose ps` cho thấy database đã chạy ổn, bạn có thể **xóa `server/db.env`** (`rm server/db.env`): các mật khẩu chỉ cần ở lần tạo database đầu tiên, app chạy bằng hai chuỗi kết nối trong `server/.env`. Muốn đổi mật khẩu sau này thì đổi trong PostgreSQL (`ALTER ROLE ... PASSWORD ...`) rồi sửa `server/.env`.
-
-**Bước 6. Kiểm tra**
-
-```bash
-curl -k https://localhost/healthz
-```
-
-Phải trả HTTP 200 và có `"dbOk": true`. Rồi mở `https://<tên máy chủ>/` bằng trình duyệt, đăng nhập `admin` / `admin` (mật khẩu mặc định, **bắt buộc đổi ngay** ở lần đầu).
-
-**Bước 7. Làm tiếp:** cài sync worker (mục 4 cho Windows hoặc 4B cho Linux) và cấu hình chi nhánh, người dùng, mail trong ứng dụng (mục 5). Dữ liệu nằm trong volume `blk-pg` trên chính máy này: bật sao lưu trong ứng dụng (mục 6.8) và chép file sao lưu sang máy khác.
+**Bước 4. Làm tiếp:** cài sync worker (mục 4 cho Windows hoặc 4B cho Linux) và cấu hình trong ứng dụng (mục 5). **Cất bản sao** `SECRET_KEY` (`grep ^SECRET_KEY= server/.env`) và mật khẩu superuser (`grep ^POSTGRES_PASSWORD= server/db.env`) ở kho mật khẩu; sau khi database chạy ổn có thể `rm server/db.env` (mật khẩu chỉ cần ở lần tạo database đầu). Dữ liệu nằm trong volume `blk-pg` trên chính máy này: bật sao lưu trong ứng dụng (mục 6.8) và chép file sao lưu sang máy khác.
 
 ### 3.4. Cách C: Không Docker (Node.js + systemd + nginx)
 
@@ -485,23 +382,18 @@ Build sẵn image trên một máy có internet, đóng thành một file, chép
    bash load.sh
    ```
 
-5. Tạo `server/.env` rồi sửa cho đúng môi trường:
-   - **DB ngoài (cách A):** làm đúng Bước 2, 3 và 4 của mục 3.2 (tạo database, sinh khóa, sửa `.env`). Các lệnh chạy ngay trong thư mục vừa giải nén.
-   - **DB trong Docker (cách B):** làm đúng Bước 2 và 3 của mục 3.3 (sinh khóa và mật khẩu, sửa `.env`). Gói đã kèm `server/db.env.example` và `server/db/init/`.
-
-6. Đặt chứng chỉ HTTPS vào `cert/` (`server.crt`, `server.key`): xin từ CA nội bộ (mục 3.5) hoặc tạo tạm bằng `bash cert/generate-self-signed.sh blk.corp.local 10.0.5.10` (script có sẵn trong gói; cần `openssl`).
-
-7. Chạy (`--no-build` để Compose không tìm cách build hay tải gì từ mạng):
+5. Cài đặt (script hỏi vài thông tin, tạo `server/.env` đúng giá trị, đề nghị tạo chứng chỉ tự ký tạm nếu chưa có chứng chỉ, rồi khởi động với `--no-build` để Compose không tìm cách build hay tải gì từ mạng):
 
    ```bash
-   mkdir -p backups && sudo chown 1000:1000 backups && chmod 700 backups
-   docker compose -f docker-compose.prod.yml up -d --no-build               # cách A
-   docker compose -f docker-compose.prod.yml --profile db up -d --no-build  # cách B
+   bash install.sh --db external     # cách A: PostgreSQL ngoài (đã tạo database như Bước 2 của mục 3.2)
+   bash install.sh --db docker       # cách B: PostgreSQL trong Docker
    ```
 
-8. Kiểm tra: `curl -k https://localhost/healthz` phải trả HTTP 200 và có `"dbOk": true`.
+   Muốn dùng chứng chỉ thật thì đặt `server.crt`, `server.key` vào `cert/` trước khi chạy. Các tùy chọn khác: `bash install.sh --help`.
 
-**Cập nhật lên bản mới:** làm lại bước 1 đến 3 trên máy có internet với tag mới, chép gói sang máy chủ, giải nén vào thư mục **mới**, chạy `bash load.sh`, rồi chạy lại lệnh ở bước 7 trong thư mục cũ có `server/.env` (hoặc chép `server/.env`, `server/db.env`, `cert/`, `backups/` sang thư mục mới). Migration tự chạy. Nên sao lưu database trước.
+6. Kiểm tra: script tự in `OK` khi `healthz` trả `"dbOk": true`; hoặc `curl -k https://localhost/healthz`.
+
+**Cập nhật lên bản mới:** làm lại bước 1 đến 3 trên máy có internet với tag mới, chép gói sang máy chủ, giải nén vào thư mục **mới**, chạy `bash load.sh`, rồi chạy lại `bash install.sh --db ... --up` trong thư mục cũ có `server/.env` (hoặc chép `server/.env`, `server/db.env`, `cert/`, `backups/` sang thư mục mới rồi chạy `bash install.sh --db ... --up` ở đó). Migration tự chạy. Nên sao lưu database trước.
 
 **Quay về bản cũ (rollback):** image bản cũ vẫn còn trong Docker nếu bạn chưa xóa. Chạy `BLK_VERSION=2.0.1 docker compose -f docker-compose.prod.yml up -d --no-build` (đổi `2.0.1` thành tag cũ). Lưu ý migration của bản mới đã chạy và không tự hoàn tác, nên chỉ quay về nếu bản cũ chạy được với schema mới, hoặc khôi phục database từ bản sao lưu trước khi nâng cấp.
 
@@ -735,9 +627,9 @@ tham chiếu mọi khóa cấu hình ở [worker-go/docs/configuration.md](worke
 
 | Thành phần | Yêu cầu |
 | --- | --- |
-| Máy chủ worker | Linux 64-bit có systemd (Ubuntu 22.04+, Debian 12+, RHEL/Rocky 9+), amd64 hoặc arm64 |
+| Máy chủ worker | Linux 64-bit có systemd, amd64 hoặc arm64: Ubuntu 22.04+, Debian 12+, RHEL/Rocky 9+, và cả **CentOS/RHEL 7** (systemd 219, script cài tự dùng bản unit riêng). **Không cần cài thư viện hay Go**: binary là bản tĩnh |
 | Mạng | Tới DC: 636 (LDAPS) hoặc 389 (StartTls / Ldap). Tới server: cổng ingest (mặc định 8443) |
-| Máy build | Go 1.26+ (có thể build trên Windows hoặc máy khác rồi chép binary sang) |
+| Máy build | Go 1.26+, chỉ cần ở máy build. Build trên máy nào cũng được (Windows, Linux kể cả CentOS 7.6) rồi chép gói sang máy chủ worker |
 | AD | Một tài khoản dịch vụ thường (bản Go không dùng được gMSA) |
 
 ### 4B.2. Chọn cách kết nối AD
@@ -785,37 +677,39 @@ Không dùng tài khoản cá nhân hay tài khoản admin. Nên chặn đăng n
 
 ### 4B.4. Build gói cài
 
-Trên máy có Go:
+Binary là **bản tĩnh** (`CGO_ENABLED=0`): không phụ thuộc thư viện hệ thống hay phiên bản glibc, nên build một lần rồi chép sang máy chủ worker chạy ngay, kể cả máy cũ như CentOS 7 (đã thử chạy trên CentOS 7.9, glibc 2.17). Máy chủ worker không cần cài Go, không cần internet. Chỉ **máy build** cần Go 1.26+.
+
+Trên máy build (Linux, kể cả CentOS 7.6 đã cài Go; hoặc Windows):
 
 ```bash
 cd worker-go
 go test ./...
-make package VERSION=1.0.0
+make package VERSION=1.1.0
 ```
 
-Kết quả: `worker-go/dist/blk-sync-1.0.0-linux-amd64.tar.gz`. Gói gồm:
+Kết quả: `worker-go/dist/blk-sync-1.1.0-linux-amd64.tar.gz`. Gói gồm:
 - binary `blk-sync` (build tĩnh);
-- `install.sh`, `blk-sync.service`;
+- `install.sh`, `blk-sync.service` (systemd mới) và `blk-sync-legacy.service` (systemd cũ như CentOS 7);
 - `config.example.json`, `README.md`.
 
-Không có `make` (Windows): xem mục 4 của [worker-go/README.md](worker-go/README.md).
+Máy chủ đích là ARM thì dùng `make linux-arm64`. Không có `make` (Windows): chạy trực tiếp `CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "-s -w -X main.version=1.1.0" -o dist/blk-sync ./cmd/blk-sync` rồi chép binary cùng thư mục `deploy/` và `config.example.json` (xem mục 4 của [worker-go/README.md](worker-go/README.md)).
 
 ### 4B.5. Cài lên máy chủ
 
 ```bash
-scp worker-go/dist/blk-sync-1.0.0-linux-amd64.tar.gz admin@sync01:/tmp/
+scp worker-go/dist/blk-sync-1.1.0-linux-amd64.tar.gz admin@sync01:/tmp/
 ssh admin@sync01
-mkdir /tmp/blk-sync && tar -C /tmp/blk-sync -xzf /tmp/blk-sync-1.0.0-linux-amd64.tar.gz
+mkdir /tmp/blk-sync && tar -C /tmp/blk-sync -xzf /tmp/blk-sync-1.1.0-linux-amd64.tar.gz
 cd /tmp/blk-sync && sudo ./install.sh
 ```
 
-Script tạo user hệ thống `blk-sync` và cài các file:
+Script tạo user hệ thống `blk-sync` và cài các file. Nó tự nhận biết systemd: từ v250 dùng `blk-sync.service` (bí mật dạng credential mã hóa, mục 4B.7); cũ hơn (CentOS/RHEL 7 là v219) dùng `blk-sync-legacy.service`, tạo sẵn `/var/lib/blk-sync` và để bí mật trong file.
 
 | File | Nội dung |
 | --- | --- |
 | `/opt/blk-sync/blk-sync` | Binary |
 | `/etc/blk-sync/config.json` | Cấu hình (chép từ `config.example.json` nếu chưa có) |
-| `/etc/systemd/system/blk-sync.service` | Unit systemd, có hardening |
+| `/etc/systemd/system/blk-sync.service` | Unit systemd, có hardening (bản mới hoặc bản cho systemd cũ, tùy máy) |
 | `/var/lib/blk-sync/state.json` | Trạng thái, systemd tự tạo thư mục khi chạy |
 
 Service chưa được bật.
@@ -862,9 +756,14 @@ sudo sh -c 'systemd-ask-password -n "AD password:" | systemd-creds encrypt --nam
 sudo sh -c 'systemd-ask-password -n "Ingest API key:" | systemd-creds encrypt --name=ingest-api-key - /etc/blk-sync/ingest-api-key.cred'
 ```
 
-systemd quá cũ (không có `systemd-creds`, trước v250): ghi bí mật vào file chỉ user `blk-sync` đọc được
-(`chown blk-sync /etc/blk-sync/ldap-password; chmod 0400 ...`), dùng `"Password": "file:/etc/blk-sync/ldap-password"`,
-và bỏ hai dòng `LoadCredentialEncrypted=` trong unit.
+**systemd cũ** (CentOS/RHEL 7, không có `systemd-creds`, trước v250): `install.sh` đã cài `blk-sync-legacy.service` (không có `LoadCredentialEncrypted`). Ghi bí mật vào file chỉ user `blk-sync` đọc được và trỏ cấu hình tới file đó:
+
+```bash
+read -rsp "AD password: " p; echo; (umask 077; printf '%s' "$p" > /etc/blk-sync/ldap-password); chown blk-sync:blk-sync /etc/blk-sync/ldap-password; unset p
+read -rsp "Ingest API key: " p; echo; (umask 077; printf '%s' "$p" > /etc/blk-sync/ingest-api-key); chown blk-sync:blk-sync /etc/blk-sync/ingest-api-key; unset p
+```
+
+Trong `/etc/blk-sync/config.json`: `"Password": "file:/etc/blk-sync/ldap-password"` (mục `Ldap`) và `"ApiKey": "file:/etc/blk-sync/ingest-api-key"` (mục `Ingest`). Thử bằng `sudo -u blk-sync /opt/blk-sync/blk-sync --config /etc/blk-sync/config.json check`.
 
 ### 4B.8. Kiểm tra rồi bật service
 
