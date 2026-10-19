@@ -447,6 +447,60 @@ Mỗi bản có ghi chú trong `CHANGELOG.md`, mục **Khi nâng cấp** cho bi�
 git commit -am "release: 1.0.0" && git tag -a v1.0.0 -m "1.0.0" && git push origin main v1.0.0
 ```
 
+
+### 3.7. Cài trên máy chủ không có internet (mạng LAN)
+
+Build sẵn image trên một máy có internet, đóng thành một file, chép sang máy chủ rồi nạp vào Docker. Máy chủ chỉ cần có Docker (kèm `docker compose`), không cần `git`, mã nguồn hay internet. Hai máy phải cùng kiến trúc CPU (cùng amd64 hoặc cùng arm64).
+
+**Trên máy có internet** (cần Docker và `git`):
+
+1. Lấy mã nguồn và (nếu muốn bản cụ thể) chọn tag:
+
+   ```bash
+   git clone git@github.com:vietcf/bitlocker-ad-sync.git blk && cd blk
+   git checkout v2.0.2        # tag phiên bản cần cài; bỏ dòng này để lấy bản mới nhất
+   ```
+
+2. Đóng gói:
+
+   ```bash
+   bash tools/build-offline.sh           # có image PostgreSQL (cách B: DB trong Docker)
+   bash tools/build-offline.sh --no-db   # không có (cách A: DB ngoài, nhỏ hơn)
+   ```
+
+   Script build image app, tải image nginx (và PostgreSQL), rồi tạo `dist/offline/blk-offline-<phiên-bản>.tar.gz` (khoảng 240 MB) cùng file `.sha256`. Trong gói có image, `docker-compose.prod.yml`, `nginx/nginx.conf`, file mẫu `.env`, script nạp `load.sh`, `README.md` và `INSTALL.txt`.
+
+3. Chép file `blk-offline-<phiên-bản>.tar.gz` sang máy chủ (USB, `scp`...). Có file `.sha256` thì chép theo để kiểm tra: `sha256sum -c blk-offline-<phiên-bản>.tar.gz.sha256`.
+
+**Trên máy chủ LAN:**
+
+4. Giải nén và nạp image (script tự kiểm tra SHA-256 các file trong gói):
+
+   ```bash
+   tar xzf blk-offline-2.0.2.tar.gz && cd blk-offline-2.0.2
+   bash load.sh
+   ```
+
+5. Tạo `server/.env` rồi sửa cho đúng môi trường:
+   - **DB ngoài (cách A):** làm đúng Bước 2, 3 và 4 của mục 3.2 (tạo database, sinh khóa, sửa `.env`). Các lệnh chạy ngay trong thư mục vừa giải nén.
+   - **DB trong Docker (cách B):** làm đúng Bước 2 và 3 của mục 3.3 (sinh khóa và mật khẩu, sửa `.env`). Gói đã kèm `server/db.env.example` và `server/db/init/`.
+
+6. Đặt chứng chỉ HTTPS vào `cert/` (`server.crt`, `server.key`): xin từ CA nội bộ (mục 3.5) hoặc tạo tạm bằng `bash cert/generate-self-signed.sh blk.corp.local 10.0.5.10` (script có sẵn trong gói; cần `openssl`).
+
+7. Chạy (`--no-build` để Compose không tìm cách build hay tải gì từ mạng):
+
+   ```bash
+   mkdir -p backups && sudo chown 1000:1000 backups && chmod 700 backups
+   docker compose -f docker-compose.prod.yml up -d --no-build               # cách A
+   docker compose -f docker-compose.prod.yml --profile db up -d --no-build  # cách B
+   ```
+
+8. Kiểm tra: `curl -k https://localhost/healthz` phải trả HTTP 200 và có `"dbOk": true`.
+
+**Cập nhật lên bản mới:** làm lại bước 1 đến 3 trên máy có internet với tag mới, chép gói sang máy chủ, giải nén vào thư mục **mới**, chạy `bash load.sh`, rồi chạy lại lệnh ở bước 7 trong thư mục cũ có `server/.env` (hoặc chép `server/.env`, `server/db.env`, `cert/`, `backups/` sang thư mục mới). Migration tự chạy. Nên sao lưu database trước.
+
+**Quay về bản cũ (rollback):** image bản cũ vẫn còn trong Docker nếu bạn chưa xóa. Chạy `BLK_VERSION=2.0.1 docker compose -f docker-compose.prod.yml up -d --no-build` (đổi `2.0.1` thành tag cũ). Lưu ý migration của bản mới đã chạy và không tự hoàn tác, nên chỉ quay về nếu bản cũ chạy được với schema mới, hoặc khôi phục database từ bản sao lưu trước khi nâng cấp.
+
 ---
 
 ## 4. Cài sync worker trên Windows

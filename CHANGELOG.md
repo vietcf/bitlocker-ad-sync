@@ -13,6 +13,20 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.1.0] - 2026-10-19
+
+### Thêm
+
+- Cài trên máy chủ không có internet: `tools/build-offline.sh` đóng gói image Docker (app, nginx, PostgreSQL) cùng file cấu hình thành một file `.tar.gz` kèm SHA-256; trên máy chủ chạy `load.sh` rồi `docker compose up -d --no-build`. README mục 3.7.
+
+### Đổi
+
+- `docker-compose.prod.yml`: image app có tên cố định `blk-server:${BLK_VERSION:-latest}` (trước đây Compose tự đặt tên theo thư mục và build hai lần cho `server` và `migrate`).
+
+### Khi nâng cấp
+
+Không có migration và không đổi `.env`. Lần đầu build lại sẽ có image mới tên `blk-server`; image cũ theo tên thư mục không còn dùng, xóa bằng `docker image prune` nếu cần.
+
 ## [2.0.2] - 2026-10-19
 
 ### Đổi
@@ -119,7 +133,8 @@ mới được kiểm thử trên mô phỏng và kết nối thử, chưa qua m
 - `server/.env`: `LDAP_URL` đã bỏ, thay bằng `LDAP_SERVERS` và `LDAP_PROTOCOL` (ví dụ `LDAP_SERVERS=dc01.corp.local`).
 - Script gọi API bằng tài khoản AD phải chuyển sang tài khoản local.
 
-[Chưa phát hành]: https://github.com/vietcf/bitlocker-ad-sync/compare/v2.0.2...HEAD
+[Chưa phát hành]: https://github.com/vietcf/bitlocker-ad-sync/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v2.1.0
 [2.0.2]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v2.0.2
 [2.0.1]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v2.0.1
 [2.0.0]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v2.0.0

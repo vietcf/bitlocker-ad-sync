@@ -1,6 +1,8 @@
 # Production: cau hinh cua app nam trong server/.env (khong co secret nao ghi cung o day).
 #   DB ngoai Docker:  docker compose -f docker-compose.prod.yml up -d --build
 #   DB trong Docker:  docker compose -f docker-compose.prod.yml --profile db up -d --build
+# May chu khong co internet: tools/build-offline.sh dong goi image thanh mot file (README muc 3.7);
+# tren may chu chay them --no-build. BLK_VERSION chon tag cua image app (mac dinh latest).
 # Mat khau tao DB lan dau (POSTGRES_PASSWORD...) nam rieng trong server/db.env, chi service db doc;
 # app khong thay mat khau superuser. Sau khi DB da khoi tao xong co the xoa server/db.env.
 # Xem README muc 3.
@@ -36,6 +38,7 @@ services:
 
   migrate:
     build: ./server
+    image: blk-server:${BLK_VERSION:-latest}
     command: ["node", "src/db/migrate.js"]
     env_file: ./server/.env
     restart: "no"
@@ -47,6 +50,7 @@ services:
 
   server:
     build: ./server
+    image: blk-server:${BLK_VERSION:-latest}
     env_file: ./server/.env
     volumes:
       - ./backups:/app/backups
