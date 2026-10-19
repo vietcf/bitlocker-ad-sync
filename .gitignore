@@ -32,3 +32,4 @@ _last-good/
 # Script nhap OU/chi nhanh dung rieng, khong dua vao git
 tools/import-branches.ps1
 tools/export-ou.ps1
+tools/import-branches.sh
