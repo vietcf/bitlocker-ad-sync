@@ -13,6 +13,12 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.11.2] - 2026-10-20
+
+### Sửa
+
+- Nút gạt Bật/Tắt của cảnh báo dữ liệu không hiện (chỉ thấy chữ "Bật") do CSS của form ép nhãn thành khối và thanh trượt thành `inline`. Nay hiện đúng: Bật là xanh với núm bên phải, Tắt là xám với núm bên trái.
+
 ## [2.11.1] - 2026-10-20
 
 ### Sửa
