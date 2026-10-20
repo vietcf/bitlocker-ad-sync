@@ -159,6 +159,33 @@ describe('report', () => {
     expect(page).toContain('noLogon=only');
   });
 
+  it('filters the computers counted by last AD logon, on the page and in the Excel file', async () => {
+    await asOwner(`UPDATE computer SET last_logon_at = now() - interval '10 days' WHERE name = 'HN-LT-0001';
+                   UPDATE computer SET last_logon_at = now() - interval '8 months' WHERE name = 'HCM-LT-0001'`); // HN-PC-NEW: no data
+    const { agent } = await apiLogin(app, 'auditor');
+    const sum = async (query) => (await agent.get('/api/reports/summary').query(query)).body;
+    expect((await sum({})).totals.computers).toBe(3); // no filter: everything
+    expect((await sum({ activity: 'a3' })).totals).toMatchObject({ computers: 1, active: 1, noLogon: 0 });
+    expect((await sum({ activity: 'i3' })).totals).toMatchObject({ computers: 1, inactive: 1 });
+    expect((await sum({ activity: 'i3', noLogon: 'include' })).totals.computers).toBe(2); // old OR no data
+    expect((await sum({ noLogon: 'only' })).totals).toMatchObject({ computers: 1, noLogon: 1 });
+    expect((await sum({ noLogon: 'only' })).noKey.map((c) => c.name)).toEqual(['HN-PC-NEW']);
+
+    const web = await webLogin(app, 'auditor');
+    const page = (await web.agent.get('/reports').query({ activity: 'a3' })).text;
+    expect(page).toContain('name="activity"');
+    expect(page).toContain('Chưa có dữ liệu đăng nhập AD');
+    expect(page).toContain('Đang lọc theo');
+    expect(page).toContain('activity=a3'); // the Excel link keeps the filter
+    const xlsx = await web.agent.get('/reports/export.xlsx').query({ activity: 'i3', noLogon: 'include' }).buffer(true).parse((r, cb) => {
+      const chunks = [];
+      r.on('data', (c) => chunks.push(c));
+      r.on('end', () => cb(null, Buffer.concat(chunks)));
+    });
+    expect(xlsx.status).toBe(200);
+    expect(Object.values(unzip(xlsx.body)).join('')).toContain('quá 3 tháng chưa thấy, gồm cả máy chưa có dữ liệu');
+  });
+
   it('renders the page with the three parts', async () => {
     const { agent } = await webLogin(app, 'auditor');
     const page = await agent.get('/reports');

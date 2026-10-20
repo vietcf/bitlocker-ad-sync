@@ -13,6 +13,16 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.12.0] - 2026-10-20
+
+### Thêm
+
+- Báo cáo: bộ lọc **Đăng nhập AD** và **Chưa có dữ liệu đăng nhập AD** (cùng cách với Tìm máy) trên trang và trong file Excel; Excel ghi bộ lọc đang dùng ở sheet Tổng quan. API `/api/reports/summary` nhận `activity`, `noLogon`. Hai ô lọc dùng chung một partial với Tìm máy.
+
+### Đổi
+
+- Nhãn ô "Chưa có dữ liệu" thành **"Chưa có dữ liệu đăng nhập AD"** (một dòng, không lệch hàng), rê chuột có giải thích đầy đủ.
+
 ## [2.11.5] - 2026-10-20
 
 ### Sửa

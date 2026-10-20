@@ -5,6 +5,7 @@ import { isWithinWorkingHours } from '../../domain/time.js';
 import { badRequest, forbidden } from '../../http/errors.js';
 import { isoDay, parse } from '../../http/validate.js';
 import { toXlsx } from '../../http/xlsx.js';
+import { activityParam, noLogonParam } from '../computers/computers.api.js';
 import { REASON_LABELS } from '../keys/keys.service.js';
 import { branchList, computersLeftInPeriod, computersWithKey, computersWithoutKey, earliestDay, existingBranches, inventoryByBranch, revealsInPeriod, revealStats } from './reports.repo.js';
 
@@ -20,6 +21,9 @@ export const reportQuery = z.object({
   branchId: z.preprocess((v) => (v === '' ? undefined : v), z.coerce.number().int().positive().optional()),
   // 'all': all time (from the first day with data); from / to are then ignored.
   period: z.preprocess((v) => (v === '' ? undefined : v), z.enum(['all']).optional()),
+  // Last AD logon filter of the computers counted (same as the computer search): activity aN / iN, noLogon exclude / include / only.
+  activity: activityParam,
+  noLogon: noLogonParam,
 });
 
 const dateIn = (date, tz) => new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(date); // YYYY-MM-DD
@@ -60,14 +64,15 @@ export class ReportsService {
   filters(rawQuery) {
     const q = parse(reportQuery, rawQuery ?? {});
     const today = dateIn(this.now(), this.tz);
-    if (q.period === 'all') return { all: true, from: null, to: today, branchId: q.branchId ?? null };
+    const logon = { activity: q.activity ?? null, noLogon: q.noLogon ?? null };
+    if (q.period === 'all') return { all: true, from: null, to: today, branchId: q.branchId ?? null, ...logon };
     const to = q.to ?? today;
     const from = q.from ?? addDays(to, -29);
     if (from > to) throw badRequest('invalid_request', 'The start date is after the end date.');
     if ((Date.parse(to) - Date.parse(from)) / 86_400_000 + 1 > MAX_DAYS) {
       throw badRequest('invalid_request', `The period is longer than ${MAX_DAYS} days.`);
     }
-    return { from, to, branchId: q.branchId ?? null };
+    return { from, to, branchId: q.branchId ?? null, ...logon };
   }
 
   /**
@@ -81,6 +86,7 @@ export class ReportsService {
     const inScope = all === 'all' || (f.branchId && all.includes(f.branchId));
     const branches = f.branchId ? (inScope ? [f.branchId] : []) : all;
     const hours = this.settings ? await this.settings.get('reveal.working_hours', null) : null;
+    const logon = { activity: f.activity, noLogon: f.noLogon };
     const months = this.settings ? Number(await this.settings.get('computer.recent_months', 3)) : 3; // "recent" last AD logon
 
     const data = branches.length === 0
@@ -93,13 +99,13 @@ export class ReportsService {
           options: await branchList(tx, all),
           list,
           existing: await existingBranches(tx, branches),
-          inventory: await inventoryByBranch(tx, branches, period, months),
+          inventory: await inventoryByBranch(tx, branches, period, months, logon),
           reveals: await revealsInPeriod(tx, branches, period),
-          noKey: await computersWithoutKey(tx, branches),
+          noKey: await computersWithoutKey(tx, branches, logon),
           // Computers that have keys, with their key counts: for the Excel file of one branch only.
-          withKey: withKeyList && (f.branchId || list.length <= 1) ? await computersWithKey(tx, branches) : null,
+          withKey: withKeyList && (f.branchId || list.length <= 1) ? await computersWithKey(tx, branches, logon) : null,
           // Computers that left the monitored scope in the period (Excel only).
-          left: withKeyList ? await computersLeftInPeriod(tx, branches, period) : null,
+          left: withKeyList ? await computersLeftInPeriod(tx, branches, period, logon) : null,
         };
       });
     f.from ??= f.to;
@@ -202,6 +208,8 @@ export class ReportsService {
     return {
       period: { all: Boolean(f.all), from: f.from, to: f.to, days: (Date.parse(f.to) - Date.parse(f.from)) / 86_400_000 + 1 },
       branchId: f.branchId,
+      activity: f.activity,
+      noLogon: f.noLogon,
       branchOptions: data.options,
       workingHours: hours,
       activityMonths: months,
@@ -240,6 +248,18 @@ const T = (v) => ({ v, s: 'total' });
 const TI = (v) => ({ v, s: 'totalInt' });
 const P = (v) => ({ v, s: 'pct' });
 
+/** The last AD logon filter in words, for the Excel file. */
+function logonText(r) {
+  const noLogon = { exclude: 'không gồm máy chưa có dữ liệu', include: 'gồm cả máy chưa có dữ liệu', only: 'chỉ máy chưa có dữ liệu' };
+  const time = r.activity && r.activity !== 'unknown'
+    ? `${r.activity[0] === 'a' ? 'hoạt động trong' : 'quá'} ${r.activity.slice(1)} tháng${r.activity[0] === 'a' ? ' gần nhất' : ' chưa thấy'}`
+    : null;
+  const only = r.noLogon === 'only' || r.activity === 'unknown';
+  if (!time && !only && !r.noLogon) return 'không lọc (tất cả máy)';
+  if (only) return noLogon.only;
+  return [time ?? 'mọi máy', noLogon[r.noLogon ?? (time ? 'exclude' : 'include')]].join(', ');
+}
+
 function workbook(r, scope) {
   const t = r.totals;
   const period = `${r.period.all ? 'Toàn bộ thời gian, ' : ''}${vnDate(r.period.from)} – ${vnDate(r.period.to)} (${r.period.days} ngày)`;
@@ -255,6 +275,7 @@ function workbook(r, scope) {
       [{ v: 'Báo cáo BitLocker recovery key', s: 'title' }],
       [{ v: `Kỳ báo cáo: ${period}`, s: 'muted' }],
       [{ v: `Phạm vi: ${scopeText}`, s: 'muted' }],
+      [{ v: `Lọc đăng nhập AD: ${logonText(r)}`, s: 'muted' }],
       [{ v: `Người xuất: ${scope.upn} · lúc`, s: 'muted' }, r.generatedAt],
       [],
       [H('Chỉ số'), H('Giá trị'), H('Ghi chú')],

@@ -6,6 +6,10 @@ import { sendCsv } from '../../http/csv.js';
 
 const day = z.preprocess((v) => (v === '' ? undefined : v), isoDay.optional());
 
+/** Last AD logon filter (aN / iN / unknown) and what to do with computers without logon data: see computerFilters. */
+export const activityParam = z.preprocess((v) => (v === '' ? undefined : v), z.string().regex(/^(?:[ai](?:[1-9]|[1-5]\d|60)|unknown)$/).optional());
+export const noLogonParam = z.preprocess((v) => (v === '' ? undefined : v), z.enum(['exclude', 'include', 'only']).optional());
+
 /** Query string of the computer list / search (shared by the page and the API). */
 export const computerQuery = z.object({
   q: z.string().max(100).default(''),
@@ -21,8 +25,8 @@ export const computerQuery = z.object({
   // (N = 1..60; the page offers 1 3 6 9 12 24). noLogon says what to do with computers that have no logon data
   // (never logged on, or the worker has not reported it yet): exclude, include (OR with the time condition) or only.
   // Default: exclude when a time condition is chosen, include otherwise. activity=unknown is the old form of noLogon=only.
-  activity: z.preprocess((v) => (v === '' ? undefined : v), z.string().regex(/^(?:[ai](?:[1-9]|[1-5]\d|60)|unknown)$/).optional()),
-  noLogon: z.preprocess((v) => (v === '' ? undefined : v), z.enum(['exclude', 'include', 'only']).optional()),
+  activity: activityParam,
+  noLogon: noLogonParam,
   // Appeared between from and to (YYYY-MM-DD, inclusive, in APP_TZ), by the date recorded in this
   // system ("seen", default) or the creation date in AD ("ad").
   dateField: z.preprocess((v) => (v === '' ? undefined : v), z.enum(['seen', 'ad']).default('seen')),

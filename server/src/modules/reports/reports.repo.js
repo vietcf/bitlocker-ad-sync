@@ -1,4 +1,11 @@
 import { branchFilter } from '../../db/scoped.js';
+import { logonCondition } from '../computers/computers.repo.js';
+
+// `logon` = { activity, noLogon } of the report filter (see computerFilters): narrows the computers counted.
+const logonClause = (logon, params) => {
+  const cond = logonCondition(logon ?? {}, params);
+  return cond ? ` AND ${cond}` : '';
+};
 
 // Period bounds: from / to are 'YYYY-MM-DD' (inclusive) in time zone tz; each query turns them into
 // [start of from, start of the day after to) as timestamptz.
@@ -32,9 +39,10 @@ export async function earliestDay(tx, branches, tz) {
  * Computers being monitored that have at least one recovery key, with how many keys each has and when
  * the newest key was created in AD. Never a key value. For the Excel export of one branch.
  */
-export async function computersWithKey(tx, branches) {
+export async function computersWithKey(tx, branches, logon) {
   const params = [];
   const scope = branchFilter('c.branch_id', branches, params);
+  const extra = logonClause(logon, params);
   const { rows } = await tx.query(
     `SELECT c.id, c.name, c.os, c.distinguished_name, c.device_serial, c.owner_email, c.ad_created_at, c.first_seen_at, c.last_logon_at,
             c.branch_id, b.code AS branch_code, b.name AS branch_name,
@@ -43,7 +51,7 @@ export async function computersWithKey(tx, branches) {
        LEFT JOIN branch b ON b.id = c.branch_id
        JOIN LATERAL (SELECT count(*)::int AS keys, max(rk.ad_created_at) AS latest_key_at
                        FROM recovery_key rk WHERE rk.computer_id = c.id) k ON k.keys > 0
-      WHERE ${scope} AND c.deleted_in_ad_at IS NULL
+      WHERE ${scope} AND c.deleted_in_ad_at IS NULL${extra}
       ORDER BY b.code NULLS FIRST, lower(c.name)`,
     params,
   );
@@ -54,17 +62,18 @@ export async function computersWithKey(tx, branches) {
  * Computers that left the monitored scope (flagged "not in AD") within the period, with how many keys they hold
  * (kept) and when a sync last saw them. Newest first. Never a key value. For the Excel export.
  */
-export async function computersLeftInPeriod(tx, branches, period) {
+export async function computersLeftInPeriod(tx, branches, period, logon) {
   const params = [];
   const scope = branchFilter('c.branch_id', branches, params);
   const { start, end } = periodParams(params, period);
+  const extra = logonClause(logon, params);
   const { rows } = await tx.query(
     `SELECT c.id, c.name, c.os, c.distinguished_name, c.device_serial, c.owner_email, c.branch_id, b.code AS branch_code,
             c.deleted_in_ad_at,
             (SELECT r.started_at FROM sync_run r WHERE r.id = c.last_seen_run) AS last_seen_at,
             (SELECT count(*)::int FROM recovery_key k WHERE k.computer_id = c.id) AS keys
        FROM computer c LEFT JOIN branch b ON b.id = c.branch_id
-      WHERE ${scope} AND c.deleted_in_ad_at >= ${start} AND c.deleted_in_ad_at < ${end}
+      WHERE ${scope} AND c.deleted_in_ad_at >= ${start} AND c.deleted_in_ad_at < ${end}${extra}
       ORDER BY c.deleted_in_ad_at DESC, b.code NULLS FIRST, lower(c.name)`,
     params,
   );
@@ -72,15 +81,16 @@ export async function computersLeftInPeriod(tx, branches, period) {
 }
 
 /** Computers present in AD with no recovery key at all (BitLocker key not escrowed). */
-export async function computersWithoutKey(tx, branches) {
+export async function computersWithoutKey(tx, branches, logon) {
   const params = [];
   const scope = branchFilter('c.branch_id', branches, params);
+  const extra = logonClause(logon, params);
   const { rows } = await tx.query(
     `SELECT c.id, c.name, c.os, c.distinguished_name, c.device_serial, c.owner_email, c.ad_created_at, c.first_seen_at, c.last_logon_at,
             c.branch_id, b.code AS branch_code, b.name AS branch_name
        FROM computer c
        LEFT JOIN branch b ON b.id = c.branch_id
-      WHERE ${scope} AND c.deleted_in_ad_at IS NULL
+      WHERE ${scope} AND c.deleted_in_ad_at IS NULL${extra}
         AND NOT EXISTS (SELECT 1 FROM recovery_key k WHERE k.computer_id = c.id)
       ORDER BY b.code NULLS FIRST, c.first_seen_at, lower(c.name)`,
     params,
@@ -108,12 +118,13 @@ export async function existingBranches(tx, branches) {
  * Per branch: computers in AD now, with / without a key, keys, and what changed in the period
  * (computers and keys first recorded, computers marked as no longer in AD).
  */
-export async function inventoryByBranch(tx, branches, period, months = 3) {
+export async function inventoryByBranch(tx, branches, period, months = 3, logon = null) {
   const params = [];
   const scope = branchFilter('c.branch_id', branches, params);
   const { start, end } = periodParams(params, period);
   params.push(months);
   const recent = `now() - make_interval(months => $${params.length})`;
+  const extra = logonClause(logon, params);
   const { rows } = await tx.query(
     `SELECT c.branch_id,
             count(*) FILTER (WHERE c.deleted_in_ad_at IS NULL)::int AS computers,
@@ -131,7 +142,7 @@ export async function inventoryByBranch(tx, branches, period, months = 3) {
          SELECT count(*)::int AS n,
                 count(*) FILTER (WHERE k.first_synced_at >= ${start} AND k.first_synced_at < ${end})::int AS new_n
            FROM recovery_key k WHERE k.computer_id = c.id) kc
-      WHERE ${scope}
+      WHERE ${scope}${extra}
       GROUP BY c.branch_id`,
     params,
   );

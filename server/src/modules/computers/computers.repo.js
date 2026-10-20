@@ -124,7 +124,7 @@ export async function listKeyMetadata(tx, computerId) {
  * Last AD logon condition: a time condition (aN seen within N months, iN not seen for more than N months) and what to do
  * with computers without logon data (noLogon: exclude | include = OR with the time condition | only). Returns SQL or null.
  */
-function logonCondition(filters, params) {
+export function logonCondition(filters, params) {
   let { activity, noLogon } = filters;
   if (activity === 'unknown') {
     activity = undefined;

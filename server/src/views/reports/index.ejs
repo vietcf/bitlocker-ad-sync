@@ -4,8 +4,8 @@
   const pct = (v) => (v === null || v === undefined ? '—' : `${h.number(Math.round(v * 1000) / 10)}%`);
   const vn = (iso) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
   const qs = h.query({}, report.period.all
-    ? { period: 'all', branchId: report.branchId }
-    : { from: report.period.from, to: report.period.to, branchId: report.branchId });
+    ? { period: 'all', branchId: report.branchId, activity: report.activity, noLogon: report.noLogon }
+    : { from: report.period.from, to: report.period.to, branchId: report.branchId, activity: report.activity, noLogon: report.noLogon });
   const label = (b) => b.branch_code ?? 'N/A';
   const reasonLabel = (r) => ({ user_locked_out: 'Bị khóa máy', hardware_change: 'Đổi phần cứng', bios_update: 'Cập nhật BIOS', disk_recovery: 'Khôi phục ổ', other: 'Khác' })[r] ?? r ?? '—';
   const USER_LIMIT = 100;
@@ -35,6 +35,7 @@
       </select>
     </label>
     <% } %>
+    <%- include('../partials/logon-filter', { filters: { activity: report.activity, noLogon: report.noLogon } }) %>
   </div>
   <div class="filter-actions">
     <span class="muted small quick">Nhanh:
@@ -63,6 +64,13 @@
   <div class="tile"><div class="tile-label">Lượt hiện key</div><div class="tile-value"><%= h.number(t.reveals) %></div>
     <div class="tile-sub"><%= h.number(t.revealUsers) %> người · <%= h.number(t.revealComputers) %> máy<% if (t.outOfHours !== null) { %> · <%= h.number(t.outOfHours) %> ngoài giờ<% } %></div></div>
 </section>
+
+<% if (report.activity || report.noLogon) { %>
+<div class="notice notice-info" role="status">
+  Đang lọc theo <strong>đăng nhập AD gần nhất</strong>: số máy và số key chỉ tính các máy khớp bộ lọc. Lượt hiện key không bị lọc.
+  <a href="/reports<%= h.query(query, { activity: undefined, noLogon: undefined }) %>">Bỏ lọc này</a>
+</div>
+<% } %>
 
 <section class="card">
   <h2>Chi tiết theo chi nhánh</h2>
