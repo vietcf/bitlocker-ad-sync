@@ -160,6 +160,7 @@ Script hỏi lần lượt: máy chủ PostgreSQL (ví dụ `db.corp.local`), c�
 - **Cổng không chuẩn:** thêm `--https-port 8444 --ingest-port 9443 --http-port 8080` (mặc định 443, 8443, 80). Script ghi các cổng vào `.env` cạnh `docker-compose.prod.yml` (Compose tự đọc), cổng 80 chuyển hướng sang đúng cổng HTTPS, và `healthz` được kiểm tra trên cổng mới. Mở các cổng đó trên tường lửa; cổng ingest chỉ cho IP máy worker.
 - **Chứng chỉ tự ký:** tên máy chủ bạn dùng để truy cập phải nằm trong chứng chỉ (script hỏi "Tên/IP truy cập", nhập đúng tên, ví dụ `blk.corp.local`; số cổng không nằm trong chứng chỉ). Worker và script gọi API phải tin CA của chứng chỉ đó: chép `cert/ca.crt` sang máy worker, đặt `Ingest.CaFile` là đường dẫn file, và `Ingest.BaseUrl` là `https://<tên>:<cổng ingest>/api/ingest`. Với `curl` dùng `--cacert ca.crt`. Chỉ khi thử mới đặt `Ingest.SkipCertificateValidation=true` (hoặc `-k`): khi đó worker gửi cả mật khẩu khôi phục tới bất kỳ máy nào giả danh server.
 - **Chạy không cần gõ** (tự động hóa): `BLK_APP_PASSWORD=... BLK_OWNER_PASSWORD=... bash tools/install.sh --db external --db-host db.corp.local --worker-ips 10.0.5.21 --yes --up`. Xem `bash tools/install.sh --help`.
+- **Sao lưu database:** script điền sẵn `BACKUP_DATABASE_URL` (trang Quản trị > Sao lưu cần nó). Khuyên dùng tài khoản chỉ đọc `blk_backup`: tạo bằng đoạn SQL ở mục 6.8 trên PostgreSQL ngoài rồi chạy script với `BLK_BACKUP_PASSWORD=<mật-khẩu>` (hoặc nhập khi script hỏi). Để trống thì script dùng tạm `blk_owner` và nhắc bạn.
 - Chạy lại script bất cứ lúc nào (đổi IP worker, thêm AD...) là an toàn: khóa bí mật cũ được giữ nguyên.
 
 **Bước 4. Kiểm tra.** Script tự gọi `https://localhost/healthz` sau khi khởi động và in `OK` khi `"dbOk": true`. Rồi mở `https://<tên máy chủ>/` bằng trình duyệt, đăng nhập `admin` / `admin` (mật khẩu mặc định, **bắt buộc đổi ngay** ở lần đầu). Xem log: `docker compose -f docker-compose.prod.yml logs -f server`.
@@ -184,7 +185,7 @@ bash tools/install.sh --db docker
 
 Script hỏi: IP máy chạy worker, máy chủ AD (để trống nếu chỉ dùng tài khoản nội bộ), múi giờ; rồi hỏi có khởi động ngay không. Script `tools/install.sh` làm thay bạn các việc dễ sai: tạo `server/.env` đúng giá trị, sinh các khóa bí mật (chỉ sinh khi chưa có, chạy lại không đổi khóa cũ), điền chuỗi kết nối database, tạo chứng chỉ tự ký tạm nếu chưa có chứng chỉ, kiểm tra đủ cấu hình, rồi khởi động và chờ `healthz`. Cài đặt riêng của Docker (`NODE_ENV`, `USER_HOST`, `INGEST_HOST`, cờ proxy, `BACKUP_DIR`...) đã nằm sẵn trong `docker-compose.prod.yml` nên không cần điền vào `.env`.
 
-- Mật khẩu database do script **tự sinh** và lưu ở `server/db.env` (chỉ container database đọc; gồm cả mật khẩu superuser `postgres`). Hai chuỗi kết nối trong `server/.env` được điền khớp với các mật khẩu đó (host là `db`), bạn không phải sửa tay.
+- Mật khẩu database do script **tự sinh** và lưu ở `server/db.env` (chỉ container database đọc; gồm cả mật khẩu superuser `postgres`). Các chuỗi kết nối trong `server/.env` (kể cả `BACKUP_DATABASE_URL` dùng tài khoản chỉ đọc `blk_backup` cho chức năng sao lưu) được điền khớp với các mật khẩu đó (host là `db`), bạn không phải sửa tay.
 - **Chứng chỉ thật:** đặt `server.crt` và `server.key` vào `cert/` trước khi chạy script (mục 3.5); chưa có thì script đề nghị tạo chứng chỉ tự ký tạm.
 - **Cổng không chuẩn:** thêm `--https-port 8444 --ingest-port 9443 --http-port 8080` (mặc định 443, 8443, 80). Script ghi các cổng vào `.env` cạnh `docker-compose.prod.yml` (Compose tự đọc), cổng 80 chuyển hướng sang đúng cổng HTTPS, và `healthz` được kiểm tra trên cổng mới. Mở các cổng đó trên tường lửa; cổng ingest chỉ cho IP máy worker.
 - **Chứng chỉ tự ký:** tên máy chủ bạn dùng để truy cập phải nằm trong chứng chỉ (script hỏi "Tên/IP truy cập", nhập đúng tên, ví dụ `blk.corp.local`; số cổng không nằm trong chứng chỉ). Worker và script gọi API phải tin CA của chứng chỉ đó: chép `cert/ca.crt` sang máy worker, đặt `Ingest.CaFile` là đường dẫn file, và `Ingest.BaseUrl` là `https://<tên>:<cổng ingest>/api/ingest`. Với `curl` dùng `--cacert ca.crt`. Chỉ khi thử mới đặt `Ingest.SkipCertificateValidation=true` (hoặc `-k`): khi đó worker gửi cả mật khẩu khôi phục tới bất kỳ máy nào giả danh server.
@@ -1041,7 +1042,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE blk_owner IN SCHEMA public GRANT SELECT ON TAB
 ALTER DEFAULT PRIVILEGES FOR ROLE blk_owner IN SCHEMA public GRANT SELECT ON SEQUENCES TO blk_backup;
 ```
 
-Thêm vào `server/.env`: `BACKUP_DATABASE_URL=postgres://blk_backup:<mk>@<db-host>:5432/blk?sslmode=require` và `BACKUP_DIR=/app/backups`
+Cài bằng `tools/install.sh` thì `BACKUP_DATABASE_URL` đã được điền sẵn (DB trong Docker: tài khoản `blk_backup` có sẵn). Nếu tự cài, thêm vào `server/.env`: `BACKUP_DATABASE_URL=postgres://blk_backup:<mk>@<db-host>:5432/blk?sslmode=require` và `BACKUP_DIR=/app/backups`
 (ngoài Docker cần `pg_dump` 17, hoặc `PG_DUMP_PATH`). Trên Linux cho uid 1000 quyền ghi `./backups`
 (`sudo chown 1000:1000 backups && sudo chmod 700 backups`). Rồi vào trang Sao lưu: đặt mật khẩu, chọn loại, giờ, bật, bấm **Sao lưu ngay** để thử. **Thử khôi phục định kỳ.**
 

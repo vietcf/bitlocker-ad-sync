@@ -112,6 +112,8 @@ case "$DB_MODE" in
     set_env "$ENV" DATABASE_URL "postgres://app_node:$A@db:5432/blk"
     set_env "$ENV" MIGRATION_DATABASE_URL "postgres://blk_owner:$O@db:5432/blk"
     set_env "$ENV" DB_SSL false
+    # Sao luu database (pg_dump): tai khoan chi doc blk_backup, do script khoi tao DB tao san
+    set_env "$ENV" BACKUP_DATABASE_URL "postgres://blk_backup:$(get_env "$DBENV" BLK_BACKUP_PASSWORD)@db:5432/blk"
     PROFILE=(--profile db)
     ;;
   external)
@@ -122,6 +124,17 @@ case "$DB_MODE" in
     set_env "$ENV" DATABASE_URL "postgres://app_node:$(urlenc "$BLK_APP_PASSWORD")@$DB_HOST:$DB_PORT/$DB_NAME"
     set_env "$ENV" MIGRATION_DATABASE_URL "postgres://blk_owner:$(urlenc "$BLK_OWNER_PASSWORD")@$DB_HOST:$DB_PORT/$DB_NAME"
     set_env "$ENV" DB_SSL "$DB_SSL"
+    # Sao luu database (pg_dump): nen dung tai khoan chi doc blk_backup (README muc 6.8); khong co thi dung blk_owner
+    if [[ -z "${BLK_BACKUP_PASSWORD:-}" ]] && interactive; then
+      read -r -s -p "Mat khau tai khoan blk_backup cho sao luu (Enter de trong = dung blk_owner): " BLK_BACKUP_PASSWORD; echo
+    fi
+    SSLQ=""; [[ "$DB_SSL" == true ]] && SSLQ="?sslmode=require"
+    if [[ -n "${BLK_BACKUP_PASSWORD:-}" ]]; then
+      set_env "$ENV" BACKUP_DATABASE_URL "postgres://blk_backup:$(urlenc "$BLK_BACKUP_PASSWORD")@$DB_HOST:$DB_PORT/$DB_NAME$SSLQ"
+    else
+      set_env "$ENV" BACKUP_DATABASE_URL "postgres://blk_owner:$(urlenc "$BLK_OWNER_PASSWORD")@$DB_HOST:$DB_PORT/$DB_NAME$SSLQ"
+      say "LUU Y: sao luu dang dung tai khoan blk_owner (quyen cao). Nen tao blk_backup chi doc (README muc 6.8) roi chay lai voi BLK_BACKUP_PASSWORD."
+    fi
     PROFILE=()
     ;;
   *) die "--db phai la docker hoac external." ;;
@@ -201,7 +214,7 @@ if [[ "$DB_MODE" == docker ]] && get_env "$ENV" DATABASE_URL | grep -q '@127\.0\
 [[ $bad -eq 0 ]] || die "Cau hinh chua day du, sua theo cac dong tren roi chay lai."
 
 say ""; say "Cau hinh ($ENV, mat khau da che):"
-grep -E '^(DATABASE_URL|MIGRATION_DATABASE_URL|DB_SSL|INGEST_ALLOWED_IPS|APP_TZ|LDAP_SERVERS|LDAP_DOMAIN|LDAP_BASE_DN|LDAP_PROTOCOL|LOCAL_LOGIN_ENABLED)=' "$ENV" | mask | sed 's/^/  /'
+grep -E '^(DATABASE_URL|MIGRATION_DATABASE_URL|BACKUP_DATABASE_URL|DB_SSL|INGEST_ALLOWED_IPS|APP_TZ|LDAP_SERVERS|LDAP_DOMAIN|LDAP_BASE_DN|LDAP_PROTOCOL|LOCAL_LOGIN_ENABLED)=' "$ENV" | mask | sed 's/^/  /'
 say "  (SESSION_SECRET, SECRET_KEY, INGEST_API_KEY: da co; CAT MOT BAN SECRET_KEY o kho mat khau)"
 
 final_info() {

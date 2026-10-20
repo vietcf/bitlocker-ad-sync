@@ -13,6 +13,16 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.4.1] - 2026-10-20
+
+### Sửa
+
+- `tools/install.sh` thiếu `BACKUP_DATABASE_URL` nên chức năng sao lưu database báo chưa cấu hình. Nay script điền sẵn: DB trong Docker dùng tài khoản chỉ đọc `blk_backup` (có sẵn); PostgreSQL ngoài dùng `blk_backup` nếu có `BLK_BACKUP_PASSWORD`, không thì tạm dùng `blk_owner` và nhắc; có `?sslmode=require` khi bật TLS.
+
+### Khi nâng cấp
+
+Máy đã cài bằng `install.sh` bản cũ: chạy lại `bash install.sh --db ... --up` (giữ nguyên khóa cũ, chỉ thêm dòng còn thiếu), hoặc thêm tay `BACKUP_DATABASE_URL` vào `server/.env` (README mục 6.8) rồi `docker compose ... up -d`.
+
 ## [2.4.0] - 2026-10-19
 
 ### Thêm
@@ -204,7 +214,8 @@ mới được kiểm thử trên mô phỏng và kết nối thử, chưa qua m
 - `server/.env`: `LDAP_URL` đã bỏ, thay bằng `LDAP_SERVERS` và `LDAP_PROTOCOL` (ví dụ `LDAP_SERVERS=dc01.corp.local`).
 - Script gọi API bằng tài khoản AD phải chuyển sang tài khoản local.
 
-[Chưa phát hành]: https://github.com/vietcf/bitlocker-ad-sync/compare/v2.4.0...HEAD
+[Chưa phát hành]: https://github.com/vietcf/bitlocker-ad-sync/compare/v2.4.1...HEAD
+[2.4.1]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v2.4.1
 [2.4.0]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v2.4.0
 [2.3.2]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v2.3.2
 [2.3.1]: https://github.com/vietcf/bitlocker-ad-sync/releases/tag/v2.3.1
