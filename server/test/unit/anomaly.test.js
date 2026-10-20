@@ -24,6 +24,18 @@ describe('checkRun', () => {
     expect(checkRun(run({ branches: [{ branch_id: 2, branch_code: 'DN', computers_seen: 0 }] }), baseline, t)).toEqual([]);
   });
 
+  it('skips a check Admin HQ switched off, and only that one', () => {
+    const off = (code) => ({ ...t, enabled: { [code]: false } });
+    const bad = run({ overall: { computers_seen: 900, keys_seen: 1000 }, plannedDeletes: 60, branches: [{ branch_id: 1, branch_code: 'HN', computers_seen: 120 }] });
+    const baseline = { branchSeen: { 1: [200, 205, 198] } };
+    expect(codes(checkRun(bad, baseline, t)).sort()).toEqual(['branch_drop', 'computers_drop', 'keys_drop', 'mass_delete']);
+    expect(codes(checkRun(bad, baseline, off('computers_drop')))).not.toContain('computers_drop');
+    expect(codes(checkRun(bad, baseline, off('keys_drop')))).not.toContain('keys_drop');
+    expect(codes(checkRun(bad, baseline, off('branch_drop')))).not.toContain('branch_drop');
+    expect(codes(checkRun(bad, baseline, off('mass_delete')))).not.toContain('mass_delete');
+    expect(codes(checkRun(bad, baseline, off('mass_delete')))).toContain('computers_drop');
+  });
+
   it('flags mass deletion over the threshold', () => {
     expect(codes(checkRun(run({ plannedDeletes: 60 }), { branchSeen: {} }, t))).toContain('mass_delete');
     expect(checkRun(run({ plannedDeletes: 40 }), { branchSeen: {} }, t)).toEqual([]);

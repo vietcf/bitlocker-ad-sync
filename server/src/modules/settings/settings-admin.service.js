@@ -11,7 +11,7 @@ import { JOB_SCHEDULE, TIME_OF_DAY, jobMinutes, jobTime } from '../../jobs/job-s
 import { LOCKOUT_DEFAULTS, LOCKOUT_LIMITS, loadLockoutPolicy } from '../auth/lockout.js';
 import { PASSWORD_LENGTH_LIMITS, describePasswordPolicy, loadPasswordPolicy } from '../auth/password.js';
 import { encryptSecret } from '../mail/secret.js';
-import { ALERT_SWITCHES, FEATURES } from './settings.service.js';
+import { ALERT_SWITCHES, CHECK_SWITCHES, FEATURES } from './settings.service.js';
 import { KEY_EXPORT_MODES } from '../keys/keys.service.js';
 import { RETENTION_LIMITS } from './retention.service.js';
 import { THRESHOLDS, fromForm, toForm } from './thresholds.js';
@@ -320,6 +320,14 @@ export class SettingsAdminService {
     return out;
   }
 
+  /** The full-run checks that can be switched off: [{ code, key, label, help, enabled }]. */
+  async checkSwitches(scope) {
+    this.#check(scope);
+    const out = [];
+    for (const c of CHECK_SWITCHES) out.push({ ...c, key: `check.${c.code}`, enabled: await this.settings.checkEnabled(c.code) });
+    return out;
+  }
+
   /** raw: { [key]: shown value }; a key left out keeps its value. Each must be within [min, max]. Alert switches: on / off. */
   async saveThresholds(scope, raw, client = {}) {
     this.#check(scope);
@@ -335,13 +343,13 @@ export class SettingsAdminService {
       }
       changes[t.key] = fromForm(t, n);
     }
-    for (const a of ALERT_SWITCHES) {
-      let v = raw?.[`alert.${a.type}`];
+    for (const [key] of [...ALERT_SWITCHES.map((a) => [`alert.${a.type}`]), ...CHECK_SWITCHES.map((c) => [`check.${c.code}`])]) {
+      let v = raw?.[key];
       if (Array.isArray(v)) v = v.at(-1); // form: hidden "off" then the checked checkbox "on"
       if (v === undefined || v === '') continue;
-      if (v === true || v === 'on' || v === 'true' || v === '1') changes[`alert.${a.type}`] = true;
-      else if (v === false || v === 'off' || v === 'false' || v === '0') changes[`alert.${a.type}`] = false;
-      else fields.push({ field: `alert.${a.type}`, message: 'on_or_off' });
+      if (v === true || v === 'on' || v === 'true' || v === '1') changes[key] = true;
+      else if (v === false || v === 'off' || v === 'false' || v === '0') changes[key] = false;
+      else fields.push({ field: key, message: 'on_or_off' });
     }
     if (fields.length) throw badRequest('invalid_request', 'The request data is invalid.', { fields });
     for (const [k, v] of Object.entries(changes)) await this.settings.set(k, v);

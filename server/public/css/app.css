@@ -148,6 +148,9 @@ tr.warn-row td { background: var(--warn-bg); }
 .date-range legend { float: left; width: 100%; padding: 0; margin-bottom: 4px; font-weight: 600; font-size: 13px; }
 /* Khung rieng cho loc dang nhap AD, tren mot dong rieng (filter-break ngay truoc) */
 .filter-break { flex-basis: 100%; height: 0; }
+/* Trang Canh bao sync: tieu de cac muc lon noi bat (mau nhan, dam) de phan biet voi khung con ben trong */
+.thr-form > fieldset > legend { color: var(--accent); font-weight: 700; font-size: 16px; padding: 0 8px; }
+.thr-form > fieldset { border-color: var(--accent); }
 /* Hai o loc dang nhap AD: nhan tren o chon nhu cac o khac, khoanh bang net vien mo */
 .filter-fields .logon-range { display: flex; flex-wrap: nowrap; gap: 8px 14px; align-items: flex-end; border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 12px 10px; margin: 0; flex: 0 0 auto; }
 @media (max-width: 760px) { .filter-fields .logon-range { flex-wrap: wrap; } }

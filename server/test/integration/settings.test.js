@@ -295,7 +295,8 @@ describe('data alert switches (Canh bao sync)', () => {
   it('lists the switches with the thresholds, saves them on / off, and shows them on the page', async () => {
     const a = await admin();
     const first = (await a.get('/api/admin/settings/thresholds')).body;
-    expect(first.alerts.map((x) => x.type)).toEqual(['escrow_broken', 'no_key_rising', 'full_stale', 'dc_cert_expiring']);
+    expect(first.alerts.filter((x) => x.group === 'data').map((x) => x.type)).toEqual(['escrow_broken', 'no_key_rising', 'full_stale', 'dc_cert_expiring']);
+    expect(first.alerts.filter((x) => x.group === 'system').map((x) => x.type)).toEqual(['worker_silent', 'ldap_error', 'sync_stale', 'sync_run_aborted', 'canary_stale', 'dc_usn_stalled']);
     expect(first.alerts.every((x) => x.enabled === true)).toBe(true);
     expect(first.items.find((t) => t.key === 'anomaly.escrow_ratio')).toMatchObject({ group: 'dataalerts', alert: 'escrow_broken' });
     const off = await a.put('/api/admin/settings/thresholds', { 'alert.full_stale': false, 'alert.no_key_rising': 'off' });
@@ -307,6 +308,12 @@ describe('data alert switches (Canh bao sync)', () => {
     expect(page).toContain('Cảnh báo dữ liệu (bật/tắt được)');
     expect(page).toContain('name="alert.full_stale"');
     expect(page).toContain('role="switch"');
+    expect(page).toContain('Kiểm tra khi lượt sync kết thúc (bật/tắt được)');
+    expect(first.checks.map((x) => x.code)).toEqual(['computers_drop', 'keys_drop', 'branch_drop', 'mass_delete']);
+    expect(first.items.find((t) => t.key === 'anomaly.min_computer_ratio')).toMatchObject({ check: 'computers_drop' });
+    const offChecks = await a.put('/api/admin/settings/thresholds', { 'check.mass_delete': false });
+    expect(offChecks.body.checks.find((x) => x.code === 'mass_delete').enabled).toBe(false);
+    expect(await services.settings.checkEnabled('computers_drop')).toBe(true);
 
     // the page form: a hidden "off" then the checkbox "on" when checked; only "off" when the switch is unchecked
     const web = await webLogin(app, 'admin.hq');

@@ -73,10 +73,10 @@ export function adminApi({ admin, syncAdmin, settingsAdmin }) {
     await settingsAdmin.saveFeatures(req.scope, req.body, clientInfo(req));
     res.json(await settingsAdmin.features(req.scope));
   });
-  r.get('/settings/thresholds', async (req, res) => res.json({ items: await settingsAdmin.thresholds(req.scope), alerts: await settingsAdmin.alertSwitches(req.scope) }));
+  r.get('/settings/thresholds', async (req, res) => res.json({ items: await settingsAdmin.thresholds(req.scope), alerts: await settingsAdmin.alertSwitches(req.scope), checks: await settingsAdmin.checkSwitches(req.scope) }));
   r.put('/settings/thresholds', async (req, res) => {
     await settingsAdmin.saveThresholds(req.scope, req.body, clientInfo(req));
-    res.json({ items: await settingsAdmin.thresholds(req.scope), alerts: await settingsAdmin.alertSwitches(req.scope) });
+    res.json({ items: await settingsAdmin.thresholds(req.scope), alerts: await settingsAdmin.alertSwitches(req.scope), checks: await settingsAdmin.checkSwitches(req.scope) });
   });
   r.get('/settings/retention', async (req, res) => res.json(await settingsAdmin.retentionSettings(req.scope)));
   r.put('/settings/retention', async (req, res) => {

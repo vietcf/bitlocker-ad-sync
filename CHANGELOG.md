@@ -13,6 +13,16 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.13.0] - 2026-10-20
+
+### Thêm
+
+- Cảnh báo sync: công tắc **Bật/Tắt** cho từng **kiểm tra khi lượt full kết thúc** (thấy quá ít máy, thấy quá ít key, chi nhánh giảm đột ngột, quá nhiều máy sắp bị gắn "không còn trong phạm vi") và cho từng **sự cố hệ thống** (worker mất kết nối, không đọc được AD, lâu không có lượt sync, lượt sync treo, canary cũ, USN đứng yên), cạnh ngưỡng riêng của nó. Tắt thì không theo dõi loại đó. Riêng kiểm tra "key đọc được nhưng mật khẩu rỗng" luôn bật. API `/api/admin/settings/thresholds` trả thêm `checks`, `alerts[].group` và nhận `check.<code>`, `alert.<type>`.
+
+### Đổi
+
+- Cảnh báo sync: tiêu đề các mục lớn đổi sang màu nhấn có viền riêng để phân biệt với khung con.
+
 ## [2.12.4] - 2026-10-20
 
 ### Sửa

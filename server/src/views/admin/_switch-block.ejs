@@ -1,0 +1,16 @@
+<%# Mot khung cau hinh co cong tac bat/tat o dau + cac nguong cua no. Tham so: sw {key,label,help,enabled}, items, values, UNIT %>
+<div class="alert-config">
+  <div class="alert-config-head">
+    <strong><%= sw.label %></strong>
+    <%# Cong tac: o an "off" di truoc de form luon gui gia tri (checkbox bo chon thi khong gui gi) %>
+    <% const v = Array.isArray(values[sw.key]) ? values[sw.key].at(-1) : values[sw.key]; const on = (v ?? sw.enabled) !== false && v !== 'off'; %>
+    <input type="hidden" name="<%= sw.key %>" value="off">
+    <label class="switch" for="<%= sw.key %>">
+      <input id="<%= sw.key %>" type="checkbox" role="switch" name="<%= sw.key %>" value="on" <%= on ? 'checked' : '' %> aria-label="Bật hoặc tắt: <%= sw.label %>">
+      <span class="switch-track" aria-hidden="true"></span>
+      <span class="switch-text" aria-hidden="true"></span>
+    </label>
+  </div>
+  <p class="muted small"><%= sw.help %></p>
+  <% if (items.length) { %><%- include('_threshold-rows', { items, values, UNIT }) %><% } %>
+</div>

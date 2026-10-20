@@ -1,6 +1,7 @@
 // Checks that run when a sync reports success but its data may be wrong
 // (design doc: "Phat hien du lieu bat thuong khi sync van bao thanh cong").
 // Pure functions: metrics in, list of findings out.
+import { CHECK_SWITCHES } from '../settings/settings.service.js';
 
 /** Median of a list of numbers (null for an empty list). */
 export function median(values) {
@@ -31,7 +32,9 @@ export function checkRun(metrics, baseline, t) {
 
   if (metrics.mode !== 'full') return found;
 
-  if (o.computers_in_db > 0) {
+  const on = (code) => t.enabled?.[code] !== false; // a check Admin HQ switched off is skipped
+
+  if (on('computers_drop') && o.computers_in_db > 0) {
     const ratio = o.computers_seen / o.computers_in_db;
     if (ratio < t.minComputerRatio) {
       found.push({
@@ -42,7 +45,7 @@ export function checkRun(metrics, baseline, t) {
     }
   }
 
-  if (o.keys_expected > 0) {
+  if (on('keys_drop') && o.keys_expected > 0) {
     const ratio = o.keys_seen / o.keys_expected;
     if (ratio < t.minKeyRatio) {
       found.push({
@@ -53,7 +56,7 @@ export function checkRun(metrics, baseline, t) {
     }
   }
 
-  for (const b of metrics.branches) {
+  for (const b of on('branch_drop') ? metrics.branches : []) {
     const base = median(baseline.branchSeen[b.branch_id] ?? []);
     if (base === null || base === 0) continue;
     const drop = base - b.computers_seen;
@@ -66,7 +69,7 @@ export function checkRun(metrics, baseline, t) {
     }
   }
 
-  if (metrics.liveComputers > 0 && metrics.plannedDeletes / metrics.liveComputers > t.maxDeleteRatio) {
+  if (on('mass_delete') && metrics.liveComputers > 0 && metrics.plannedDeletes / metrics.liveComputers > t.maxDeleteRatio) {
     found.push({
       code: 'mass_delete',
       message: `The full run did not see ${metrics.plannedDeletes}/${metrics.liveComputers} computers (over ${pct(t.maxDeleteRatio)}); if accepted they are flagged "no longer in the monitored scope" (no data is deleted, keys are kept).`,
@@ -112,5 +115,6 @@ export async function loadThresholds(settings) {
     usnStallHours: await n('anomaly.usn_stall_hours', 6),
     canaryMaxAgeMinutes: await n('anomaly.canary_max_age_minutes', 90),
     maxDeleteRatio: await n('full_sync.max_delete_ratio', 0.05),
+    enabled: Object.fromEntries(await Promise.all(CHECK_SWITCHES.map(async (c) => [c.code, await settings.checkEnabled(c.code)]))),
   };
 }

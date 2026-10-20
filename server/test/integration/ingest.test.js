@@ -366,6 +366,28 @@ describe('heartbeat, manual sync and watchdog', () => {
     expect(sent.some((m) => m.subject.includes('Đã khôi phục'))).toBe(false);
   });
 
+  it('a system fault switched off in Canh bao sync is not watched: no alert, no mail', async () => {
+    const setOff = async (type) => {
+      await asOwner(`INSERT INTO app_setting (key, value) VALUES ('alert.${type}', 'false') ON CONFLICT (key) DO UPDATE SET value = 'false'`);
+      services.settings.invalidate();
+    };
+    await setOff('worker_silent');
+    const r = await watchdog(); // no heartbeat at all
+    expect(r.workerOffline).toBe(true);
+    expect(sent.map((m) => m.type)).toEqual([]); // no "worker offline" mail
+    expect(await openTypes()).not.toContain('worker_offline');
+    expect(await openTypes()).not.toContain('worker_silent');
+
+    await asOwner(`DELETE FROM app_setting WHERE key = 'alert.worker_silent'`);
+    services.settings.invalidate();
+    await setOff('ldap_error');
+    await heartbeat({ ldapOk: false, lastErrorCode: 'ldap_tls_failed' });
+    const r2 = await watchdog();
+    expect(r2.problems).not.toContain('ldap_error'); // switched off
+    expect(r2.problems).toContain('sync_stale'); // the others still count
+    expect(await openTypes()).not.toContain('ldap_error');
+  });
+
   it('a delta run page shows only what the run saw; only a full run is compared with the whole system', async () => {
     const full = await runSync({ computers: [computer(1), computer(2), computer(3)], keys: [key(1, 1)] });
     const delta = await runSync({ mode: 'delta', computers: [computer(2)] });

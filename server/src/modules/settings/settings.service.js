@@ -12,14 +12,33 @@ export const FEATURES = [
   { key: 'reveal.ticket_required', default: false }, // a ticket number is required to reveal a key
 ];
 /**
- * Data alerts of the watchdog that Admin HQ can switch off (Quan tri > Dong bo AD > Canh bao sync), next to their
- * thresholds. System faults (worker, AD, overdue sync...) cannot be switched off. Stored as app_setting "alert.<type>".
+ * Alerts of the watchdog that Admin HQ can switch off (Quan tri > Dong bo AD > Canh bao sync), next to their
+ * thresholds: system faults (group system) and data alerts (group data). Stored as app_setting "alert.<type>".
  */
 export const ALERT_SWITCHES = [
-  { type: 'escrow_broken', label: 'Máy mới không lưu key lên AD', help: 'Máy tạo trong 7 ngày qua (đã quá 48 giờ) mà tỉ lệ chưa có key vượt ngưỡng.' },
-  { type: 'no_key_rising', label: 'Tỉ lệ máy không có key tăng', help: 'Tỉ lệ máy chưa có key của một chi nhánh tăng so với tuần trước.' },
-  { type: 'full_stale', label: 'Full sync quá hạn', help: 'Lâu không có lượt full thành công. Lượt delta vẫn được theo dõi riêng (sự cố hệ thống).' },
-  { type: 'dc_cert_expiring', label: 'Chứng chỉ DC sắp hết hạn', help: 'Chứng chỉ LDAPS của DC còn dưới 30 ngày (không có ngưỡng chỉnh).' },
+  // group 'system': measured live by the watchdog (a switched-off one is not watched at all)
+  { group: 'system', type: 'worker_silent', label: 'Worker (agent) mất kết nối', help: 'Không có heartbeat quá ngưỡng: mail "Worker Offline". Tắt thì không theo dõi worker, kể cả các kiểm tra phụ thuộc worker.' },
+  { group: 'system', type: 'ldap_error', label: 'Worker không đọc được AD', help: 'DC offline, sai quyền hoặc lỗi TLS (không có ngưỡng chỉnh).' },
+  { group: 'system', type: 'sync_stale', label: 'Lâu không có lượt sync thành công', help: 'Không có lượt delta hoặc full thành công quá ngưỡng.' },
+  { group: 'system', type: 'sync_run_aborted', label: 'Lượt sync bị treo', help: 'Có lượt ở trạng thái "đang chạy" quá ngưỡng nên bị hủy.' },
+  { group: 'system', type: 'canary_stale', label: 'Canary cũ', help: 'Thay đổi thử trên AD không còn đến được server.' },
+  { group: 'system', type: 'dc_usn_stalled', label: 'USN của DC đứng yên', help: 'DC không còn nhận thay đổi trong thời gian quá ngưỡng.' },
+  // group 'data': computed from stored data, still true for days after the cause is fixed
+  { group: 'data', type: 'escrow_broken', label: 'Máy mới không lưu key lên AD', help: 'Máy tạo trong 7 ngày qua (đã quá 48 giờ) mà tỉ lệ chưa có key vượt ngưỡng.' },
+  { group: 'data', type: 'no_key_rising', label: 'Tỉ lệ máy không có key tăng', help: 'Tỉ lệ máy chưa có key của một chi nhánh tăng so với tuần trước.' },
+  { group: 'data', type: 'full_stale', label: 'Full sync quá hạn', help: 'Lâu không có lượt full thành công. Lượt delta vẫn được theo dõi riêng (sự cố hệ thống).' },
+  { group: 'data', type: 'dc_cert_expiring', label: 'Chứng chỉ DC sắp hết hạn', help: 'Chứng chỉ LDAPS của DC còn dưới 30 ngày (không có ngưỡng chỉnh).' },
+];
+/**
+ * Checks run when a full sync reports success (anomaly.js): a breach quarantines the run. Admin HQ can switch each one off
+ * (Quan tri > Dong bo AD > Canh bao sync). `key_attr_unreadable` (the sync account lost read access) is not listed: always on.
+ * Stored as app_setting "check.<code>".
+ */
+export const CHECK_SWITCHES = [
+  { code: 'computers_drop', label: 'Lượt full thấy quá ít máy', help: 'Lượt full thấy ít hơn ngưỡng % số máy đang có thì bị giữ lại.' },
+  { code: 'keys_drop', label: 'Lượt full thấy quá ít key', help: 'Lượt full thấy ít hơn ngưỡng % số key đang có thì bị giữ lại.' },
+  { code: 'branch_drop', label: 'Một chi nhánh giảm đột ngột', help: 'Số máy một chi nhánh giảm quá ngưỡng so với mức thường.' },
+  { code: 'mass_delete', label: 'Quá nhiều máy sắp bị gắn "không còn trong phạm vi"', help: 'Lượt full không thấy quá ngưỡng % số máy đang giám sát.' },
 ];
 const FEATURE_DEFAULTS = Object.fromEntries(FEATURES.map((f) => [f.key, f.default]));
 
@@ -59,6 +78,11 @@ export class SettingsService {
   /** Whether a data alert type is switched on (default: on). */
   async alertEnabled(type) {
     return (await this.get(`alert.${type}`, true)) !== false;
+  }
+
+  /** Whether a run check is switched on (default: on). */
+  async checkEnabled(code) {
+    return (await this.get(`check.${code}`, true)) !== false;
   }
 
   /** All switchable features: { [key]: boolean }. */

@@ -57,7 +57,8 @@ export function settingsWeb({ settingsAdmin }) {
     const list = await settingsAdmin.thresholds(req.scope);
     const values = error ? { ...Object.fromEntries(list.map((t) => [t.key, t.value])), ...req.body } : Object.fromEntries(list.map((t) => [t.key, t.value]));
     const alerts = await settingsAdmin.alertSwitches(req.scope);
-    res.render('admin/settings-thresholds', { title: 'Cảnh báo sync', list, alerts, values, error });
+    const checks = await settingsAdmin.checkSwitches(req.scope);
+    res.render('admin/settings-thresholds', { title: 'Cảnh báo sync', list, alerts, checks, values, error });
   };
   r.get('/settings/thresholds', (req, res) => renderThresholds(req, res, null));
   r.post('/settings/thresholds', formAction(async (req, res) => {

@@ -912,7 +912,7 @@ Watchdog chạy mỗi 5 phút, hai trạng thái, mỗi loại **một** mail kh
 - **Worker Offline:** không có heartbeat quá ngưỡng (worker chết, máy tắt, mất mạng, sai API key / IP / chứng chỉ). Khi Offline, trạng thái AD là "chưa xác định".
 - **Đồng bộ AD có sự cố:** worker vẫn chạy nhưng AD hoặc sync có vấn đề. Gồm **sự cố hệ thống** (đo trực tiếp, tự hết khi sửa xong: không đọc được AD, sync quá hạn, lượt sync treo, canary, USN) và **cảnh báo dữ liệu** (tính từ dữ liệu: máy mới không có key, tỉ lệ không key tăng, full sync quá hạn, chứng chỉ DC sắp hết hạn).
 
-Cảnh báo dữ liệu còn đúng nhiều ngày sau khi sửa nguyên nhân, nên có **Đã xử lý** (im lặng 30 ngày), **Bỏ qua 1/7/30 ngày** và công tắc **Bật/Tắt** từng loại. Ngưỡng và công tắc ở **Quản trị > Đồng bộ AD > Cảnh báo sync**.
+Cảnh báo dữ liệu còn đúng nhiều ngày sau khi sửa nguyên nhân, nên có **Đã xử lý** (im lặng 30 ngày) và **Bỏ qua 1/7/30 ngày**. Mọi loại cảnh báo (sự cố hệ thống và cảnh báo dữ liệu) và các kiểm tra khi lượt full kết thúc đều có công tắc **Bật/Tắt** cạnh ngưỡng của nó ở **Quản trị > Đồng bộ AD > Cảnh báo sync**. Tắt thì không theo dõi loại đó: nếu sự cố xảy ra thật sẽ không có cảnh báo nào.
 
 Mail cảnh báo chia 4 nhóm, bật/tắt và chọn người nhận ở Quản trị > Thông báo (`NOTIFY_TO` luôn nhận nhóm đang bật; tắt nhóm thì vẫn hiện trong app): **Agent ngừng hoạt động**; **Kết nối AD và đồng bộ có vấn đề** (kể cả sync lỗi, lượt bị giữ lại, Key ID trùng); **Xem key ngoài giờ và bảo mật dữ liệu**; **Sao lưu lỗi**.
 

@@ -1,10 +1,7 @@
 <%- include('../partials/head') %>
 <%- include('_tabs') %>
 <% const UNIT = { percent: '%', minutes: 'phút', hours: 'giờ', months: 'tháng', days: 'ngày', count: '', points: 'điểm %' }; %>
-<% const GROUPS = [
-  ['run', 'Kiểm tra khi lượt sync kết thúc', 'Vượt ngưỡng thì lượt sync bị giữ lại (cách ly) và chờ Admin HQ chấp nhận hoặc bác bỏ ở tab Tình trạng sync. Các ngưỡng này chỉ xét lượt full (lượt delta chỉ đọc máy và key có thay đổi nên không so với toàn hệ thống).'],
-  ['watchdog', 'Sự cố hệ thống (watchdog)', 'Đo trực tiếp, tự hết khi sửa xong, không tắt được. Không có heartbeat thì Worker Offline (một mail); worker vẫn chạy mà vượt ngưỡng khác (không đọc được AD, lâu không có lượt sync, canary, USN...) thì Đồng bộ AD có sự cố (một mail).'],
-]; %>
+<% const GROUPS = []; %>
 <section class="card">
   <h2>Cảnh báo sync</h2>
   <p class="muted">Ngưỡng và bật/tắt các cảnh báo của đồng bộ AD. Thay đổi có hiệu lực trong vòng 30 giây và được ghi vào nhật ký. Cột "Mặc định" là giá trị khi cài đặt.</p>
@@ -21,15 +18,24 @@
     </ul>
   </div>
   <%- include('../partials/error-box', { error }) %>
-  <form method="post" action="/admin/settings/thresholds" class="form">
+  <form method="post" action="/admin/settings/thresholds" class="form thr-form">
     <%- include('../partials/csrf') %>
-    <% GROUPS.forEach(([group, title, help]) => { %>
-      <fieldset>
-        <legend><%= title %></legend>
-        <p class="muted small"><%= help %></p>
-        <%- include('_threshold-rows', { items: list.filter((t) => t.group === group), values, UNIT }) %>
-      </fieldset>
-    <% }) %>
+    <fieldset>
+      <legend>Kiểm tra khi lượt sync kết thúc (bật/tắt được)</legend>
+      <p class="muted small">Vượt ngưỡng thì lượt sync bị giữ lại (cách ly) và chờ Admin HQ chấp nhận hoặc bác bỏ ở tab Tình trạng sync. Các kiểm tra này chỉ xét lượt full (lượt delta chỉ đọc máy và key có thay đổi nên không so với toàn hệ thống). Tắt một kiểm tra thì lượt full không bị giữ lại vì lý do đó nữa. Kiểm tra "key đọc được nhưng mật khẩu rỗng" (mất quyền đọc thuộc tính confidential) luôn bật.</p>
+      <% checks.forEach((c) => { %>
+        <%- include('_switch-block', { sw: c, items: list.filter((t) => t.check === c.code), values, UNIT }) %>
+      <% }) %>
+    </fieldset>
+
+    <fieldset>
+      <legend>Sự cố hệ thống (watchdog, bật/tắt được)</legend>
+      <p class="muted small">Đo trực tiếp, tự hết khi sửa xong. Không có heartbeat thì Worker Offline (một mail); worker vẫn chạy mà vượt ngưỡng khác (không đọc được AD, lâu không có lượt sync, canary, USN...) thì Đồng bộ AD có sự cố (một mail). Tắt một loại thì watchdog không theo dõi nó nữa: nếu sự cố đó xảy ra thật sẽ không có cảnh báo nào.</p>
+      <%- include('_threshold-rows', { items: list.filter((t) => t.group === 'watchdog' && !t.alert), values, UNIT }) %>
+      <% alerts.filter((a) => a.group === 'system').forEach((a) => { %>
+        <%- include('_switch-block', { sw: a, items: list.filter((t) => t.alert === a.type), values, UNIT }) %>
+      <% }) %>
+    </fieldset>
 
     <fieldset>
       <legend>Cảnh báo dữ liệu (bật/tắt được)</legend>
@@ -39,24 +45,8 @@
         <p class="muted small">Áp dụng cho cả bốn loại bên dưới, không phải riêng loại nào.</p>
         <%- include('_threshold-rows', { items: list.filter((t) => t.group === 'dataalerts' && !t.alert), values, UNIT }) %>
       </div>
-      <% alerts.forEach((a) => { %>
-        <div class="alert-config">
-          <div class="alert-config-head">
-            <strong><%= a.label %></strong>
-            <%# Cong tac: o an "off" di truoc de form luon gui gia tri (checkbox bo chon thi khong gui gi) %>
-            <% const v = Array.isArray(values[a.key]) ? values[a.key].at(-1) : values[a.key]; const on = (v ?? a.enabled) !== false && v !== 'off'; %>
-            <input type="hidden" name="<%= a.key %>" value="off">
-            <label class="switch" for="<%= a.key %>">
-              <input id="<%= a.key %>" type="checkbox" role="switch" name="<%= a.key %>" value="on" <%= on ? 'checked' : '' %> aria-label="Bật hoặc tắt: <%= a.label %>">
-              <span class="switch-track" aria-hidden="true"></span>
-              <span class="switch-text" aria-hidden="true"></span>
-            </label>
-          </div>
-          <p class="muted small"><%= a.help %></p>
-          <% const own = list.filter((t) => t.alert === a.type); if (own.length) { %>
-            <%- include('_threshold-rows', { items: own, values, UNIT }) %>
-          <% } %>
-        </div>
+      <% alerts.filter((a) => a.group === 'data').forEach((a) => { %>
+        <%- include('_switch-block', { sw: a, items: list.filter((t) => t.alert === a.type), values, UNIT }) %>
       <% }) %>
     </fieldset>
 

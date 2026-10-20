@@ -1,5 +1,4 @@
 import { withAllBranches } from '../db/scoped.js';
-import { DATA_ALERT_TYPES } from '../modules/alerts/alerts.service.js';
 import { loadThresholds } from '../modules/sync/anomaly.js';
 import {
   abortStaleRuns,
@@ -39,17 +38,14 @@ export async function runSyncWatchdog({ pool, alerts, settings }) {
   const problems = []; // { type, subject, severity } of the sync_problem group
   // Each alert's text is the mail template named like its type (templates/mail-templates.yaml).
   const flag = async (type, severity, vars) => {
+    if (!(await settings.alertEnabled(type))) return quiet(type); // switched off by Admin HQ: not watched, an open one is closed quietly
     raised.push(type);
     const subject = await alerts.record(type, severity, vars);
     // a data alert marked handled / snoozed by Admin HQ no longer counts as a sync problem
     if (type !== 'worker_silent' && !(await alerts.isSilenced(type))) problems.push({ type, subject, severity });
   };
   const quiet = (type) => alerts.clear(type, {}, { announce: false });
-  // A data alert Admin HQ switched off (Quan tri > Tinh nang) is never opened; an open one is closed quietly.
-  const check = async (type, isBad, severity, vars) => {
-    const off = DATA_ALERT_TYPES.includes(type) && !(await settings.alertEnabled(type));
-    return isBad && !off ? flag(type, severity, vars) : quiet(type);
-  };
+  const check = async (type, isBad, severity, vars) => (isBad ? flag(type, severity, vars) : quiet(type));
 
   const [heartbeats, last, lastFull, aborted, recent, trend] = await withAllBranches(pool, async (tx) => [
     await listHeartbeats(tx),
@@ -125,7 +121,7 @@ export async function runSyncWatchdog({ pool, alerts, settings }) {
   });
 
   // ---- One mail per group, at most once a day while it lasts ----
-  if (workerOffline) {
+  if (workerOffline && (await settings.alertEnabled('worker_silent'))) {
     await alerts.raise('worker_offline', 'high', {
       worker: hb?.worker_id ?? '—',
       lastHeartbeatAt: hb ? when(hb.at) : 'chưa bao giờ',
