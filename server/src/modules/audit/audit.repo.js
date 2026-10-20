@@ -64,11 +64,11 @@ export async function searchLog(tx, branches, filters, { limit, offset, tz = pro
     params.push(filters.to.toISOString().slice(0, 10), tz);
     where.push(`l.at < ((($${params.length - 1}::date) + 1)::timestamp AT TIME ZONE $${params.length})`);
   }
+  const countParams = [...params];
   params.push(limit, offset);
   const { rows } = await tx.query(
     `SELECT l.id, l.at, l.user_upn, l.action, l.reason, l.reason_note, l.ticket_no, l.client_ip,
-            l.key_id, l.detail, b.code AS branch_code, c.id AS computer_id, c.name AS computer_name,
-            count(*) OVER () AS total
+            l.key_id, l.detail, b.code AS branch_code, c.id AS computer_id, c.name AS computer_name
        FROM access_log l
        LEFT JOIN branch b ON b.id = l.branch_id
        LEFT JOIN computer c ON c.id = l.computer_id
@@ -77,6 +77,11 @@ export async function searchLog(tx, branches, filters, { limit, offset, tz = pro
       LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params,
   );
-  return { rows, total: Number(rows[0]?.total ?? 0) };
+  // The total is counted on its own: a window count made every page read the whole log (hundreds of thousands of rows
+  // joined to branch and computer) just to show 50. A short first page needs no count at all.
+  if (offset === 0 && rows.length < limit) return { rows, total: rows.length };
+  const joinComputer = filters.computer ? 'LEFT JOIN computer c ON c.id = l.computer_id' : '';
+  const counted = await tx.query(`SELECT count(*)::int AS n FROM access_log l ${joinComputer} WHERE ${where.join(' AND ')}`, countParams);
+  return { rows, total: counted.rows[0].n };
 }
 

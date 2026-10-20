@@ -26,10 +26,12 @@ export async function earliestDay(tx, branches, tz, dateField = 'seen') {
   const params = [];
   const scope = branchFilter('c.branch_id', branches, params);
   params.push(tz);
+  const [cCol, kCol] = dateField === 'ad' ? ['c.ad_created_at', 'k.ad_created_at'] : ['c.first_seen_at', 'k.first_synced_at'];
+  // two independent minimums (index on the computer column) instead of a computer x key join
   const { rows } = await tx.query(
-    `SELECT to_char(${dateField === 'ad' ? 'least(min(c.ad_created_at), min(k.ad_created_at))' : 'least(min(c.first_seen_at), min(k.first_synced_at))'} AT TIME ZONE $${params.length},'YYYY-MM-DD') AS day
-       FROM computer c LEFT JOIN recovery_key k ON k.computer_id = c.id
-      WHERE ${scope}`,
+    `SELECT to_char(least((SELECT min(${cCol}) FROM computer c WHERE ${scope}),
+                          (SELECT min(${kCol}) FROM recovery_key k ${branches === 'all' ? '' : 'JOIN computer c ON c.id = k.computer_id'} WHERE ${branches === 'all' ? 'true' : scope}))
+                    AT TIME ZONE $${params.length}, 'YYYY-MM-DD') AS day`,
     params,
   );
   return rows[0]?.day ?? null;
@@ -141,6 +143,7 @@ export async function inventoryByBranch(tx, branches, period, months = 3, logon 
             coalesce(sum(kc.new_n), 0)::int AS new_keys,
             count(*) FILTER (WHERE c.deleted_in_ad_at >= ${start} AND c.deleted_in_ad_at < ${end})::int AS left_ad
        FROM computer c
+       -- a per-computer lateral count (index lookups) beats one grouped scan of recovery_key: row-level security is evaluated per key row
        CROSS JOIN LATERAL (
          SELECT count(*)::int AS n,
                 count(*) FILTER (WHERE ${newK} >= ${start} AND ${newK} < ${end})::int AS new_n

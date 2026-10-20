@@ -13,6 +13,29 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.19.5] - 2026-10-20
+
+### Hiệu năng
+
+Đo trên dữ liệu cỡ production (50.000 máy, 60.000 key, 300.000 dòng nhật ký, 600 lượt sync), Admin HQ:
+
+| Trang | Trước | Sau |
+| --- | --- | --- |
+| Tổng quan | 5,2 s | 0,32 s |
+| Báo cáo (30 ngày) | 2,9 s | 0,51 s |
+| Báo cáo (toàn bộ thời gian) | 6,3 s | 0,77 s |
+| Xuất Excel báo cáo | 2,9 s | 0,68 s |
+| Nhật ký, trang 1 | 414 ms | 89 ms |
+| Tìm máy, danh sách | 111 ms | 34 ms |
+| Lọc theo đăng nhập AD | 69 ms | 33 ms |
+
+Nguyên nhân và cách sửa:
+
+- **Tổng quan:** biểu đồ số máy và key theo ngày quét lại cả hai bảng 30 lần (mỗi ngày một lần). Nay gom theo ngày một lần rồi cộng dồn (số liệu giống hệt, có test so với cách tính từng ngày).
+- **Báo cáo:** mỗi lượt hiện key tạo mới một bộ định dạng giờ để kiểm tra giờ làm việc (hàng chục nghìn lần); nay dùng chung một bộ cho mỗi múi giờ. Ngày đầu tiên có dữ liệu không còn nối hai bảng.
+- **Phân quyền theo chi nhánh (RLS):** chính sách của `recovery_key`, `key_duplicate`, `key_owner_change` luôn dựng bảng băm của toàn bộ bảng máy cho mỗi truy vấn, kể cả Admin HQ. Thêm `app_all_branches() OR` lên đầu để Admin HQ bỏ qua; ý nghĩa phân quyền không đổi (migration 040).
+- **Nhật ký và danh sách máy:** tổng số trang được đếm riêng thay vì đếm cả bảng kèm sắp xếp; trang đầu ngắn không cần đếm. Thêm chỉ mục cho thứ tự danh sách máy, ngày key đầu tiên và lọc nhật ký theo người dùng (migration 039).
+
 ## [2.19.4] - 2026-10-20
 
 ### Đổi

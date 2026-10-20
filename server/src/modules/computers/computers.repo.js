@@ -180,19 +180,22 @@ export function computerFilters(branches, filters, params) {
 export async function listComputers(tx, branches, filters, { limit, offset }) {
   const params = [];
   const where = [computerFilters(branches, filters, params)];
+  const countParams = [...params];
   params.push(limit, offset);
   const { rows } = await tx.query(
     `SELECT ${COMPUTER_COLUMNS},
             (SELECT count(*)::int FROM recovery_key k WHERE k.computer_id = c.id) AS key_count,
-            (SELECT max(k.ad_created_at) FROM recovery_key k WHERE k.computer_id = c.id) AS latest_key_at,
-            count(*) OVER () AS total
+            (SELECT max(k.ad_created_at) FROM recovery_key k WHERE k.computer_id = c.id) AS latest_key_at
        FROM computer c LEFT JOIN branch b ON b.id = c.branch_id
       WHERE ${where.join(' AND ')}
       ORDER BY c.deleted_in_ad_at NULLS FIRST, lower(c.name)
       LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params,
   );
-  return { rows, total: Number(rows[0]?.total ?? 0) };
+  // Counted on its own (a window count forced a sort of every matching computer); a short first page needs no count.
+  if (offset === 0 && rows.length < limit) return { rows, total: rows.length };
+  const counted = await tx.query(`SELECT count(*)::int AS n FROM computer c WHERE ${where.join(' AND ')}`, countParams);
+  return { rows, total: counted.rows[0].n };
 }
 
 /** Branches the caller can browse (for the filter list). */
