@@ -17,36 +17,43 @@
 </div>
 
 <form method="get" action="/reports" class="filter-bar" data-autosubmit>
-  <div class="filter-fields">
-    <fieldset class="date-range">
+  <div class="filter-groups">
+    <fieldset class="filter-group">
       <legend>Kỳ báo cáo</legend>
-      <input type="date" name="from" value="<%= report.period.from %>" aria-label="Từ ngày" title="Từ ngày">
-      <span class="muted">–</span>
-      <input type="date" name="to" value="<%= report.period.to %>" aria-label="Đến ngày" title="Đến ngày">
-      <label class="check" title="Từ ngày đầu tiên có dữ liệu đến hôm nay; bỏ qua ô ngày">
-        <input type="checkbox" name="period" value="all" <%= report.period.all ? 'checked' : '' %>> Toàn bộ thời gian
+      <div class="period-line">
+        <input type="date" name="from" value="<%= report.period.from %>" aria-label="Từ ngày" title="Từ ngày">
+        <span class="muted">–</span>
+        <input type="date" name="to" value="<%= report.period.to %>" aria-label="Đến ngày" title="Đến ngày">
+        <label class="check" title="Từ ngày đầu tiên có dữ liệu đến hôm nay; bỏ qua ô ngày">
+          <input type="checkbox" name="period" value="all" <%= report.period.all ? 'checked' : '' %>> Toàn bộ thời gian
+        </label>
+      </div>
+      <label title="Máy mới và key mới trong kỳ tính theo ngày hệ thống ghi nhận (lần đầu thấy qua sync) hoặc ngày tạo trên AD. Máy rời phạm vi và lượt hiện key không đổi.">Máy mới / key mới theo
+        <select name="dateField">
+          <option value="seen" <%= report.dateField !== 'ad' ? 'selected' : '' %>>Ghi nhận trên hệ thống</option>
+          <option value="ad" <%= report.dateField === 'ad' ? 'selected' : '' %>>Tạo trên AD</option>
+        </select>
       </label>
+      <p class="muted small hint">Áp dụng cho máy mới, key mới, máy rời phạm vi và lượt hiện key.</p>
     </fieldset>
-    <label title="Máy mới và key mới trong kỳ tính theo ngày hệ thống ghi nhận (lần đầu thấy qua sync) hoặc ngày tạo trên AD. Máy rời phạm vi và lượt hiện key không đổi.">Máy mới / key mới theo
-      <select name="dateField">
-        <option value="seen" <%= report.dateField !== 'ad' ? 'selected' : '' %>>Ghi nhận trên hệ thống</option>
-        <option value="ad" <%= report.dateField === 'ad' ? 'selected' : '' %>>Tạo trên AD</option>
-      </select>
-    </label>
-    <% if (report.branchOptions.length > 1) { %>
-    <label>Chi nhánh
-      <select name="branchId">
-        <option value="">Tất cả</option>
-        <% report.branchOptions.forEach((b) => { %><option value="<%= b.id %>" <%= report.branchId === b.id ? 'selected' : '' %>><%= b.code %> · <%= b.name %></option><% }) %>
-      </select>
-    </label>
-    <% } %>
-    <%- include('../partials/logon-filter', { filters: { activity: report.activity, noLogon: report.noLogon } }) %>
+    <fieldset class="filter-group">
+      <legend>Máy trong báo cáo</legend>
+      <% if (report.branchOptions.length > 1) { %>
+      <label>Chi nhánh
+        <select name="branchId">
+          <option value="">Tất cả</option>
+          <% report.branchOptions.forEach((b) => { %><option value="<%= b.id %>" <%= report.branchId === b.id ? 'selected' : '' %>><%= b.code %> · <%= b.name %></option><% }) %>
+        </select>
+      </label>
+      <% } %>
+      <%- include('../partials/logon-filter', { filters: { activity: report.activity, noLogon: report.noLogon }, bare: true }) %>
+      <p class="muted small hint">Áp dụng cho số máy và số key.</p>
+    </fieldset>
   </div>
   <div class="filter-actions">
     <span class="spacer"></span>
+    <noscript><button type="submit" class="small">Lọc</button></noscript>
     <a href="/reports" class="small" title="Về kỳ mặc định 30 ngày">Xóa lọc</a>
-    <button type="submit" class="small" title="Tự áp dụng khi bạn đổi kỳ hoặc chi nhánh">Lọc</button>
   </div>
 </form>
 

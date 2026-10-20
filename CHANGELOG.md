@@ -13,6 +13,13 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.19.7] - 2026-10-20
+
+### Đổi
+
+- Báo cáo: bộ lọc chia **hai khung**: **Kỳ báo cáo** (hai ngày, Toàn bộ thời gian, Máy mới / key mới theo) và **Máy trong báo cáo** (Chi nhánh, Đăng nhập AD gần nhất, Máy chưa có dữ liệu), mỗi khung có dòng ghi áp dụng cho số liệu nào. Bỏ nút "Lọc" (trang tự áp dụng khi đổi; vẫn có khi tắt JavaScript).
+- Excel của báo cáo: sắp lại thứ tự cột theo nhóm. Theo chi nhánh: định danh, số hiện tại, hoạt động đăng nhập AD, số trong kỳ. Xem key theo CN: lượt hiện key, xuất file, ngoài giờ, rồi người và máy. Danh sách máy: máy, các mốc ngày theo thứ tự thời gian, thông tin key hoặc sync, DN ở cuối. Tổng quan thêm dòng trống ngăn nhóm.
+
 ## [2.19.6] - 2026-10-20
 
 ### Đổi

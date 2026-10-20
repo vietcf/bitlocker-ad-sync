@@ -267,3 +267,38 @@ describe('Excel of one branch: computers with keys', () => {
     expect(sheet).not.toMatch(/\d{6}-\d{6}-\d{6}/);
   });
 });
+
+describe('Excel column order', () => {
+  const fetchXlsx = async (query) => {
+    const { agent } = await webLogin(app, 'auditor');
+    const res = await agent.get('/reports/export.xlsx').query(query).buffer(true).parse((r, cb) => {
+      const chunks = [];
+      r.on('data', (c) => chunks.push(c));
+      r.on('end', () => cb(null, Buffer.concat(chunks)));
+    });
+    return unzip(res.body);
+  };
+  // header row of a sheet: its first strings, in column order
+  const header = (xml, n) => [...xml.matchAll(/<t[^>]*>([^<]*)<\/t>/g)].map((m) => m[1]).slice(0, n);
+
+  it('per branch: identity, current figures, AD logon activity, then the period figures', async () => {
+    const files = await fetchXlsx({});
+    expect(header(files['xl/worksheets/sheet2.xml'], 14)).toEqual([
+      'Chi nhánh', 'Tên', 'Máy', 'Có key', 'Chưa có key', '% có key', 'Số key',
+      'Hoạt động gần đây (3 tháng)', 'Không hoạt động gần đây', 'Chưa có dữ liệu đăng nhập',
+      'Máy mới', 'Key mới', 'Rời phạm vi', 'Lượt hiện key']);
+    expect(header(files['xl/worksheets/sheet3.xml'], 7)).toEqual(['Chi nhánh', 'Tên', 'Lượt hiện key', 'Xuất file', 'Ngoài giờ', 'Người xem', 'Máy được xem']);
+  });
+
+  it('computer lists: machine, dates in time order, then key or sync details, then DN last', async () => {
+    const files = await fetchXlsx({ branchId: 1 });
+    expect(header(files['xl/worksheets/sheet5.xml'], 11)).toEqual([
+      'Chi nhánh', 'Máy', 'Hệ điều hành', 'Serial', 'Email người dùng', 'Tạo trên AD', 'Ghi nhận', 'Đăng nhập AD gần nhất',
+      'Số key', 'Key mới nhất (tạo trên AD)', 'DN']);
+    expect(header(files['xl/worksheets/sheet6.xml'], 10)).toEqual([
+      'Chi nhánh', 'Máy', 'Hệ điều hành', 'Serial', 'Email người dùng', 'Tạo trên AD', 'Ghi nhận', 'Đăng nhập AD gần nhất',
+      'Số ngày chưa có key', 'DN']);
+    expect(header(files['xl/worksheets/sheet7.xml'], 9)).toEqual([
+      'Chi nhánh', 'Máy', 'Hệ điều hành', 'Serial', 'Email người dùng', 'Lần cuối sync thấy', 'Rời phạm vi lúc', 'Số key (vẫn lưu)', 'DN']);
+  });
+});

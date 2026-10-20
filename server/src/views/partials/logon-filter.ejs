@@ -1,11 +1,12 @@
-<%# Hai o loc dang nhap AD gan nhat, dung chung cho Tim may va Bao cao. Tham so: filters { activity, noLogon }; newRow (mac dinh true: xuong dong rieng); activityMonths la local %>
+<%# Hai o loc dang nhap AD gan nhat, dung chung cho Tim may va Bao cao. Tham so: filters { activity, noLogon }; newRow (mac dinh true: xuong dong rieng); bare (chi hai nhan, khong khung: de dat trong khung cua trang goi); activityMonths la local %>
 <%
   const act = filters.activity === 'unknown' ? '' : (filters.activity ?? '');
   const noLogon = filters.activity === 'unknown' ? 'only' : (filters.noLogon ?? (act ? 'exclude' : 'include'));
   const months = [...new Set([1, 3, 6, 9, 12, 24, Number(act.slice(1)) || 1, activityMonths])].sort((x, y) => x - y);
 %>
-<% if (typeof newRow === 'undefined' || newRow) { %><div class="filter-break"></div><% } %>
-<div class="logon-range<%= typeof newRow !== 'undefined' && !newRow ? ' logon-inline' : '' %>" role="group" aria-label="Đăng nhập AD gần nhất">
+<% const isBare = typeof bare !== 'undefined' && bare; %>
+<% if (!isBare && (typeof newRow === 'undefined' || newRow)) { %><div class="filter-break"></div><% } %>
+<% if (!isBare) { %><div class="logon-range<%= typeof newRow !== 'undefined' && !newRow ? ' logon-inline' : '' %>" role="group" aria-label="Đăng nhập AD gần nhất"><% } %>
   <label class="logon-activity" title="Theo lần đăng nhập domain gần nhất của máy trên AD (lastLogonTimestamp, lệch tối đa ~14 ngày)">Đăng nhập AD gần nhất
     <select name="activity">
       <option value="">Tất cả</option>
@@ -24,5 +25,5 @@
       <option value="only" <%= noLogon === 'only' ? 'selected' : '' %>>Chỉ máy này</option>
     </select>
   </label>
-</div>
-<div class="filter-break"></div>
+<% if (!isBare) { %></div>
+<div class="filter-break"></div><% } %>
