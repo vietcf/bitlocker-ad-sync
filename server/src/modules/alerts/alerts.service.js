@@ -112,11 +112,11 @@ export class AlertsService {
     return rows.length > 0;
   }
 
-  /** "Handled": a data alert goes quiet until it clears; any other alert only records who looked at it. */
+  /** "Handled": a data alert goes quiet until it clears. Live system faults clear themselves and cannot be marked. */
   async acknowledge(id, { by, note }) {
     const { rows } = await this.pool.query(
       `UPDATE sync_alert SET acked_at = now(), acked_by = $2, ack_note = $3, snoozed_until = NULL
-        WHERE id = $1 AND resolved_at IS NULL RETURNING id, type, (type = ANY($4::text[])) AS silences`,
+        WHERE id = $1 AND resolved_at IS NULL AND type = ANY($4::text[]) RETURNING id, type`,
       [id, by, note || null, DATA_ALERT_TYPES],
     );
     return rows[0] ?? null;

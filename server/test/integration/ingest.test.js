@@ -356,7 +356,7 @@ describe('heartbeat, manual sync and watchdog', () => {
     expect(sent.some((m) => m.subject.includes('Đã khôi phục'))).toBe(false);
   });
 
-  it('Admin HQ can mark a data alert handled or snooze it; live errors can only be marked as seen', async () => {
+  it('Admin HQ can mark a data alert handled or snooze it; system faults cannot be marked', async () => {
     await heartbeat();
     await runSync({ computers: [computer(1)] }); // a full run, then it gets old
     await asOwner("UPDATE sync_run SET finished_at = now() - interval '3 days'");
@@ -386,10 +386,10 @@ describe('heartbeat, manual sync and watchdog', () => {
     await asOwner(`UPDATE sync_alert SET snoozed_until = now() - interval '1 minute' WHERE type = 'full_stale'`);
     expect((await watchdog()).problems).toEqual(['full_stale']);
 
-    // a live error is never silenced: "seen" only records it, and it cannot be snoozed
+    // a system fault clears itself: it can be neither marked handled nor snoozed
     await heartbeat({ ldapOk: false, lastErrorCode: 'ldap_bind_failed' });
     await watchdog();
-    expect((await post('ldap_error', 'ack')).status).toBe(302);
+    expect((await post('ldap_error', 'ack')).status).toBe(400);
     expect(await services.alerts.isSilenced('ldap_error')).toBe(false);
     expect((await post('ldap_error', 'snooze', { days: '7' })).status).toBe(400);
     expect((await watchdog()).problems).toContain('ldap_error');

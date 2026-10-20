@@ -45,21 +45,19 @@
       <strong><%= a.detail.subject %></strong> <span class="muted">· từ <%= h.dateTime(a.opened_at) %></span>
       <% if (a.silenced) { %><span class="badge badge-muted"><%= a.snoozed_until && new Date(a.snoozed_until) > new Date() ? 'Bỏ qua đến ' + h.dateTime(a.snoozed_until) : 'Đã xử lý' %></span><% } %>
       <div class="pre"><%= a.detail.text %></div>
-      <% if (a.acked_by && (a.silenced || !data)) { %><div class="muted small">Đã <%= data && a.snoozed_until ? 'bỏ qua' : (data ? 'xử lý' : 'xem') %> bởi <%= a.acked_by %><% if (a.acked_at) { %> lúc <%= h.dateTime(a.acked_at) %><% } %><% if (a.ack_note) { %>: <%= a.ack_note %><% } %></div><% } %>
-      <% if (!a.silenced) { %>
+      <% if (data && a.acked_by && a.silenced) { %><div class="muted small">Đã <%= a.snoozed_until ? 'bỏ qua' : 'xử lý' %> bởi <%= a.acked_by %><% if (a.acked_at) { %> lúc <%= h.dateTime(a.acked_at) %><% } %><% if (a.ack_note) { %>: <%= a.ack_note %><% } %></div><% } %>
+      <% if (data && !a.silenced) { %>
       <form method="post" class="inline-actions" style="margin-top:.5rem">
         <%- include('../partials/csrf') %>
         <input type="text" name="note" maxlength="300" placeholder="Ghi chú (tùy chọn)" aria-label="Ghi chú" style="min-width:14rem">
-        <button type="submit" formaction="/admin/sync/alerts/<%= a.id %>/ack" class="small" title="<%= data ? 'Đã xử lý nguyên nhân: ngừng gửi mail, cảnh báo tự đóng khi điều kiện hết, báo lại nếu tái phát' : 'Ghi nhận bạn đã xem; vẫn hiện cho đến khi hết sự cố' %>"><%= data ? 'Đã xử lý' : 'Đã xem' %></button>
-        <% if (data) { %>
+        <button type="submit" formaction="/admin/sync/alerts/<%= a.id %>/ack" class="small" title="Đã xử lý nguyên nhân: ngừng gửi mail, cảnh báo tự đóng khi điều kiện hết, báo lại nếu tái phát">Đã xử lý</button>
         <select name="days" aria-label="Số ngày bỏ qua"><option value="1">1 ngày</option><option value="7" selected>7 ngày</option><option value="30">30 ngày</option></select>
         <button type="submit" formaction="/admin/sync/alerts/<%= a.id %>/snooze" class="small secondary" title="Im lặng trong thời gian chọn; hết hạn mà điều kiện còn thì báo lại">Bỏ qua</button>
-        <% } %>
       </form>
       <% } %>
     </div>
   <% }) %>
-  <p class="muted small"><strong>Đã xử lý</strong> (cảnh báo tính từ dữ liệu: máy mới không có key, tỉ lệ không key tăng, full sync quá hạn, chứng chỉ DC sắp hết hạn): ngừng gửi mail và không tính vào trạng thái "Có sự cố"; cảnh báo vẫn tự đóng khi điều kiện hết và báo lại nếu tái phát. <strong>Bỏ qua</strong> im lặng trong 1/7/30 ngày, hết hạn mà điều kiện còn thì báo lại. Cảnh báo đo trực tiếp (worker, đọc AD, lượt sync, canary, USN) tự hết khi sửa xong nên chỉ có nút <strong>Đã xem</strong>. Mọi thao tác được ghi vào nhật ký truy cập.</p>
+  <p class="muted small"><strong>Đã xử lý</strong> (cảnh báo tính từ dữ liệu: máy mới không có key, tỉ lệ không key tăng, full sync quá hạn, chứng chỉ DC sắp hết hạn): ngừng gửi mail và không tính vào trạng thái "Có sự cố"; cảnh báo vẫn tự đóng khi điều kiện hết và báo lại nếu tái phát. <strong>Bỏ qua</strong> im lặng trong 1/7/30 ngày, hết hạn mà điều kiện còn thì báo lại. Sự cố hệ thống (worker, đọc AD, lượt sync, canary, USN) tự hết khi sửa xong nên không cần xác nhận. Mọi thao tác ghi vào nhật ký truy cập.</p>
 </section>
 <% } %>
 

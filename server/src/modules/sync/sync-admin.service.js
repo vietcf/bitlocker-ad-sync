@@ -102,13 +102,13 @@ export class SyncAdminService {
     });
   }
 
-  /** "Handled" on an alert (Quan tri > Sync AD). A data alert goes quiet until it clears; others only record who looked. */
+  /** "Handled" on a data alert (Quan tri > Sync AD): quiet until it clears. System faults cannot be marked (they clear themselves). */
   async ackAlert(scope, id, raw, client = {}) {
     this.#check(scope);
     const { note } = parse(alertAckInput, raw);
     const a = await this.alerts.acknowledge(id, { by: scope.upn, note });
-    if (!a) throw notFound('Alert not found or already closed.');
-    await this.audit.log({ ...this.audit.actor(scope, client), action: 'alert_ack', detail: { alertId: Number(a.id), type: a.type, silences: a.silences, note: note ?? null } });
+    if (!a) throw badRequest('Only open alerts computed from data (not system faults) can be marked handled.');
+    await this.audit.log({ ...this.audit.actor(scope, client), action: 'alert_ack', detail: { alertId: Number(a.id), type: a.type, note: note ?? null } });
     return a;
   }
 
@@ -117,7 +117,7 @@ export class SyncAdminService {
     this.#check(scope);
     const { days, note } = parse(alertSnoozeInput, raw);
     const a = await this.alerts.snooze(id, { by: scope.upn, days, note });
-    if (!a) throw badRequest('Only alerts computed from data (not live sync errors) can be skipped.');
+    if (!a) throw badRequest('Only alerts computed from data (not system faults) can be skipped.');
     await this.audit.log({ ...this.audit.actor(scope, client), action: 'alert_snooze', detail: { alertId: Number(a.id), type: a.type, days, note: note ?? null } });
     return a;
   }

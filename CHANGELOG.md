@@ -13,12 +13,18 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.6.1] - 2026-10-20
+
+### Sửa
+
+- Quản trị > Sync AD: bỏ ô ghi chú và nút ở các sự cố hệ thống (worker, LDAP...). Chỉ cảnh báo dữ liệu có **Đã xử lý** / **Bỏ qua**; API từ chối thao tác với sự cố hệ thống.
+
 ## [2.6.0] - 2026-10-20
 
 ### Thêm
 
 - Quản trị > Sync AD: ô "Đồng bộ AD" tách hai phần, **Sự cố hệ thống** và **Cảnh báo dữ liệu** ("Có cảnh báo nhẹ"); Tổng quan hiển thị riêng hai loại.
-- Cảnh báo tính từ dữ liệu (`escrow_broken`, `no_key_rising`, `full_stale`, `dc_cert_expiring`) có nút **Đã xử lý** (ghi chú, ngừng mail, không tính vào trạng thái, tự đóng khi hết, báo lại nếu tái phát) và **Bỏ qua 1/7/30 ngày**. Cảnh báo đo trực tiếp chỉ có **Đã xem**. Ghi nhật ký `alert_ack`, `alert_snooze`. Migration 035 thêm `acked_at`, `acked_by`, `ack_note`, `snoozed_until` cho `sync_alert`.
+- Cảnh báo tính từ dữ liệu (`escrow_broken`, `no_key_rising`, `full_stale`, `dc_cert_expiring`) có nút **Đã xử lý** (ghi chú, ngừng mail, không tính vào trạng thái, tự đóng khi hết, báo lại nếu tái phát) và **Bỏ qua 1/7/30 ngày**. Sự cố hệ thống (worker, LDAP...) tự hết nên không có nút nào. Ghi nhật ký `alert_ack`, `alert_snooze`. Migration 035 thêm `acked_at`, `acked_by`, `ack_note`, `snoozed_until` cho `sync_alert`.
 - Báo cáo hằng ngày không liệt kê cảnh báo đã xử lý / bỏ qua.
 
 ## [2.5.0] - 2026-10-20
