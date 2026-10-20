@@ -13,6 +13,7 @@ import { dashboardWeb } from '../modules/dashboard/dashboard.web.js';
 import { settingsWeb } from '../modules/settings/settings.web.js';
 import { templateLocals, webErrorHandler } from './middleware.js';
 import { helpers } from './helpers.js';
+import { ALERT_SWITCHES } from '../modules/settings/settings.service.js';
 
 /** Server-rendered pages (EJS). Same services as the API; forms carry a CSRF token. */
 export function createWebRouter({ services, config, sessions }) {
@@ -23,6 +24,8 @@ export function createWebRouter({ services, config, sessions }) {
   // Feature switches (Quan tri > Tinh nang) for templates: show or hide buttons.
   web.use(async (req, res, next) => {
     res.locals.features = await services.settings.features();
+    res.locals.alertsOff = [];
+    for (const a of ALERT_SWITCHES) if (!(await services.settings.alertEnabled(a.type))) res.locals.alertsOff.push(a.type);
     res.locals.activityMonths = Number(await services.settings.get('computer.recent_months', 3));
     res.locals.activityTip = helpers.activityTip(res.locals.activityMonths);
     next();

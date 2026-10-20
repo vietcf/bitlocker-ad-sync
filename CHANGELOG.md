@@ -13,6 +13,13 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.11.0] - 2026-10-20
+
+### Đổi
+
+- Cấu hình cảnh báo sync gom về một chỗ: Quản trị > Đồng bộ AD > **Cảnh báo sync** (trước là "Ngưỡng cảnh báo"). Mỗi cảnh báo dữ liệu có công tắc **Bật/Tắt** ngay cạnh ngưỡng riêng của nó (máy mới không có key, tỉ lệ không key tăng, full sync quá hạn, chứng chỉ DC); ngưỡng "full quá hạn", "máy mới chưa có key" và "tỉ lệ không key tăng" chuyển vào đúng cảnh báo. Sự cố hệ thống đứng riêng, không có công tắc. Công tắc không còn ở Hệ thống > Tính năng. API `/api/admin/settings/thresholds` trả thêm `alerts` và nhận `alert.<type>`.
+- Form "Đã xử lý" / "Bỏ qua" của cảnh báo dữ liệu: ô ghi chú một dòng riêng, các nút bên dưới có khoảng cách (trước đây các nút dính sát ô ghi chú).
+
 ## [2.10.1] - 2026-10-20
 
 ### Sửa

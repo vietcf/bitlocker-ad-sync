@@ -47,7 +47,7 @@ export async function runSyncWatchdog({ pool, alerts, settings }) {
   const quiet = (type) => alerts.clear(type, {}, { announce: false });
   // A data alert Admin HQ switched off (Quan tri > Tinh nang) is never opened; an open one is closed quietly.
   const check = async (type, isBad, severity, vars) => {
-    const off = DATA_ALERT_TYPES.includes(type) && !(await settings.feature(`alert.${type}`));
+    const off = DATA_ALERT_TYPES.includes(type) && !(await settings.alertEnabled(type));
     return isBad && !off ? flag(type, severity, vars) : quiet(type);
   };
 

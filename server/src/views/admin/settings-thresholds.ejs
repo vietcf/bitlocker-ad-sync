@@ -2,14 +2,12 @@
 <%- include('_tabs') %>
 <% const UNIT = { percent: '%', minutes: 'phút', hours: 'giờ', months: 'tháng', days: 'ngày', count: '', points: 'điểm %' }; %>
 <% const GROUPS = [
-  ['run', 'Kiểm tra khi lượt sync kết thúc', 'Vượt ngưỡng thì lượt sync bị giữ lại (cách ly) và chờ Admin HQ chấp nhận hoặc bác bỏ ở tab Sync AD. Các ngưỡng này chỉ xét lượt full (lượt delta chỉ đọc phần thay đổi); riêng key đọc được mà không có mật khẩu thì lượt nào cũng giữ lại.'],
-  ['watchdog', 'Watchdog', 'Hai loại sự cố riêng: không có heartbeat thì Worker Offline (một mail); worker vẫn chạy mà vượt ngưỡng khác (không đọc được AD, lâu không sync, canary, USN...) thì Đồng bộ AD có sự cố (một mail). Mỗi loại nhắc lại tối đa 1 lần mỗi ngày; hết thì tự về bình thường, không gửi gì nữa.'],
-  ['dataalerts', 'Cảnh báo dữ liệu', 'Nút "Đã xử lý" ở Quản trị > Sync AD im lặng cảnh báo đến hết thời hạn này; hết hạn mà điều kiện còn thì báo lại. Muốn tắt hẳn một loại: Quản trị > Tính năng.'],
-  ['activity', 'Hoạt động của máy', 'Nhãn "Hoạt động gần đây" / "Không hoạt động gần đây" ở trang máy và danh sách Tìm máy, theo lần đăng nhập AD gần nhất của máy (lastLogonTimestamp, lệch tối đa ~14 ngày). Không tạo cảnh báo. Bộ lọc ở Tìm máy có các mốc riêng (1/3/6/9/12/24 tháng).'],
+  ['run', 'Kiểm tra khi lượt sync kết thúc', 'Vượt ngưỡng thì lượt sync bị giữ lại (cách ly) và chờ Admin HQ chấp nhận hoặc bác bỏ ở tab Tình trạng sync. Các ngưỡng này chỉ xét lượt full (lượt delta chỉ đọc máy và key có thay đổi nên không so với toàn hệ thống).'],
+  ['watchdog', 'Sự cố hệ thống (watchdog)', 'Đo trực tiếp, tự hết khi sửa xong, không tắt được. Không có heartbeat thì Worker Offline (một mail); worker vẫn chạy mà vượt ngưỡng khác (không đọc được AD, lâu không có lượt sync, canary, USN...) thì Đồng bộ AD có sự cố (một mail).'],
 ]; %>
 <section class="card">
-  <h2>Ngưỡng cảnh báo</h2>
-  <p class="muted">Thay đổi có hiệu lực trong vòng 30 giây và được ghi vào nhật ký. Cột "Mặc định" là giá trị khi cài đặt.</p>
+  <h2>Cảnh báo sync</h2>
+  <p class="muted">Ngưỡng và bật/tắt các cảnh báo của đồng bộ AD. Thay đổi có hiệu lực trong vòng 30 giây và được ghi vào nhật ký. Cột "Mặc định" là giá trị khi cài đặt.</p>
   <div class="notice notice-info">
     <strong>Cách các ngưỡng kết hợp</strong>
     <ul>
@@ -29,35 +27,36 @@
       <fieldset>
         <legend><%= title %></legend>
         <p class="muted small"><%= help %></p>
-        <%
-          // Gom dong "..." (VA) vao cung khung voi dong ngay tren
-          const units = [];
-          list.filter((t) => t.group === group).forEach((t) => {
-            if (t.label.startsWith('...') && units.length) units[units.length - 1].push(t);
-            else units.push([t]);
-          });
-        %>
-        <div class="thr-list">
-          <div class="thr-row thr-head"><span>Ngưỡng</span><span>Giá trị</span><span>Mặc định</span></div>
-          <% units.forEach((unit) => { %>
-            <% if (unit.length > 1) { %><div class="thr-and" role="group" aria-label="Phải vượt cả <%= unit.length %> ngưỡng">
-              <span class="thr-and-tag">VÀ · phải vượt cả <%= unit.length %> ngưỡng mới tính</span><% } %>
-            <% unit.forEach((t, i) => { %>
-              <% if (i > 0) { %><div class="thr-and-sep"><span>và</span></div><% } %>
-              <div class="thr-row">
-                <label for="<%= t.key %>"><%= t.label.replace(/^\.\.\.\s*(và\s+)?/, '') %></label>
-                <span class="nowrap">
-                  <input id="<%= t.key %>" name="<%= t.key %>" type="number" value="<%= values[t.key] %>" class="thr-input"
-                         min="<%= t.min %>" max="<%= t.max %>" step="<%= t.unit === 'percent' ? '0.1' : '1' %>" required> <%= UNIT[t.unit] %>
-                </span>
-                <span class="muted"><%= t.defaultValue %> <%= UNIT[t.unit] %></span>
-              </div>
-            <% }) %>
-            <% if (unit.length > 1) { %></div><% } %>
-          <% }) %>
-        </div>
+        <%- include('_threshold-rows', { items: list.filter((t) => t.group === group), values, UNIT }) %>
       </fieldset>
     <% }) %>
+
+    <fieldset>
+      <legend>Cảnh báo dữ liệu (bật/tắt được)</legend>
+      <p class="muted small">Tính từ nội dung đã đồng bộ nên còn đúng nhiều ngày sau khi sửa nguyên nhân; không làm dừng sync. Mỗi loại có công tắc bật/tắt và ngưỡng riêng. Tắt thì không bao giờ mở cảnh báo đó (đang mở thì đóng). Nút "Đã xử lý" / "Bỏ qua" ở tab Tình trạng sync chỉ im lặng tạm thời.</p>
+      <% alerts.forEach((a) => { %>
+        <div class="alert-config">
+          <div class="alert-config-head">
+            <label for="<%= a.key %>"><strong><%= a.label %></strong></label>
+            <select id="<%= a.key %>" name="<%= a.key %>" aria-label="Bật hoặc tắt: <%= a.label %>">
+              <option value="on" <%= (values[a.key] ?? a.enabled) !== false && (values[a.key] ?? a.enabled) !== 'off' ? 'selected' : '' %>>Bật</option>
+              <option value="off" <%= (values[a.key] ?? a.enabled) === false || values[a.key] === 'off' ? 'selected' : '' %>>Tắt</option>
+            </select>
+          </div>
+          <p class="muted small"><%= a.help %></p>
+          <% const own = list.filter((t) => t.alert === a.type); if (own.length) { %>
+            <%- include('_threshold-rows', { items: own, values, UNIT }) %>
+          <% } %>
+        </div>
+      <% }) %>
+      <%- include('_threshold-rows', { items: list.filter((t) => t.group === 'dataalerts' && !t.alert), values, UNIT }) %>
+    </fieldset>
+
+    <fieldset>
+      <legend>Nhãn hoạt động của máy (không phải cảnh báo)</legend>
+      <p class="muted small">Nhãn "Hoạt động gần đây" / "Không hoạt động gần đây" ở trang máy, danh sách Tìm máy và Báo cáo, theo lần đăng nhập AD gần nhất của máy (lastLogonTimestamp, lệch tối đa ~14 ngày). Không tạo cảnh báo. Bộ lọc ở Tìm máy có các mốc riêng (1/3/6/9/12/24 tháng).</p>
+      <%- include('_threshold-rows', { items: list.filter((t) => t.group === 'activity'), values, UNIT }) %>
+    </fieldset>
     <div class="actions"><button type="submit">Lưu</button></div>
   </form>
 </section>

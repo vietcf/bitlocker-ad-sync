@@ -1,0 +1,27 @@
+<%# Cac dong nguong (gom dong "..." thanh khung VA). Tham so: items (cac nguong), values, UNIT %>
+<%
+  const units = [];
+  items.forEach((t) => {
+    if (t.label.startsWith('...') && units.length) units[units.length - 1].push(t);
+    else units.push([t]);
+  });
+%>
+<div class="thr-list">
+  <div class="thr-row thr-head"><span>Ngưỡng</span><span>Giá trị</span><span>Mặc định</span></div>
+  <% units.forEach((unit) => { %>
+    <% if (unit.length > 1) { %><div class="thr-and" role="group" aria-label="Phải vượt cả <%= unit.length %> ngưỡng">
+      <span class="thr-and-tag">VÀ · phải vượt cả <%= unit.length %> ngưỡng mới tính</span><% } %>
+    <% unit.forEach((t, i) => { %>
+      <% if (i > 0) { %><div class="thr-and-sep"><span>và</span></div><% } %>
+      <div class="thr-row">
+        <label for="<%= t.key %>"><%= t.label.replace(/^\.\.\.\s*(và\s+)?/, '') %></label>
+        <span class="nowrap">
+          <input id="<%= t.key %>" name="<%= t.key %>" type="number" value="<%= values[t.key] %>" class="thr-input"
+                 min="<%= t.min %>" max="<%= t.max %>" step="<%= t.unit === 'percent' ? '0.1' : '1' %>" required> <%= UNIT[t.unit] %>
+        </span>
+        <span class="muted"><%= t.defaultValue %> <%= UNIT[t.unit] %></span>
+      </div>
+    <% }) %>
+    <% if (unit.length > 1) { %></div><% } %>
+  <% }) %>
+</div>

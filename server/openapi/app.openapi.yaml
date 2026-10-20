@@ -497,7 +497,7 @@ paths:
       tags: [Reports]
       summary: Computers in AD without any recovery key
       responses:
-        '200': { description: '`{ items: [...] }`', content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { type: object, additionalProperties: true } } } } } } }
+        '200': { description: '`{ items: [...] }`', content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { type: object, additionalProperties: true } }, alerts: { type: array, items: { type: object, additionalProperties: true } } } } } } }
   /api/reports/reveals:
     get:
       operationId: getReportsReveals
@@ -832,28 +832,29 @@ paths:
       tags: [Admin - settings]
       summary: Anomaly and watchdog thresholds
       description: |
-        `[{ key, group (run | watchdog | activity), unit (percent | minutes | hours | months | count | points), label, min, max,
+        `[{ key, group (run | watchdog | dataalerts | activity), unit (percent | minutes | hours | months | count | points), label, min, max,
         default, value, defaultValue }]` in `items`. `value`, `defaultValue`, `min` and `max` are in page units (percent as 0-100);
-        `default` is the stored value (percent as a ratio, 0.5 = 50%).
+        `default` is the stored value (percent as a ratio, 0.5 = 50%). Thresholds of a data alert carry its `alert` type.
+        `alerts` lists the data alerts that can be switched off: `[{ type, key (alert.<type>), label, help, enabled }]`.
       responses:
-        '200': { description: The thresholds., content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { type: object, additionalProperties: true } } } } } } }
+        '200': { description: The thresholds., content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { type: object, additionalProperties: true } }, alerts: { type: array, items: { type: object, additionalProperties: true } } } } } } }
     put:
       operationId: putAdminSettingsThresholds
       tags: [Admin - settings]
       summary: Save the thresholds
       description: |
-        Body: `{ "<key>": value }`, the same units as the page (percent as 0-100). A key left out keeps its
-        value. Out of range -> 400 with field message `out_of_range:min-max`.
+        Body: `{ "<key>": value }`, the same units as the page (percent as 0-100); an alert switch `alert.<type>` takes
+        `true` / `false` (or `"on"` / `"off"`). A key left out keeps its value. Out of range -> 400 with field message `out_of_range:min-max`.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              additionalProperties: { type: number }
-              example: { 'anomaly.min_computer_ratio': 70, 'watchdog.delta_max_minutes': 60 }
+              additionalProperties: { oneOf: [{ type: number }, { type: boolean }, { type: string, enum: ['on', 'off'] }] }
+              example: { 'anomaly.min_computer_ratio': 70, 'watchdog.delta_max_minutes': 60, 'alert.full_stale': false }
       responses:
-        '200': { description: The saved thresholds., content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { type: object, additionalProperties: true } } } } } } }
+        '200': { description: The saved thresholds., content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { type: object, additionalProperties: true } }, alerts: { type: array, items: { type: object, additionalProperties: true } } } } } } }
         '400': { $ref: '#/components/responses/Error', description: invalid_request }
   /api/admin/settings/retention:
     get:
@@ -1055,10 +1056,6 @@ components:
         feature.computer_export: { type: boolean }
         feature.reveal_alerts: { type: boolean, description: Alert on reveals outside working hours. }
         reveal.ticket_required: { type: boolean }
-        alert.escrow_broken: { type: boolean, description: Data alert on new computers without a key. }
-        alert.no_key_rising: { type: boolean, description: Data alert when the share of computers without a key rises. }
-        alert.full_stale: { type: boolean, description: Data alert when no full run succeeded for too long. }
-        alert.dc_cert_expiring: { type: boolean, description: Data alert on a DC certificate close to expiry. }
         export.keys: { type: string, enum: ['off', admin, all], description: Who may export keys with passwords. }
         ui.page_size.computers: { type: integer, minimum: 5, maximum: 200, default: 25, description: Rows per page of the computer search and list. }
         ui.page_size.audit: { type: integer, minimum: 5, maximum: 200, default: 50, description: Rows per page of the access log. }

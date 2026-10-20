@@ -56,12 +56,13 @@ export function settingsWeb({ settingsAdmin }) {
   const renderThresholds = async (req, res, error) => {
     const list = await settingsAdmin.thresholds(req.scope);
     const values = error ? { ...Object.fromEntries(list.map((t) => [t.key, t.value])), ...req.body } : Object.fromEntries(list.map((t) => [t.key, t.value]));
-    res.render('admin/settings-thresholds', { title: 'Ngưỡng cảnh báo', list, values, error });
+    const alerts = await settingsAdmin.alertSwitches(req.scope);
+    res.render('admin/settings-thresholds', { title: 'Cảnh báo sync', list, alerts, values, error });
   };
   r.get('/settings/thresholds', (req, res) => renderThresholds(req, res, null));
   r.post('/settings/thresholds', formAction(async (req, res) => {
     await settingsAdmin.saveThresholds(req.scope, req.body, clientInfo(req));
-    flash(req, 'success', 'Đã lưu ngưỡng. Thay đổi có hiệu lực trong vòng 30 giây (lượt sync / lần watchdog kế tiếp).');
+    flash(req, 'success', 'Đã lưu cấu hình cảnh báo sync. Thay đổi có hiệu lực trong vòng 30 giây (lượt sync / lần watchdog kế tiếp).');
     res.redirect('/admin/settings/thresholds');
   }, renderThresholds));
 

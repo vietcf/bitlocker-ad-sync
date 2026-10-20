@@ -291,6 +291,24 @@ describe('feature switches', () => {
   });
 });
 
+describe('data alert switches (Canh bao sync)', () => {
+  it('lists the switches with the thresholds, saves them on / off, and shows them on the page', async () => {
+    const a = await admin();
+    const first = (await a.get('/api/admin/settings/thresholds')).body;
+    expect(first.alerts.map((x) => x.type)).toEqual(['escrow_broken', 'no_key_rising', 'full_stale', 'dc_cert_expiring']);
+    expect(first.alerts.every((x) => x.enabled === true)).toBe(true);
+    expect(first.items.find((t) => t.key === 'anomaly.escrow_ratio')).toMatchObject({ group: 'dataalerts', alert: 'escrow_broken' });
+    const off = await a.put('/api/admin/settings/thresholds', { 'alert.full_stale': false, 'alert.no_key_rising': 'off' });
+    expect(off.status).toBe(200);
+    expect(off.body.alerts.filter((x) => !x.enabled).map((x) => x.type)).toEqual(['no_key_rising', 'full_stale']);
+    expect((await a.put('/api/admin/settings/thresholds', { 'alert.full_stale': 'maybe' })).status).toBe(400);
+    expect((await a.get('/api/admin/settings/features')).body['alert.full_stale']).toBeUndefined(); // not a feature any more
+    const page = (await (await webLogin(app, 'admin.hq')).agent.get('/admin/settings/thresholds')).text;
+    expect(page).toContain('Cảnh báo dữ liệu (bật/tắt được)');
+    expect(page).toContain('name="alert.full_stale"');
+  });
+});
+
 describe('thresholds', () => {
   it('shows percent values as 0-100, saves within range only, and audits the change', async () => {
     const a = await admin();

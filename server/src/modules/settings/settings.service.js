@@ -10,11 +10,16 @@ export const FEATURES = [
   { key: 'feature.computer_export', default: true }, // CSV export of the computer list (no keys)
   { key: 'feature.reveal_alerts', default: true }, // alert on reveals outside working hours
   { key: 'reveal.ticket_required', default: false }, // a ticket number is required to reveal a key
-  // Data alerts of the watchdog (system faults cannot be switched off): a switched-off alert is never opened
-  { key: 'alert.escrow_broken', default: true },
-  { key: 'alert.no_key_rising', default: true },
-  { key: 'alert.full_stale', default: true },
-  { key: 'alert.dc_cert_expiring', default: true },
+];
+/**
+ * Data alerts of the watchdog that Admin HQ can switch off (Quan tri > Dong bo AD > Canh bao sync), next to their
+ * thresholds. System faults (worker, AD, overdue sync...) cannot be switched off. Stored as app_setting "alert.<type>".
+ */
+export const ALERT_SWITCHES = [
+  { type: 'escrow_broken', label: 'Máy mới không lưu key lên AD', help: 'Máy tạo trong 7 ngày qua (đã quá 48 giờ) mà tỉ lệ chưa có key vượt ngưỡng.' },
+  { type: 'no_key_rising', label: 'Tỉ lệ máy không có key tăng', help: 'Tỉ lệ máy chưa có key của một chi nhánh tăng so với tuần trước.' },
+  { type: 'full_stale', label: 'Full sync quá hạn', help: 'Lâu không có lượt full thành công. Lượt delta vẫn được theo dõi riêng (sự cố hệ thống).' },
+  { type: 'dc_cert_expiring', label: 'Chứng chỉ DC sắp hết hạn', help: 'Chứng chỉ LDAPS của DC còn dưới 30 ngày (không có ngưỡng chỉnh).' },
 ];
 const FEATURE_DEFAULTS = Object.fromEntries(FEATURES.map((f) => [f.key, f.default]));
 
@@ -49,6 +54,11 @@ export class SettingsService {
   async feature(key) {
     if (!(key in FEATURE_DEFAULTS)) throw new Error(`unknown feature ${key}`);
     return (await this.get(key, FEATURE_DEFAULTS[key])) === true;
+  }
+
+  /** Whether a data alert type is switched on (default: on). */
+  async alertEnabled(type) {
+    return (await this.get(`alert.${type}`, true)) !== false;
   }
 
   /** All switchable features: { [key]: boolean }. */

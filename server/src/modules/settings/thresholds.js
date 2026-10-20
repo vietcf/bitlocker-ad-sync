@@ -22,7 +22,7 @@ export const THRESHOLDS = [
     label: 'Không có heartbeat của worker quá (phút)' },
   { key: 'watchdog.delta_max_minutes', group: 'watchdog', unit: 'minutes', default: 60, min: 15, max: 10080,
     label: 'Không có lượt sync thành công quá (phút)' },
-  { key: 'watchdog.full_max_hours', group: 'watchdog', unit: 'hours', default: 26, min: 1, max: 720,
+  { key: 'watchdog.full_max_hours', group: 'dataalerts', alert: 'full_stale', unit: 'hours', default: 26, min: 1, max: 720,
     label: 'Không có lượt full thành công quá (giờ)' },
   { key: 'watchdog.running_max_hours', group: 'watchdog', unit: 'hours', default: 2, min: 1, max: 72,
     label: 'Lượt sync "đang chạy" quá (giờ) thì hủy' },
@@ -30,11 +30,11 @@ export const THRESHOLDS = [
     label: 'USN của DC không đổi quá (giờ)' },
   { key: 'anomaly.canary_max_age_minutes', group: 'watchdog', unit: 'minutes', default: 90, min: 10, max: 10080,
     label: 'Giá trị canary cũ quá (phút)' },
-  { key: 'anomaly.escrow_ratio', group: 'watchdog', unit: 'percent', default: 0.5, min: 1, max: 100,
+  { key: 'anomaly.escrow_ratio', group: 'dataalerts', alert: 'escrow_broken', unit: 'percent', default: 0.5, min: 1, max: 100,
     label: 'Máy mới (2–7 ngày) chưa có key quá (%)' },
-  { key: 'anomaly.escrow_min_new', group: 'watchdog', unit: 'count', default: 5, min: 1, max: 100000,
+  { key: 'anomaly.escrow_min_new', group: 'dataalerts', alert: 'escrow_broken', unit: 'count', default: 5, min: 1, max: 100000,
     label: '... chỉ xét khi số máy mới ít nhất là' },
-  { key: 'anomaly.no_key_pp_increase', group: 'watchdog', unit: 'points', default: 5, min: 1, max: 100,
+  { key: 'anomaly.no_key_pp_increase', group: 'dataalerts', alert: 'no_key_rising', unit: 'points', default: 5, min: 1, max: 100,
     label: 'Tỉ lệ máy chưa có key của chi nhánh tăng quá (điểm %, so với tuần trước)' },
 
   // Data alerts: a "handled" alert is reported again after this long if its condition remains.

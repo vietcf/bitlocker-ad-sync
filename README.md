@@ -922,7 +922,7 @@ Nên máy bị xóa hoặc chuyển ra khỏi phạm vi chỉ cập nhật **sau
 
 ### 6.1. Lượt sync bị giữ lại (cách ly)
 
-Có lượt sync báo thành công nhưng số liệu bất thường. Server giữ lại thay đổi của lượt đó, cảnh báo và chờ Admin HQ quyết định. Ngưỡng chỉnh ở **Quản trị > Ngưỡng cảnh báo** (mặc định):
+Có lượt sync báo thành công nhưng số liệu bất thường. Server giữ lại thay đổi của lượt đó, cảnh báo và chờ Admin HQ quyết định. Ngưỡng chỉnh ở **Quản trị > Đồng bộ AD > Cảnh báo sync** (mặc định):
 
 | Trường hợp | Ngưỡng |
 | --- | --- |
@@ -953,7 +953,7 @@ Watchdog chạy mỗi 5 phút và tách **hai loại sự cố**, mỗi loại m
 - Mỗi loại: gửi khi bắt đầu, nhắc lại tối đa 1 lần mỗi ngày, hết sự cố thì không gửi gì nữa.
 - Xem ở **Quản trị > Đồng bộ AD > Tình trạng sync** (hai ô Worker và Đồng bộ AD, bên dưới là cảnh báo đang mở), Tổng quan của Admin HQ và báo cáo email hằng ngày.
 
-**Ô "Đồng bộ AD" gồm 2 phần:** **Sự cố hệ thống** (đo trực tiếp: không đọc được AD, sync quá hạn, lượt sync treo, canary, USN; tự hết khi sửa xong) và **Cảnh báo dữ liệu** (tính từ nội dung đã đồng bộ: máy mới không có key, tỉ lệ không key tăng, full sync quá hạn, chứng chỉ DC sắp hết hạn; hiện "Có cảnh báo nhẹ" và không làm dừng sync). Vì cảnh báo dữ liệu còn đúng nhiều ngày sau khi bạn đã sửa nguyên nhân, mỗi cảnh báo loại này có nút **Đã xử lý** (kèm ghi chú: ngừng gửi mail và không tính vào trạng thái trong **30 ngày** theo mặc định, chỉnh ở Ngưỡng cảnh báo; hết hạn mà điều kiện còn thì báo lại, điều kiện hết thì cảnh báo tự đóng) và **Bỏ qua 1/7/30 ngày** (cùng cách). Muốn **tắt hẳn** một loại cảnh báo dữ liệu: **Quản trị > Tính năng** (4 công tắc "Cảnh báo dữ liệu: ..."); loại đã tắt không bao giờ mở, đang mở thì đóng, và ô trạng thái ghi "Đã tắt N loại". Sự cố hệ thống không tắt được. Sự cố hệ thống tự hết khi sửa xong nên không có nút nào. Chỉ Admin HQ bấm được; mọi thao tác ghi vào nhật ký truy cập (`alert_ack`, `alert_snooze`).
+**Ô "Đồng bộ AD" gồm 2 phần:** **Sự cố hệ thống** (đo trực tiếp: không đọc được AD, sync quá hạn, lượt sync treo, canary, USN; tự hết khi sửa xong) và **Cảnh báo dữ liệu** (tính từ nội dung đã đồng bộ: máy mới không có key, tỉ lệ không key tăng, full sync quá hạn, chứng chỉ DC sắp hết hạn; hiện "Có cảnh báo nhẹ" và không làm dừng sync). Vì cảnh báo dữ liệu còn đúng nhiều ngày sau khi bạn đã sửa nguyên nhân, mỗi cảnh báo loại này có nút **Đã xử lý** (kèm ghi chú: ngừng gửi mail và không tính vào trạng thái trong **30 ngày** theo mặc định, chỉnh ở Ngưỡng cảnh báo; hết hạn mà điều kiện còn thì báo lại, điều kiện hết thì cảnh báo tự đóng) và **Bỏ qua 1/7/30 ngày** (cùng cách). Muốn **tắt hẳn** một loại cảnh báo dữ liệu: công tắc **Bật/Tắt** ngay cạnh ngưỡng của nó ở **Quản trị > Đồng bộ AD > Cảnh báo sync**; loại đã tắt không bao giờ mở, đang mở thì đóng, và ô trạng thái ghi "Đã tắt N loại". Sự cố hệ thống không tắt được. Sự cố hệ thống tự hết khi sửa xong nên không có nút nào. Chỉ Admin HQ bấm được; mọi thao tác ghi vào nhật ký truy cập (`alert_ack`, `alert_snooze`).
 
 **Email cảnh báo chia 4 nhóm**, mỗi nhóm bật/tắt và chọn người nhận riêng ở **Quản trị > Thông báo** (Admin HQ và/hoặc địa chỉ thêm; `NOTIFY_TO` luôn nhận nhóm đang bật). Tắt nhóm thì không gửi mail nhóm đó (cảnh báo vẫn hiện trong app):
 
@@ -964,7 +964,7 @@ Watchdog chạy mỗi 5 phút và tách **hai loại sự cố**, mỗi loại m
 | **Xem key ngoài giờ và bảo mật dữ liệu** | Hiện key ngoài giờ, xuất key hàng loạt |
 | **Sao lưu** | Một lượt sao lưu bị lỗi |
 
-Ngưỡng của watchdog (**Quản trị > Ngưỡng cảnh báo**):
+Ngưỡng của watchdog (**Quản trị > Đồng bộ AD > Cảnh báo sync**):
 
 | Ngưỡng | Mặc định |
 | --- | --- |
@@ -991,7 +991,7 @@ Mọi cấu hình của Admin HQ nằm trong menu **Quản trị**, gom thành 4
 | Người dùng & chi nhánh | Chi nhánh & OU | Thêm/sửa/xóa chi nhánh và OU gốc (lưu là quét lại máy theo OU ngay; xóa thì máy về N/A, gõ mã để xác nhận). Máy ngoài mọi OU là N/A |
 | | Người dùng | Tài khoản, email, cách đăng nhập, quyền |
 | Đồng bộ AD | Tình trạng sync | Hai ô **Worker** Online / Offline (Online = có heartbeat trong ngưỡng, mặc định 15 phút) và **Đồng bộ AD** Bình thường / Có sự cố (mục 6.2); yêu cầu sync, chấp nhận / bác bỏ lượt bị giữ lại |
-| | Ngưỡng cảnh báo | Ngưỡng giữ lại lượt sync (6.1) và watchdog (6.2). Mỗi ô có khoảng cho phép và mặc định; ngoài khoảng bị từ chối. Ngưỡng trong khung viền xanh phải vượt cùng lúc (VÀ), còn lại độc lập (HOẶC). Có hiệu lực trong 30 giây, ghi nhật ký `settings_thresholds` |
+| | Cảnh báo sync (Đồng bộ AD) | Ngưỡng giữ lại lượt sync (6.1), watchdog (6.2) và công tắc bật/tắt từng loại cảnh báo dữ liệu. Mỗi ô có khoảng cho phép và mặc định; ngoài khoảng bị từ chối. Ngưỡng trong khung viền xanh phải vượt cùng lúc (VÀ), còn lại độc lập (HOẶC). Có hiệu lực trong 30 giây, ghi nhật ký `settings_thresholds` |
 | Email | Thông báo | Email cảnh báo theo **4 nhóm** (Agent ngừng, AD/đồng bộ có vấn đề, xem key ngoài giờ và bảo mật dữ liệu, sao lưu; mục 6.2); email khi có **máy mới** / **key mới** (gửi người dùng chi nhánh và/hoặc Admin HQ); **báo cáo hằng ngày** (mục 6.11) |
 | | Mail server | SMTP: địa chỉ, cổng, STARTTLS/SSL/không mã hóa, tài khoản, địa chỉ gửi, địa chỉ web của app; nút **Gửi thử** |
 | | Log email | Mọi email hệ thống tạo ra (chờ gửi / đã gửi / thất bại / không gửi), ghi **đã gửi cho ai** và **ai lẽ ra nhận nhưng chưa có email**; lọc, tìm, xem nội dung, gửi lại mail thất bại |
@@ -1014,7 +1014,7 @@ Mỗi máy và mỗi key có hai mốc: **Tạo trên AD** (`whenCreated`) và *
 
 Bộ lọc danh sách: chi nhánh (kể cả N/A), tình trạng, có tính máy ngoài phạm vi giám sát hay không, và **khoảng ngày** theo *Ghi nhận* (mặc định) hoặc *Tạo trên AD* (tính cả hai đầu, theo `APP_TZ`). Ví dụ: máy mới tuần này = Ghi nhận, từ thứ Hai đến hôm nay.
 
-**Đăng nhập AD gần nhất:** worker đọc thêm thuộc tính `lastLogonTimestamp` của máy (AD đồng bộ giữa các DC nên chỉ cần hỏi một DC; AD chỉ cập nhật khi giá trị cũ hơn khoảng 14 ngày nên lệch tối đa ~14 ngày). Giá trị hiện ở danh sách, trang chi tiết và CSV (`last_logon_utc`), kèm nhãn **Hoạt động gần đây** (trong 3 tháng theo mặc định, đổi ở **Quản trị > Ngưỡng cảnh báo > Hoạt động của máy**), **Không hoạt động gần đây** hoặc **Chưa có dữ liệu** (máy chưa từng đăng nhập, hoặc worker chưa báo, ví dụ worker bản cũ). Đó chỉ là "chưa thấy máy đăng nhập domain", không có nghĩa máy đã hỏng hay bị bỏ. Bộ lọc gồm hai ô kết hợp được: **Đăng nhập AD** (Tất cả / trong N tháng gần nhất / quá N tháng chưa thấy, N = 1/3/6/9/12/24) và **Máy chưa có dữ liệu đăng nhập** (Không gồm / Gồm cả / Chỉ máy này; "Gồm cả" là HOẶC với mốc thời gian, ví dụ "quá 6 tháng chưa thấy" kèm "Gồm cả" ra danh sách máy ứng viên để dọn). Mặc định không lọc gì; chọn một mốc N tháng thì ô thứ hai tự là "Không gồm" (chỉ tính máy có bằng chứng). Cạnh ô có số máy chưa có dữ liệu. Cần cập nhật worker (Go và .NET từ 1.2.0 có thuộc tính này) rồi chờ lượt sync full kế tiếp để dữ liệu có đủ.
+**Đăng nhập AD gần nhất:** worker đọc thêm thuộc tính `lastLogonTimestamp` của máy (AD đồng bộ giữa các DC nên chỉ cần hỏi một DC; AD chỉ cập nhật khi giá trị cũ hơn khoảng 14 ngày nên lệch tối đa ~14 ngày). Giá trị hiện ở danh sách, trang chi tiết và CSV (`last_logon_utc`), kèm nhãn **Hoạt động gần đây** (trong 3 tháng theo mặc định, đổi ở **Quản trị > Đồng bộ AD > Cảnh báo sync > Hoạt động của máy**), **Không hoạt động gần đây** hoặc **Chưa có dữ liệu** (máy chưa từng đăng nhập, hoặc worker chưa báo, ví dụ worker bản cũ). Đó chỉ là "chưa thấy máy đăng nhập domain", không có nghĩa máy đã hỏng hay bị bỏ. Bộ lọc gồm hai ô kết hợp được: **Đăng nhập AD** (Tất cả / trong N tháng gần nhất / quá N tháng chưa thấy, N = 1/3/6/9/12/24) và **Máy chưa có dữ liệu đăng nhập** (Không gồm / Gồm cả / Chỉ máy này; "Gồm cả" là HOẶC với mốc thời gian, ví dụ "quá 6 tháng chưa thấy" kèm "Gồm cả" ra danh sách máy ứng viên để dọn). Mặc định không lọc gì; chọn một mốc N tháng thì ô thứ hai tự là "Không gồm" (chỉ tính máy có bằng chứng). Cạnh ô có số máy chưa có dữ liệu. Cần cập nhật worker (Go và .NET từ 1.2.0 có thuộc tính này) rồi chờ lượt sync full kế tiếp để dữ liệu có đủ.
 
 Hai nút xuất, đều xuất **toàn bộ** danh sách theo bộ lọc (không chỉ trang đang xem) và trong phạm vi chi nhánh của người xuất:
 
@@ -1290,7 +1290,7 @@ Mỗi job có giờ / chu kỳ mặc định, chỉnh ngay trên trang của job
 | Job | Mặc định | Chỉnh ở |
 | --- | --- | --- |
 | Gửi mail đang chờ | mỗi **1 phút** (1–60) | Quản trị > Mail server |
-| Watchdog | mỗi **5 phút** (1–60) | Quản trị > Ngưỡng cảnh báo |
+| Watchdog | mỗi **5 phút** (1–60) | Quản trị > Đồng bộ AD > Cảnh báo sync |
 | Dọn dữ liệu quá hạn | **03:00** | Quản trị > Lưu trữ |
 | Báo cáo email hằng ngày | **07:30** (tắt) | Quản trị > Thông báo |
 | Sao lưu | **01:30** (tắt) | Quản trị > Sao lưu |
@@ -1315,7 +1315,7 @@ Giờ đọc AD của **worker** (delta 15 phút, full 01:00, heartbeat 5 phút)
 | Lượt sync bị giữ lại liên tục | Ngưỡng không hợp với thực tế, hoặc DB còn dữ liệu thử | Xem lý do trên tab Quản trị > Sync AD, chấp nhận hoặc bác bỏ |
 | Máy hiện "Không còn trong phạm vi giám sát" | Máy bị xóa khỏi AD, hoặc nằm ngoài `SearchBases` của worker | Kiểm tra AD và `SearchBases`. Máy xuất hiện lại trong AD thì nhãn tự mất |
 | Lượt sync lỗi `ldap_search_base_failed` | Một OU trong `SearchBases` không tồn tại, bị đổi tên/di chuyển, hoặc tài khoản worker không có quyền đọc | Log worker ghi tên OU. Chạy `check` để xem OU nào `FAIL`, sửa `SearchBases` hoặc cấp quyền (mục 4.1) |
-| Trang Tổng quan báo dữ liệu có thể đã cũ | Worker dừng, lỗi, hoặc lượt sync bị giữ lại | Xem Quản trị > Sync AD và log worker; ngưỡng ở Quản trị > Ngưỡng cảnh báo |
+| Trang Tổng quan báo dữ liệu có thể đã cũ | Worker dừng, lỗi, hoặc lượt sync bị giữ lại | Xem Quản trị > Sync AD và log worker; ngưỡng ở Quản trị > Đồng bộ AD > Cảnh báo sync |
 | Quên mật khẩu, mất điện thoại 2 bước, web hỏng | | CLI trên máy chủ: `reset-password`, `reset-2fa`, `disable-2fa`, `unlock` (mục 6.9) |
 | Sao lưu lỗi hoặc "Đang sao lưu" mãi | `pg_dump` lỗi, hết đĩa, sai `BACKUP_DATABASE_URL` | Xem "Lần chạy gần nhất" ở Quản trị > Sao lưu và log server (mục 6.8) |
 | Không nhận được email | Chưa bật mail server, sai SMTP, hoặc người nhận chưa có email | Quản trị > Mail server > **Gửi thử** để xem lỗi; Quản trị > Log email xem trạng thái và lỗi từng mail; kiểm tra email của user ở Quản trị > Người dùng |

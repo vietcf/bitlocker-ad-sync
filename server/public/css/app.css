@@ -343,3 +343,16 @@ button:disabled { cursor: not-allowed; }
 .quick a[aria-current="true"] { background: var(--accent); color: var(--accent-fg); font-weight: 600; }
 
 .app-version { text-align: center; padding: 16px; }
+
+/* Cau hinh canh bao sync: mot khung cho moi canh bao du lieu, cong tac bat/tat o dau khung */
+.alert-config { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 14px; margin: 10px 0; background: var(--surface); }
+.alert-config-head { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.alert-config-head select { min-width: 6rem; }
+
+/* Form xac nhan canh bao du lieu: o ghi chu mot dong, cac nut ben duoi co khoang cach */
+.alert-form { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; max-width: 36rem; }
+.alert-form input[type="text"] { width: 100%; }
+.alert-form-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.alert-form-or { color: var(--muted); font-size: 13px; }
+.alert-form-snooze { display: inline-flex; align-items: center; gap: 8px; }
+.inline-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
