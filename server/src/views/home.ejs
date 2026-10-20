@@ -122,7 +122,7 @@
     <p class="muted">Không có máy nào khớp bộ lọc.</p>
   <% } else { %>
   <table>
-    <thead><tr><th>Máy</th><th>Chi nhánh</th><th>Hệ điều hành</th><th class="num">Số key</th><th>Key mới nhất</th><th>Tạo trên AD</th><th>Ghi nhận</th><th>Đăng nhập AD gần nhất</th><th>Tình trạng</th></tr></thead>
+    <thead><tr><th>Máy</th><th>Chi nhánh</th><th>Hệ điều hành</th><th class="num">Số key</th><th>Key mới nhất</th><th>Tạo trên AD</th><th>Ghi nhận</th><th title="Lần máy này đăng nhập (xác thực) vào domain gần nhất, theo thuộc tính lastLogonTimestamp của máy trên AD. AD chỉ cập nhật khi giá trị cũ hơn khoảng 14 ngày nên số liệu có thể lệch tối đa ~14 ngày. Chỉ cho biết 'chưa thấy máy đăng nhập domain', không có nghĩa máy đã hỏng hay bị bỏ. 'Hoạt động gần đây' = trong 3 tháng. 'Chưa có dữ liệu' = máy chưa từng đăng nhập hoặc worker chưa báo giá trị này.">Đăng nhập AD gần nhất</th><th>Tình trạng</th></tr></thead>
     <tbody>
     <% list.rows.forEach((c) => { %>
       <tr>

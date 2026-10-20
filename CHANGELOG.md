@@ -13,6 +13,12 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.7.1] - 2026-10-20
+
+### Sửa
+
+- Trang máy và danh sách Tìm máy: rê chuột vào "Đăng nhập AD gần nhất" (nhãn, giá trị, tiêu đề cột) hiện giải thích ý nghĩa, độ lệch ~14 ngày và các nhãn hoạt động.
+
 ## [2.7.0] - 2026-10-20
 
 ### Thêm
