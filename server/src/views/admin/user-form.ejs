@@ -58,6 +58,10 @@
 
     <fieldset>
       <legend>Quyền</legend>
+      <label class="check admin-check"><input type="checkbox" name="grants" value="admin:all" <%= form.grants.includes('admin:all') ? 'checked' : '' %>>
+        <span><strong>Admin HQ</strong>: toàn quyền, xem key mọi chi nhánh, quản trị hệ thống. Chọn mục này thì không cần chọn vai trò theo chi nhánh.</span></label>
+      <div class="grants-wrap">
+      <p class="muted small">Không chọn Admin HQ thì chọn vai trò theo từng chi nhánh (mỗi chi nhánh một vai trò).</p>
       <table class="grants">
         <thead><tr><th>Chi nhánh</th><% ['it', 'lead', 'auditor'].forEach((r) => { %><th><%= h.role(r) %></th><% }) %></tr></thead>
         <tbody>
@@ -71,8 +75,7 @@
           <% }) %>
         </tbody>
       </table>
-      <label class="check admin-check"><input type="checkbox" name="grants" value="admin:all" <%= form.grants.includes('admin:all') ? 'checked' : '' %>>
-        <strong>Admin HQ</strong>: toàn quyền, xem key mọi chi nhánh, quản trị hệ thống. Chọn mục này thì không chọn thêm vai trò theo chi nhánh. Mỗi chi nhánh chỉ một vai trò.</label>
+      </div>
     </fieldset>
 
     <div class="actions">

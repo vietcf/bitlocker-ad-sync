@@ -401,6 +401,16 @@ describe('heartbeat, manual sync and watchdog', () => {
     expect(deltaPage).not.toContain('Máy đang có');
     expect(deltaPage).not.toContain('Chênh lệch');
     expect(deltaPage).not.toContain('Key đang có');
+    expect(deltaPage).toContain('Máy mới');
+
+    // a delta that adds a computer to the system: "Máy mới" counts it on the run list and on the run page; full runs show a dash on the list
+    const added = await runSync({ mode: 'delta', computers: [computer(2), computer(4)] });
+    const addedPage = (await web.agent.get(`/admin/sync/runs/${added.runId}`)).text;
+    expect(addedPage).toMatch(/Toàn hệ thống<\/td>\s*<td class="num">2<\/td>\s*<td class="num">1<\/td>/); // saw 2, 1 new
+    const list = (await web.agent.get('/admin/sync')).text;
+    expect(list).toContain('>Máy mới</th>');
+    const [{ n }] = await asOwner(`SELECT count(*)::int AS n FROM computer WHERE first_seen_run = ${added.runId}`);
+    expect(n).toBe(1);
   });
 
   it('Admin HQ can mark a data alert handled or snooze it; system faults cannot be marked', async () => {
@@ -561,7 +571,7 @@ describe('same Key ID under another computer (unjoin / rejoin, cloned image)', (
     const [{ id }] = await asOwner('SELECT id FROM key_duplicate');
     const post = (action) => web.agent.post(`/admin/sync/key-duplicates/${id}/review`).type('form').send({ _csrf: web.csrf, action });
     expect((await post('assign')).status).toBe(302); // refused: same creation time, back to the page with the reason
-    expect((await web.agent.get('/admin/sync')).text).toContain('không có gì để chuyển');
+    expect((await web.agent.get('/admin/sync')).text).toContain('được tạo cùng lúc trên AD'); // same creation time: short reason with both names
     expect((await ownerOf(1)).name).toBe('PC-1');
     expect(await asOwner('SELECT resolved_at FROM key_duplicate')).toEqual([{ resolved_at: null }]); // still open
     expect((await post('share')).status).toBe(302);

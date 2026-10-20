@@ -13,6 +13,14 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.19.3] - 2026-10-20
+
+### Sửa
+
+- "Gán cho máy mới hơn" bị từ chối: thông báo ngắn, nêu đúng lý do kèm tên hai máy: "A (đang giữ key) đã mới hơn B", "A và B được tạo cùng lúc trên AD", "mật khẩu của 2 máy khác nhau" hoặc "thiếu ngày tạo trên AD".
+- Lượt sync **delta**: thêm cột **Máy mới** (số máy lần đầu được thêm vào hệ thống bởi lượt đó) ở bảng "Các lượt sync gần đây" (lượt full hiện "—") và trong trang chi tiết của lượt delta (toàn hệ thống và từng chi nhánh). Lượt full giữ nguyên.
+- Form người dùng: ô **Admin HQ** đặt lên đầu mục Quyền (mặc định không chọn); chọn Admin HQ thì **ẩn** bảng quyền theo từng chi nhánh cho đỡ dài trang.
+
 ## [2.19.2] - 2026-10-20
 
 ### Sửa

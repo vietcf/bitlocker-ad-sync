@@ -52,7 +52,7 @@ export class SyncAdminService {
   async status(scope) {
     this.#check(scope);
     const [runs, heartbeats, openAlerts, requested, duplicates] = await Promise.all([
-      listRuns(this.pool, 30),
+      withAllBranches(this.pool, (tx) => listRuns(tx, 30)), // computers table has RLS: count needs the all-branch scope
       listHeartbeats(this.pool),
       this.alerts.listOpen(),
       peekSyncRequest(this.pool),
@@ -86,8 +86,12 @@ export class SyncAdminService {
       if (action === 'assign') {
         if (!d.same_password) throw badRequest('duplicate_password_differs', 'The two computers have different passwords for this Key ID: the key cannot be moved.', { holder: d.owner_name, other: d.other_name });
         if (!d.owner_created || !d.other_created) throw badRequest('duplicate_created_unknown', 'AD creation time of a computer is unknown: cannot tell which one is newer.', { holder: d.owner_name, other: d.other_name });
-        if (new Date(d.other_created) <= new Date(d.owner_created)) {
-          throw badRequest('duplicate_not_newer', 'The computer holding the key is already the newer one: nothing to move.', { holder: d.owner_name, other: d.other_name, holderAt: d.owner_created, otherAt: d.other_created });
+        const times = { holder: d.owner_name, other: d.other_name, holderAt: d.owner_created, otherAt: d.other_created };
+        if (new Date(d.other_created).getTime() === new Date(d.owner_created).getTime()) {
+          throw badRequest('duplicate_same_time', 'Both computers were created in AD at the same time: cannot tell which one is newer.', times);
+        }
+        if (new Date(d.other_created) < new Date(d.owner_created)) {
+          throw badRequest('duplicate_not_newer', 'The computer holding the key is already the newer one: nothing to move.', times);
         }
         await moveKey(tx, { keyId: d.key_id, fromId: d.owner_id, toId: d.other_id, runId: null, reason: 'review_newer' });
       } else {

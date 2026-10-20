@@ -118,11 +118,13 @@ document.querySelectorAll('form[data-autosubmit]').forEach((form) => {
   const adminBox = document.querySelector('.admin-check input[type="checkbox"]');
   if (!table) return;
   const boxes = [...table.querySelectorAll('input[type="checkbox"]')];
+  const wrap = table.closest('.grants-wrap');
   const sync = () => {
     const off = !!adminBox && adminBox.checked;
     if (off) boxes.forEach((b) => { b.checked = false; });
     boxes.forEach((b) => { b.disabled = off; });
     table.classList.toggle('dimmed', off);
+    if (wrap) wrap.hidden = off; // Admin HQ bao het chi nhanh: an bang quyen theo chi nhanh cho do dai trang
   };
   table.addEventListener('change', (e) => {
     if (!e.target.checked) return;

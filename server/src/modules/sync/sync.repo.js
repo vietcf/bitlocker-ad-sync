@@ -91,7 +91,8 @@ export async function abortStaleRuns(db, hours) {
 export async function listRuns(db, limit = 30) {
   const { rows } = await db.query(
     `SELECT id, started_at, finished_at, mode, dc_name, since_usn, highest_usn, computers_seen, keys_seen,
-            keys_added, keys_empty_pwd, errors, error_code, status, anomalies, pending, ack_by, ack_decision, ack_at
+            keys_added, keys_empty_pwd, errors, error_code, status, anomalies, pending, ack_by, ack_decision, ack_at,
+            (SELECT count(*)::int FROM computer c WHERE c.first_seen_run = sync_run.id) AS computers_added
        FROM sync_run ORDER BY id DESC LIMIT $1`,
     [limit],
   );
@@ -534,7 +535,10 @@ export async function getRun(db, id) {
 /** Metrics of a run, the whole system first, then per branch (with the branch code). */
 export async function runMetrics(db, runId) {
   const { rows } = await db.query(
-    `SELECT m.*, b.code AS branch_code, b.name AS branch_name
+    `SELECT m.*, b.code AS branch_code, b.name AS branch_name,
+            -- computers first recorded by this run: all of them on the overall row, the branch's own on a branch row
+            (SELECT count(*)::int FROM computer c
+              WHERE c.first_seen_run = m.run_id AND (m.branch_id IS NULL OR c.branch_id = m.branch_id)) AS computers_added
        FROM sync_metric m LEFT JOIN branch b ON b.id = m.branch_id
       WHERE m.run_id = $1
       ORDER BY m.branch_id IS NOT NULL, b.code`,

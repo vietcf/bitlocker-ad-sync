@@ -141,7 +141,7 @@
 <section class="card">
   <h2>Các lượt sync gần đây</h2>
   <table class="dense">
-    <thead><tr><th>#</th><th>Bắt đầu</th><th>Kiểu</th><th>DC</th><th>Trạng thái</th><th class="num">Máy</th><th class="num">Key mới</th><th>Ghi chú</th></tr></thead>
+    <thead><tr><th>#</th><th>Bắt đầu</th><th>Kiểu</th><th>DC</th><th>Trạng thái</th><th class="num" title="Số máy lượt này thấy">Máy</th><th class="num" title="Lượt delta: số máy lần đầu được thêm vào hệ thống bởi lượt này">Máy mới</th><th class="num">Key mới</th><th>Ghi chú</th></tr></thead>
     <tbody>
     <% runs.forEach((r) => { const st = h.runStatus(r.status); %>
       <tr>
@@ -151,6 +151,7 @@
         <td><%= r.dc_name %></td>
         <td><span class="badge badge-<%= st.tone %>"><%= st.label %></span></td>
         <td class="num"><%= h.number(r.computers_seen) %></td>
+        <td class="num"><%= r.mode === 'delta' ? h.number(r.computers_added) : '—' %></td>
         <td class="num"><%= h.number(r.keys_added) %></td>
         <td>
           <% if (r.error_code) { %><code><%= r.error_code %></code><% } %>
@@ -165,7 +166,7 @@
         </td>
       </tr>
     <% }) %>
-    <% if (!runs.length) { %><tr><td colspan="8" class="muted">Chưa có lượt sync nào.</td></tr><% } %>
+    <% if (!runs.length) { %><tr><td colspan="9" class="muted">Chưa có lượt sync nào.</td></tr><% } %>
     </tbody>
   </table>
 </section>
