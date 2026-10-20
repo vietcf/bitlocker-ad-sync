@@ -13,6 +13,12 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.19.1] - 2026-10-20
+
+### Sửa
+
+- Đổi tên thư mục cài không còn làm database "biến mất": `tools/install.sh` ghi `COMPOSE_PROJECT_NAME` vào `.env` (cài mới: `blk`; máy đã cài: giữ đúng tên project đang dùng, phát hiện qua volume `<thư-mục>_blk-pg` hoặc container cũ). Trước đây volume đặt tên theo thư mục nên đổi tên thư mục là Docker tạo database trống mới (volume cũ vẫn còn). README mục 3.6 ghi cách lấy lại.
+
 ## [2.19.0] - 2026-10-20
 
 ### Thêm

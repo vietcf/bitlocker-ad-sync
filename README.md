@@ -328,6 +328,8 @@ nginx dùng **một chứng chỉ** cho cả web (cổng 443) và ingest API (c�
 
 ### 3.6. Cập nhật phiên bản
 
+**Đổi tên hoặc chuyển thư mục cài:** giữ nguyên file `.env` (có dòng `COMPOSE_PROJECT_NAME`, do `install.sh` ghi). Thiếu dòng này, Docker coi thư mục mới là project mới và tạo database **trống**; volume cũ vẫn còn (`docker volume ls`, tên `<thư-mục-cũ>_blk-pg`), đặt `COMPOSE_PROJECT_NAME=<thư-mục-cũ>` để dùng lại.
+
 Sao lưu database trước (trong ứng dụng: Quản trị > Sao lưu). Dùng Docker Compose thì **migration tự chạy**: bản mới được dựng, tạo bảng mới xong mới khởi động; migration lỗi thì server không lên và bản cũ giữ nguyên. Migration chỉ thêm, không sửa file cũ. Làm trong thư mục dự án:
 
 ```bash

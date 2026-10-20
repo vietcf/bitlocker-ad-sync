@@ -198,6 +198,14 @@ done
 [[ "$P_HTTPS" != "$P_INGEST" && "$P_HTTPS" != "$P_HTTP" && "$P_INGEST" != "$P_HTTP" ]] || die "Ba cong (web, ingest, http) phai khac nhau."
 [[ -f $PENV ]] || : > "$PENV"
 set_env "$PENV" HTTPS_PORT "$P_HTTPS"; set_env "$PENV" INGEST_PUBLIC_PORT "$P_INGEST"; set_env "$PENV" HTTP_PORT "$P_HTTP"
+# Ghim ten project Compose: volume database ten theo project (= ten thu muc), doi ten thu muc ma khong ghim thi
+# Compose tao database TRONG moi (volume cu van con nhung khong con duoc gan). May da cai truoc do: ghim dung ten dang dung.
+if ! grep -q '^COMPOSE_PROJECT_NAME=' "$PENV"; then
+  CUR=$(basename "$PWD" | tr 'A-Z' 'a-z' | sed 's/[^a-z0-9_-]//g; s/^[-_]*//')
+  if [[ -n "$CUR" ]] && { docker volume inspect "${CUR}_blk-pg" >/dev/null 2>&1 || [[ -n "$(docker ps -aq --filter "label=com.docker.compose.project=$CUR" 2>/dev/null)" ]]; }; then
+    set_env "$PENV" COMPOSE_PROJECT_NAME "$CUR"; say "May da cai truoc do: ghim ten project Compose = $CUR (doi ten thu muc khong lam mat database)."
+  else set_env "$PENV" COMPOSE_PROJECT_NAME blk; fi
+fi
 # Cong 80 chuyen sang HTTPS: giu cong HTTPS khi khac 443.
 mkdir -p nginx
 if [[ "$P_HTTPS" == 443 ]]; then printf 'return 301 https://$host$request_uri;\n' > nginx/redirect.conf
