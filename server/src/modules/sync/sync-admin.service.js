@@ -84,9 +84,11 @@ export class SyncAdminService {
       const d = await getOpenDuplicate(tx, id);
       if (!d) throw notFound('Duplicate not found or already closed.');
       if (action === 'assign') {
-        if (!d.same_password) throw badRequest('The two computers have different passwords for this Key ID: the key cannot be moved.');
-        if (!d.owner_created || !d.other_created) throw badRequest('AD creation time of a computer is unknown: cannot tell which one is newer.');
-        if (new Date(d.other_created) <= new Date(d.owner_created)) throw badRequest('The computer holding the key is already the newer one: nothing to move.');
+        if (!d.same_password) throw badRequest('duplicate_password_differs', 'The two computers have different passwords for this Key ID: the key cannot be moved.', { holder: d.owner_name, other: d.other_name });
+        if (!d.owner_created || !d.other_created) throw badRequest('duplicate_created_unknown', 'AD creation time of a computer is unknown: cannot tell which one is newer.', { holder: d.owner_name, other: d.other_name });
+        if (new Date(d.other_created) <= new Date(d.owner_created)) {
+          throw badRequest('duplicate_not_newer', 'The computer holding the key is already the newer one: nothing to move.', { holder: d.owner_name, other: d.other_name, holderAt: d.owner_created, otherAt: d.other_created });
+        }
         await moveKey(tx, { keyId: d.key_id, fromId: d.owner_id, toId: d.other_id, runId: null, reason: 'review_newer' });
       } else {
         await reviewDuplicate(tx, id, scope.upn, 'shared');
@@ -108,7 +110,7 @@ export class SyncAdminService {
     const { note } = parse(alertAckInput, raw);
     const days = Number(await this.settings.get('alerts.ack_reopen_days', 30));
     const a = await this.alerts.acknowledge(id, { by: scope.upn, note, days });
-    if (!a) throw badRequest('Only open alerts computed from data (not system faults) can be marked handled.');
+    if (!a) throw badRequest('alert_not_markable', 'Only open alerts computed from data (not system faults) can be marked handled.');
     await this.audit.log({ ...this.audit.actor(scope, client), action: 'alert_ack', detail: { alertId: Number(a.id), type: a.type, days, note: note ?? null } });
     return a;
   }
@@ -118,7 +120,7 @@ export class SyncAdminService {
     this.#check(scope);
     const { days, note } = parse(alertSnoozeInput, raw);
     const a = await this.alerts.snooze(id, { by: scope.upn, days, note });
-    if (!a) throw badRequest('Only alerts computed from data (not system faults) can be skipped.');
+    if (!a) throw badRequest('alert_not_markable', 'Only alerts computed from data (not system faults) can be skipped.');
     await this.audit.log({ ...this.audit.actor(scope, client), action: 'alert_snooze', detail: { alertId: Number(a.id), type: a.type, days, note: note ?? null } });
     return a;
   }

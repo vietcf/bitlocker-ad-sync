@@ -2,8 +2,14 @@
 // the web looks errors up here by code, or by the English message when one code has several.
 // Anything not listed falls back to the English message.
 
+const fmt = (d) => (d ? new Date(d).toLocaleString('vi-VN') : 'không rõ');
+
 const BY_CODE = {
   invalid_request: 'Dữ liệu gửi lên không hợp lệ.',
+  duplicate_password_differs: (d) => `Hai máy ${d?.holder ?? ''} và ${d?.other ?? ''} có mật khẩu khác nhau cho Key ID này, nên không gán key được (mật khẩu đang lưu thuộc máy đang giữ key). Dùng "Dùng chung 2 máy" nếu 2 máy cố ý dùng chung.`,
+  duplicate_created_unknown: (d) => `Thiếu ngày tạo trên AD của ${d?.holder ?? 'một máy'} hoặc ${d?.other ?? 'máy kia'}, nên không biết máy nào mới hơn.`,
+  duplicate_not_newer: (d) => `Máy đang giữ key (${d?.holder}, tạo trên AD ${fmt(d?.holderAt)}) đã là máy mới hơn hoặc cùng thời điểm với ${d?.other} (${fmt(d?.otherAt)}), nên không có gì để chuyển. Dùng "Dùng chung 2 máy" nếu muốn giữ key cho cả hai.`,
+  alert_not_markable: 'Chỉ cảnh báo tính từ dữ liệu mới xử lý hoặc bỏ qua được; sự cố hệ thống tự hết khi sửa xong.',
   unauthenticated: 'Bạn cần đăng nhập.',
   api_requires_local: 'API chỉ nhận tài khoản local. Tài khoản AD đăng nhập trên web.',
   forbidden: 'Bạn không có quyền thực hiện thao tác này.',

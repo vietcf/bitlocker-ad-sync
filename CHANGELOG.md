@@ -13,6 +13,12 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.19.2] - 2026-10-20
+
+### Sửa
+
+- Key ID trùng, nút **Gán cho máy mới hơn**: khi không gán được (máy đang giữ key đã là máy mới hơn hoặc cùng thời điểm, mật khẩu 2 máy khác nhau, thiếu ngày tạo trên AD) nay quay lại trang với thông báo nêu đúng lý do bằng tiếng Việt, thay vì trang lỗi chung "Dữ liệu gửi lên không hợp lệ" (câu giải thích bị truyền sai tham số). Cũng áp dụng cho nút Đã xử lý / Bỏ qua của cảnh báo dữ liệu.
+
 ## [2.19.1] - 2026-10-20
 
 ### Sửa

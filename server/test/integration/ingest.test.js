@@ -452,9 +452,10 @@ describe('heartbeat, manual sync and watchdog', () => {
     // a system fault clears itself: it can be neither marked handled nor snoozed
     await heartbeat({ ldapOk: false, lastErrorCode: 'ldap_bind_failed' });
     await watchdog();
-    expect((await post('ldap_error', 'ack')).status).toBe(400);
+    expect((await post('ldap_error', 'ack')).status).toBe(302); // refused: back to the page with the reason
+    expect((await web.agent.get('/admin/sync')).text).toContain('sự cố hệ thống tự hết khi sửa xong');
     expect(await services.alerts.isSilenced('ldap_error')).toBe(false);
-    expect((await post('ldap_error', 'snooze', { days: '7' })).status).toBe(400);
+    expect((await post('ldap_error', 'snooze', { days: '7' })).status).toBe(302);
     expect((await watchdog()).problems).toContain('ldap_error');
   });
 
@@ -559,7 +560,8 @@ describe('same Key ID under another computer (unjoin / rejoin, cloned image)', (
     const web = await webLogin(app, 'admin.hq');
     const [{ id }] = await asOwner('SELECT id FROM key_duplicate');
     const post = (action) => web.agent.post(`/admin/sync/key-duplicates/${id}/review`).type('form').send({ _csrf: web.csrf, action });
-    expect((await post('assign')).status).toBe(400);
+    expect((await post('assign')).status).toBe(302); // refused: same creation time, back to the page with the reason
+    expect((await web.agent.get('/admin/sync')).text).toContain('không có gì để chuyển');
     expect((await ownerOf(1)).name).toBe('PC-1');
     expect(await asOwner('SELECT resolved_at FROM key_duplicate')).toEqual([{ resolved_at: null }]); // still open
     expect((await post('share')).status).toBe(302);

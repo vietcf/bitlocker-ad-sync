@@ -1,12 +1,28 @@
 import { Router } from 'express';
 import { id, parse } from '../../http/validate.js';
 import { clientInfo } from '../../http/security.js';
+import { AppError } from '../../http/errors.js';
 import { flash } from '../../web/middleware.js';
+import { errorText } from '../../web/messages.js';
 import { runRef } from './run-ref.js';
 
 /** /admin/sync — sync health, manual run request, quarantine decisions. */
 export function syncWeb({ syncAdmin }) {
   const r = Router();
+
+  // A refusal on a decision button (e.g. no newer computer to give the key to): say why on the same page, not an error page.
+  const refusal = (handler) => async (req, res, next) => {
+    try {
+      await handler(req, res);
+    } catch (err) {
+      if (err instanceof AppError && err.status === 400) {
+        flash(req, 'error', errorText(err));
+        return res.redirect('/admin/sync');
+      }
+      return next(err);
+    }
+    return undefined;
+  };
 
   r.get('/', async (req, res) => {
     res.render('admin/sync', { title: 'Tình trạng sync', ...(await syncAdmin.status(req.scope)) });
@@ -35,19 +51,19 @@ export function syncWeb({ syncAdmin }) {
     res.redirect('/admin/sync');
   });
 
-  r.post('/alerts/:id/ack', async (req, res) => {
+  r.post('/alerts/:id/ack', refusal(async (req, res) => {
     const a = await syncAdmin.ackAlert(req.scope, parse(id, req.params.id), { note: req.body.note || undefined }, clientInfo(req));
     flash(req, 'success', `Đã đánh dấu cảnh báo là đã xử lý. Không gửi mail và không tính vào trạng thái đến ${a.snoozed_until.toLocaleString('vi-VN')}; hết hạn mà điều kiện còn thì báo lại. Cảnh báo tự đóng khi điều kiện hết.`);
     res.redirect('/admin/sync');
-  });
+  }));
 
-  r.post('/alerts/:id/snooze', async (req, res) => {
+  r.post('/alerts/:id/snooze', refusal(async (req, res) => {
     const a = await syncAdmin.snoozeAlert(req.scope, parse(id, req.params.id), { days: req.body.days, note: req.body.note || undefined }, clientInfo(req));
     flash(req, 'success', `Đã bỏ qua cảnh báo đến ${a.snoozed_until.toLocaleString('vi-VN')}. Hết hạn mà điều kiện còn thì báo lại.`);
     res.redirect('/admin/sync');
-  });
+  }));
 
-  r.post('/key-duplicates/:id/review', async (req, res) => {
+  r.post('/key-duplicates/:id/review', refusal(async (req, res) => {
     const out = await syncAdmin.reviewKeyDuplicate(req.scope, parse(id, req.params.id), { action: req.body.action }, clientInfo(req));
     flash(
       req,
@@ -57,7 +73,7 @@ export function syncWeb({ syncAdmin }) {
         : `Đã đánh dấu Key ID dùng chung giữa ${out.from} và ${out.to}. Key vẫn giữ ở ${out.from}; trang của cả 2 máy hiển thị ghi chú. Cặp này đã đóng.`,
     );
     res.redirect('/admin/sync');
-  });
+  }));
 
   return r;
 }
