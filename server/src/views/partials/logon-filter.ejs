@@ -4,8 +4,10 @@
   const noLogon = filters.activity === 'unknown' ? 'only' : (filters.noLogon ?? (act ? 'exclude' : 'include'));
   const months = [...new Set([1, 3, 6, 9, 12, 24, Number(act.slice(1)) || 1, activityMonths])].sort((x, y) => x - y);
 %>
-<label title="Theo lần đăng nhập domain gần nhất của máy trên AD (lastLogonTimestamp, lệch tối đa ~14 ngày)">Đăng nhập AD
-  <select name="activity">
+<div class="filter-break"></div>
+<fieldset class="logon-range" title="Theo lần đăng nhập domain gần nhất của máy trên AD (lastLogonTimestamp, lệch tối đa ~14 ngày)">
+  <legend>Đăng nhập AD gần nhất</legend>
+  <select name="activity" aria-label="Mốc đăng nhập AD gần nhất">
     <option value="">Tất cả</option>
     <optgroup label="Hoạt động gần đây">
       <% months.forEach((n) => { %><option value="a<%= n %>" <%= act === 'a' + n ? 'selected' : '' %>>Trong <%= n %> tháng gần nhất</option><% }) %>
@@ -14,11 +16,11 @@
       <% months.forEach((n) => { %><option value="i<%= n %>" <%= act === 'i' + n ? 'selected' : '' %>>Quá <%= n %> tháng chưa thấy</option><% }) %>
     </optgroup>
   </select>
-</label>
-<label class="nowrap" title="Máy chưa có dữ liệu đăng nhập trên AD: thuộc tính lastLogonTimestamp của máy trên AD đang trống (máy chưa từng đăng nhập domain, hoặc chưa đủ ~14 ngày để AD ghi lần đầu), hoặc worker bản cũ chưa báo giá trị này. Không gồm: bỏ các máy này khỏi kết quả. Gồm cả: tính thêm các máy này vào kết quả của mốc thời gian (HOẶC). Chỉ máy này: chỉ liệt kê các máy này, bỏ qua mốc thời gian.">Chưa có dữ liệu đăng nhập AD
-  <select name="noLogon">
-    <option value="exclude" <%= noLogon === 'exclude' ? 'selected' : '' %>>Không gồm</option>
-    <option value="include" <%= noLogon === 'include' ? 'selected' : '' %>>Gồm cả</option>
-    <option value="only" <%= noLogon === 'only' ? 'selected' : '' %>>Chỉ máy này</option>
-  </select>
-</label>
+  <label title="Máy chưa có dữ liệu đăng nhập trên AD: thuộc tính lastLogonTimestamp của máy trên AD đang trống (máy chưa từng đăng nhập domain, hoặc chưa đủ ~14 ngày để AD ghi lần đầu), hoặc worker bản cũ chưa báo giá trị này. Không gồm: bỏ các máy này khỏi kết quả. Gồm cả: tính thêm các máy này vào kết quả của mốc thời gian (HOẶC). Chỉ máy này: chỉ liệt kê các máy này, bỏ qua mốc thời gian.">Máy chưa có dữ liệu
+    <select name="noLogon">
+      <option value="exclude" <%= noLogon === 'exclude' ? 'selected' : '' %>>Không gồm</option>
+      <option value="include" <%= noLogon === 'include' ? 'selected' : '' %>>Gồm cả</option>
+      <option value="only" <%= noLogon === 'only' ? 'selected' : '' %>>Chỉ máy này</option>
+    </select>
+  </label>
+</fieldset>

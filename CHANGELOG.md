@@ -13,6 +13,12 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.12.1] - 2026-10-20
+
+### Sửa
+
+- Bộ lọc đăng nhập AD (Tìm máy, Báo cáo): hai ô gom vào một **khung riêng** "Đăng nhập AD gần nhất" trên một hàng riêng (nhãn ô thứ hai rút gọn thành "Máy chưa có dữ liệu"). Báo cáo: hàng 1 là kỳ báo cáo và chi nhánh, hàng 2 là khung đăng nhập AD, hết vỡ bố cục.
+
 ## [2.12.0] - 2026-10-20
 
 ### Thêm

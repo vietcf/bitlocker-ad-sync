@@ -174,7 +174,8 @@ describe('report', () => {
     const web = await webLogin(app, 'auditor');
     const page = (await web.agent.get('/reports').query({ activity: 'a3' })).text;
     expect(page).toContain('name="activity"');
-    expect(page).toContain('Chưa có dữ liệu đăng nhập AD');
+    expect(page).toContain('Đăng nhập AD gần nhất');
+    expect(page).toContain('Máy chưa có dữ liệu');
     expect(page).toContain('Đang lọc theo');
     expect(page).toContain('activity=a3'); // the Excel link keeps the filter
     const xlsx = await web.agent.get('/reports/export.xlsx').query({ activity: 'i3', noLogon: 'include' }).buffer(true).parse((r, cb) => {
