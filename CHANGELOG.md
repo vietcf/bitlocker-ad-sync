@@ -13,6 +13,12 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.18.3] - 2026-10-20
+
+### Thêm
+
+- Cảnh báo sync > Kiểm tra khi lượt sync kết thúc: kiểm tra **"Có key nhưng không đọc được mật khẩu"** (mất quyền đọc thuộc tính confidential) nay có khung riêng với công tắc **Bật/Tắt** và ngưỡng chỉnh được (số key tối thiểu, mặc định 1; trước đây luôn bật và không chỉnh được).
+
 ## [2.18.2] - 2026-10-20
 
 ### Sửa

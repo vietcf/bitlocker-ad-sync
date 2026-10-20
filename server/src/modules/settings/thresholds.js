@@ -4,6 +4,8 @@
 
 export const THRESHOLDS = [
   // When a sync run reports success (POST /complete): a breach quarantines the run.
+  { key: 'anomaly.min_empty_pwd_keys', group: 'run', check: 'key_attr_unreadable', unit: 'count', default: 1, min: 1, max: 100000,
+    label: 'Lượt báo khi có ít nhất (số key không đọc được mật khẩu)' },
   { key: 'anomaly.min_computer_ratio', group: 'run', check: 'computers_drop', unit: 'percent', default: 0.95, min: 50, max: 100,
     label: 'Lượt full phải thấy ít nhất (% số máy đang có)' },
   { key: 'anomaly.min_key_ratio', group: 'run', check: 'keys_drop', unit: 'percent', default: 0.95, min: 50, max: 100,

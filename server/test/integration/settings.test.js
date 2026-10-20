@@ -309,7 +309,8 @@ describe('data alert switches (Canh bao sync)', () => {
     expect(page).toContain('name="alert.full_stale"');
     expect(page).toContain('role="switch"');
     expect(page).toContain('Kiểm tra khi lượt sync kết thúc (bật/tắt được)');
-    expect(first.checks.map((x) => x.code)).toEqual(['computers_drop', 'keys_drop', 'branch_drop', 'mass_delete']);
+    expect(first.checks.map((x) => x.code)).toEqual(['computers_drop', 'keys_drop', 'branch_drop', 'key_attr_unreadable', 'mass_delete']);
+    expect(first.items.find((t) => t.key === 'anomaly.min_empty_pwd_keys')).toMatchObject({ check: 'key_attr_unreadable', value: 1 });
     expect(first.items.find((t) => t.key === 'anomaly.min_computer_ratio')).toMatchObject({ check: 'computers_drop' });
     const offChecks = await a.put('/api/admin/settings/thresholds', { 'check.mass_delete': false });
     expect(offChecks.body.checks.find((x) => x.code === 'mass_delete').enabled).toBe(false);

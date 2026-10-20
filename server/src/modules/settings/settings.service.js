@@ -31,13 +31,14 @@ export const ALERT_SWITCHES = [
 ];
 /**
  * Checks run when a full sync reports success (anomaly.js): a breach quarantines the run. Admin HQ can switch each one off
- * (Quan tri > Dong bo AD > Canh bao sync). `key_attr_unreadable` (the sync account lost read access) is not listed: always on.
+ * (Quan tri > Dong bo AD > Canh bao sync).
  * Stored as app_setting "check.<code>".
  */
 export const CHECK_SWITCHES = [
   { code: 'computers_drop', label: 'Lượt full thấy quá ít máy', help: 'Lượt full thấy ít hơn ngưỡng % số máy đang có thì bị giữ lại.' },
   { code: 'keys_drop', label: 'Lượt full thấy quá ít key', help: 'Lượt full thấy ít hơn ngưỡng % số key đang có thì bị giữ lại.' },
   { code: 'branch_drop', label: 'Một chi nhánh giảm đột ngột', help: 'Số máy một chi nhánh giảm quá ngưỡng so với mức thường.' },
+  { code: 'key_attr_unreadable', label: 'Có key nhưng không đọc được mật khẩu', help: 'Worker đọc được object key nhưng mật khẩu rỗng, thường do tài khoản sync mất quyền đọc thuộc tính confidential. Chạy cả lượt delta và full. Tắt thì key vẫn được lưu nhưng không có mật khẩu và không có cảnh báo nào.' },
   { code: 'mass_delete', label: 'Quá nhiều máy sắp bị gắn "không còn trong phạm vi"', help: 'Lượt full không thấy quá ngưỡng % số máy đang giám sát.' },
 ];
 const FEATURE_DEFAULTS = Object.fromEntries(FEATURES.map((f) => [f.key, f.default]));

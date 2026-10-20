@@ -10,7 +10,7 @@
     <%- include('../partials/csrf') %>
     <fieldset>
       <legend>Kiểm tra khi lượt sync kết thúc (bật/tắt được)</legend>
-      <p class="muted small">Vượt ngưỡng thì lượt sync bị giữ lại (cách ly) và chờ Admin HQ chấp nhận hoặc bác bỏ ở tab Tình trạng sync. Các kiểm tra này chỉ xét lượt full (lượt delta chỉ đọc máy và key có thay đổi nên không so với toàn hệ thống). Tắt một kiểm tra thì lượt full không bị giữ lại vì lý do đó nữa. Kiểm tra "key đọc được nhưng mật khẩu rỗng" (mất quyền đọc thuộc tính confidential) luôn bật.</p>
+      <p class="muted small">Vượt ngưỡng thì lượt sync bị giữ lại (cách ly) và chờ Admin HQ chấp nhận hoặc bác bỏ ở tab Tình trạng sync. Các kiểm tra này chỉ xét lượt full (lượt delta chỉ đọc máy và key có thay đổi nên không so với toàn hệ thống). Tắt một kiểm tra thì lượt full không bị giữ lại vì lý do đó nữa.</p>
       <% checks.forEach((c) => { %>
         <%- include('_switch-block', { sw: c, items: list.filter((t) => t.check === c.code), values, UNIT }) %>
       <% }) %>

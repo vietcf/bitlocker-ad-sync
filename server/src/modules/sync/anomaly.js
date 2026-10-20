@@ -22,7 +22,7 @@ export function checkRun(metrics, baseline, t) {
   const found = [];
   const o = metrics.overall;
 
-  if (o.keys_empty_pwd > 0) {
+  if (t.enabled?.key_attr_unreadable !== false && o.keys_empty_pwd >= (t.minEmptyPwdKeys ?? 1)) {
     found.push({
       code: 'key_attr_unreadable',
       message: `${o.keys_empty_pwd} keys were read without their password: the sync account may have lost read access to the confidential attribute.`,
@@ -115,6 +115,7 @@ export async function loadThresholds(settings) {
     usnStallHours: await n('anomaly.usn_stall_hours', 6),
     canaryMaxAgeMinutes: await n('anomaly.canary_max_age_minutes', 90),
     maxDeleteRatio: await n('full_sync.max_delete_ratio', 0.05),
+    minEmptyPwdKeys: await n('anomaly.min_empty_pwd_keys', 1),
     enabled: Object.fromEntries(await Promise.all(CHECK_SWITCHES.map(async (c) => [c.code, await settings.checkEnabled(c.code)]))),
   };
 }

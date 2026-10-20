@@ -24,6 +24,15 @@ describe('checkRun', () => {
     expect(checkRun(run({ branches: [{ branch_id: 2, branch_code: 'DN', computers_seen: 0 }] }), baseline, t)).toEqual([]);
   });
 
+  it('flags keys read without a password from the configured count, and not when switched off', () => {
+    const bad = run({ overall: { keys_empty_pwd: 3 } });
+    expect(codes(checkRun(bad, { branchSeen: {} }, t))).toEqual(['key_attr_unreadable']); // default: one key is enough
+    expect(codes(checkRun(bad, { branchSeen: {} }, { ...t, minEmptyPwdKeys: 3 }))).toEqual(['key_attr_unreadable']);
+    expect(checkRun(bad, { branchSeen: {} }, { ...t, minEmptyPwdKeys: 4 })).toEqual([]);
+    expect(checkRun(bad, { branchSeen: {} }, { ...t, enabled: { key_attr_unreadable: false } })).toEqual([]);
+    expect(codes(checkRun({ ...bad, mode: 'delta' }, { branchSeen: {} }, t))).toEqual(['key_attr_unreadable']); // delta too
+  });
+
   it('skips a check Admin HQ switched off, and only that one', () => {
     const off = (code) => ({ ...t, enabled: { [code]: false } });
     const bad = run({ overall: { computers_seen: 900, keys_seen: 1000 }, plannedDeletes: 60, branches: [{ branch_id: 1, branch_code: 'HN', computers_seen: 120 }] });

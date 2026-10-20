@@ -896,7 +896,7 @@ Có lượt sync báo thành công nhưng số liệu bất thường. Server gi
 | Lượt full không thấy nhiều máy (sẽ bị gắn nhãn ngoài phạm vi) | quá 5% |
 | Đọc được key nhưng mật khẩu rỗng (tài khoản sync mất quyền) | từ 1 key |
 
-Chỉ cần một ngưỡng vượt là bị giữ; riêng các cặp đánh dấu **VÀ** phải vượt cả hai.
+Chỉ cần một ngưỡng vượt là bị giữ; riêng các cặp đánh dấu **VÀ** phải vượt cả hai. Mỗi kiểm tra có công tắc **Bật/Tắt** riêng. Kiểm tra "mật khẩu rỗng" chạy cả lượt delta; tắt nó thì key vẫn được lưu nhưng không có mật khẩu và không có cảnh báo nào.
 
 Xử lý ở Quản trị > Đồng bộ AD > Tình trạng sync: bấm **Xem chi tiết và quyết định** để xem lý do, số liệu so với hệ thống theo chi nhánh, danh sách máy **sẽ bị gắn nhãn** nếu chấp nhận, và máy/key mới lượt đó đã lưu. Rồi chọn:
 
