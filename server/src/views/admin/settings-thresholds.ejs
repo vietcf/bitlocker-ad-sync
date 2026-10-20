@@ -5,18 +5,6 @@
 <section class="card">
   <h2>Cảnh báo sync</h2>
   <p class="muted">Ngưỡng và bật/tắt các cảnh báo của đồng bộ AD. Thay đổi có hiệu lực trong vòng 30 giây và được ghi vào nhật ký. Cột "Mặc định" là giá trị khi cài đặt.</p>
-  <div class="notice notice-info">
-    <strong>Cách các ngưỡng kết hợp</strong>
-    <ul>
-      <li><strong>Các ngưỡng độc lập với nhau (HOẶC):</strong> chỉ cần <em>một</em> ngưỡng bị vượt là lượt sync bị giữ lại
-        (hoặc mở cảnh báo). Nhiều ngưỡng cùng vượt thì liệt kê đủ các lý do.</li>
-      <li><strong>Các ngưỡng nằm chung một khung viền xanh (VÀ)</strong>: phải vượt <em>cả hai</em> mới tính.
-        Ngưỡng thứ hai để tránh báo nhầm khi số lượng quá nhỏ.<br>
-        Ví dụ "chi nhánh giảm quá 20% <strong>và</strong> quá 10 máy": chi nhánh 30 máy còn 20 (giảm 33% nhưng chỉ 10 máy) thì
-        không bị giữ; chi nhánh 100 máy còn 75 (giảm 25% và 25 máy) thì bị giữ.</li>
-      <li>"Quá" nghĩa là lớn hơn hẳn: ngưỡng 20% thì giảm đúng 20% chưa tính.</li>
-    </ul>
-  </div>
   <%- include('../partials/error-box', { error }) %>
   <form method="post" action="/admin/settings/thresholds" class="form thr-form">
     <%- include('../partials/csrf') %>

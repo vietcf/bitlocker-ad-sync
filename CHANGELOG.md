@@ -13,6 +13,12 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.18.1] - 2026-10-20
+
+### Sửa
+
+- Cảnh báo sync: bỏ khung giải thích "Cách các ngưỡng kết hợp" ở đầu trang.
+
 ## [2.18.0] - 2026-10-20
 
 Bản phát hành gộp: không có thay đổi mới so với 2.13.2. Số phiên bản nhảy thẳng lên 2.18 (không có 2.14 đến 2.17); các mục 2.13.x và cũ hơn bên dưới là lịch sử của cùng đợt thay đổi.
