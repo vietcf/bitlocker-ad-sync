@@ -13,6 +13,12 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.13.1] - 2026-10-20
+
+### Sửa
+
+- Cảnh báo sync: khung "VÀ · phải vượt cả 2 ngưỡng" nhạt hơn (viền mảnh, nền gần như trắng, chữ ghi chú màu xám) để không nổi hơn các mục chính.
+
 ## [2.13.0] - 2026-10-20
 
 ### Thêm

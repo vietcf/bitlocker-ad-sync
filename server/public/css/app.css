@@ -250,12 +250,12 @@ table.thresholds label { font-weight: 400; margin: 0; }
 .thr-head { font-weight: 600; font-size: 13px; color: var(--muted); border-top: 0; padding-top: 0; }
 .thr-row label { font-weight: 400; margin: 0; }
 .thr-input { display: inline-block; width: 110px; margin: 0; }
-.thr-and { border: 2px solid var(--info); border-radius: 12px; background: var(--info-bg); padding: 4px 12px 6px; margin: 10px 0; }
+.thr-and { border: 1px solid color-mix(in srgb, var(--info) 25%, var(--line)); border-radius: 10px; background: color-mix(in srgb, var(--info-bg) 40%, var(--surface)); padding: 4px 12px 6px; margin: 10px 0; }
 .thr-and .thr-row { border-top: 0; padding-left: 0; padding-right: 0; }
 .thr-and + .thr-row { border-top: 0; }
-.thr-and-tag { display: inline-block; font-size: 12px; font-weight: 600; color: var(--info); padding: 2px 0; }
-.thr-and-sep { display: flex; align-items: center; gap: 8px; color: var(--info); font-size: 12px; font-weight: 600; text-transform: uppercase; }
-.thr-and-sep::before, .thr-and-sep::after { content: ""; flex: 1; border-top: 1px dashed var(--info); }
+.thr-and-tag { display: inline-block; font-size: 12px; font-weight: 500; color: var(--muted); padding: 2px 0; }
+.thr-and-sep { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; font-weight: 500; text-transform: uppercase; }
+.thr-and-sep::before, .thr-and-sep::after { content: ""; flex: 1; border-top: 1px dashed var(--line); }
 @media (max-width: 640px) { .thr-row { grid-template-columns: 1fr; gap: 4px; } .thr-head { display: none; } }
 
 /* Theo chi nhanh: thanh ngang 100%, xanh = co key, do = chua co key */
