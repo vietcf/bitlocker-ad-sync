@@ -13,6 +13,13 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.19.4] - 2026-10-20
+
+### Đổi
+
+- Bảng "Các lượt sync gần đây": hai cột **Máy** và **Key** hiện số thay đổi có dấu: Máy `+N` (thêm vào hệ thống) `−M` (bị gắn "không còn trong phạm vi giám sát" bởi lượt đó), Key `+N`. Thay cho các cột Máy (thấy), Máy mới và Key mới.
+- Trang chi tiết lượt delta: thêm **Máy hiện tại** và **Key hiện tại** cạnh số máy / key lượt đó thấy (vẫn không so với toàn hệ thống). Migration 038 thêm `sync_run.marked_not_in_ad` (các lượt cũ ghi 0).
+
 ## [2.19.3] - 2026-10-20
 
 ### Sửa

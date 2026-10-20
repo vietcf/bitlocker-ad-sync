@@ -54,7 +54,8 @@ export async function abortOrphanRuns(db, minutes) {
 export async function finishRun(db, id, f) {
   await db.query(
     `UPDATE sync_run SET status = $2, finished_at = CASE WHEN $10::boolean THEN coalesce(finished_at, now()) ELSE now() END, highest_usn = $3, computers_seen = $4,
-            keys_seen = $5, errors = $6, error_code = $7, pending = $8, anomalies = $9
+            keys_seen = $5, errors = $6, error_code = $7, pending = $8, anomalies = $9,
+            marked_not_in_ad = coalesce($11, marked_not_in_ad)
       WHERE id = $1`,
     [
       id,
@@ -67,6 +68,7 @@ export async function finishRun(db, id, f) {
       f.pending ? JSON.stringify(f.pending) : null,
       f.anomalies ? JSON.stringify(f.anomalies) : null,
       f.keepFinishedAt === true,
+      f.markedNotInAd ?? null,
     ],
   );
 }
@@ -91,7 +93,7 @@ export async function abortStaleRuns(db, hours) {
 export async function listRuns(db, limit = 30) {
   const { rows } = await db.query(
     `SELECT id, started_at, finished_at, mode, dc_name, since_usn, highest_usn, computers_seen, keys_seen,
-            keys_added, keys_empty_pwd, errors, error_code, status, anomalies, pending, ack_by, ack_decision, ack_at,
+            keys_added, keys_empty_pwd, errors, error_code, status, anomalies, pending, ack_by, ack_decision, ack_at, marked_not_in_ad,
             (SELECT count(*)::int FROM computer c WHERE c.first_seen_run = sync_run.id) AS computers_added
        FROM sync_run ORDER BY id DESC LIMIT $1`,
     [limit],

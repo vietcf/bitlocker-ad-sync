@@ -366,6 +366,19 @@ describe('heartbeat, manual sync and watchdog', () => {
     expect(sent.some((m) => m.subject.includes('Đã khôi phục'))).toBe(false);
   });
 
+  it('the run list shows + computers added and − computers flagged out of scope, + keys added', async () => {
+    const all = Array.from({ length: 40 }, (_, i) => computer(i + 1));
+    await runSync({ computers: all, keys: [key(1, 1)] }); // +40 computers, +1 key
+    await runSync({ computers: all.slice(0, 39), keys: [key(1, 1)] }); // the full run no longer sees one: −1
+    await addUser(pool, 'admin.hq', [{ branchId: null, role: 'admin' }]);
+    const web = await webLogin(app, 'admin.hq');
+    const list = (await web.agent.get('/admin/sync')).text;
+    expect(list).toContain('class="delta-up">+40</span>');
+    expect(list).toContain('class="delta-up">+1</span>'); // the key
+    expect(list).toContain('class="delta-down">−1</span>');
+    expect((await asOwner('SELECT marked_not_in_ad FROM sync_run ORDER BY id DESC LIMIT 1'))[0].marked_not_in_ad).toBe(1);
+  });
+
   it('a system fault switched off in Canh bao sync is not watched: no alert, no mail', async () => {
     const setOff = async (type) => {
       await asOwner(`INSERT INTO app_setting (key, value) VALUES ('alert.${type}', 'false') ON CONFLICT (key) DO UPDATE SET value = 'false'`);
@@ -406,9 +419,11 @@ describe('heartbeat, manual sync and watchdog', () => {
     // a delta that adds a computer to the system: "Máy mới" counts it on the run list and on the run page; full runs show a dash on the list
     const added = await runSync({ mode: 'delta', computers: [computer(2), computer(4)] });
     const addedPage = (await web.agent.get(`/admin/sync/runs/${added.runId}`)).text;
-    expect(addedPage).toMatch(/Toàn hệ thống<\/td>\s*<td class="num">2<\/td>\s*<td class="num">1<\/td>/); // saw 2, 1 new
+    expect(addedPage).toMatch(/Toàn hệ thống<\/td>\s*<td class="num">2<\/td>\s*<td class="num">4<\/td>\s*<td class="num">1<\/td>/); // saw 2, 4 computers now, 1 new
+    expect(addedPage).toContain('Máy hiện tại');
+    expect(addedPage).toContain('Key hiện tại');
     const list = (await web.agent.get('/admin/sync')).text;
-    expect(list).toContain('>Máy mới</th>');
+    expect(list).toContain('class="delta-up">+1</span>'); // the delta row: +1 computer
     const [{ n }] = await asOwner(`SELECT count(*)::int AS n FROM computer WHERE first_seen_run = ${added.runId}`);
     expect(n).toBe(1);
   });

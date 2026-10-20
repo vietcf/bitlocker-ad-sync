@@ -188,6 +188,7 @@ export class SyncAdminService {
           keysSeen: run.keys_seen,
           errors: run.errors,
           anomalies: run.anomalies,
+          markedNotInAd: notInAd.length,
           // duyet muon: giu gio ket thuc cua luot, khong coi la vua sync xong (healthz, watchdog)
           keepFinishedAt: true,
         });

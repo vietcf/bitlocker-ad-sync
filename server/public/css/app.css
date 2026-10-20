@@ -151,6 +151,9 @@ tr.warn-row td { background: var(--warn-bg); }
 /* Trang Canh bao sync: tieu de cac muc lon noi bat (mau nhan, dam) de phan biet voi khung con ben trong */
 .thr-form > fieldset > legend { color: var(--accent); font-weight: 700; font-size: 16px; padding: 0 8px; }
 .thr-form > fieldset { border-color: var(--accent); }
+/* Cot May / Key o bang Cac luot sync gan day: + them vao, - bi gan nhan */
+.delta-up { color: var(--good); font-weight: 600; }
+.delta-down { color: var(--bad); font-weight: 600; }
 /* Hai o loc dang nhap AD: nhan tren o chon nhu cac o khac, khoanh bang net vien mo */
 .filter-fields .logon-range { display: flex; flex-wrap: nowrap; gap: 8px 14px; align-items: flex-end; border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 12px 10px; margin: 0; flex: 0 0 auto; }
 @media (max-width: 760px) { .filter-fields .logon-range { flex-wrap: wrap; } }

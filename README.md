@@ -877,7 +877,7 @@ sudo systemctl daemon-reload && sudo userdel blk-sync
 
 Worker chạy **delta** mỗi 15 phút (chỉ đọc object có `uSNChanged` mới) và **full** mỗi đêm (`FullAt`, mặc định 01:00; thêm một lần khi worker khởi động lần đầu).
 
-Trang chi tiết của một lượt (Quản trị > Sync AD, bấm mã lượt): lượt **delta** chỉ hiện những gì lượt đó thấy (máy thấy, key thấy, key mới thêm, key không đọc được); chỉ lượt **full** mới so với dữ liệu đang có (máy/key đang có, chênh lệch).
+Bảng **Các lượt sync gần đây** (Quản trị > Sync AD) có cột **Máy** (`+` máy mới thêm vào hệ thống, `−` máy bị gắn "không còn trong phạm vi giám sát", chỉ lượt full phát hiện) và **Key** (`+` key mới; key không bao giờ bị xóa). Trang chi tiết của một lượt (bấm mã lượt): máy / key lượt đó thấy, máy / key hiện tại, key không đọc được mật khẩu, và bên dưới là danh sách máy và key mới; chỉ lượt **full** mới so với dữ liệu trước đó (chênh lệch).
 
 | Thay đổi trên AD | Delta | Full |
 | --- | --- | --- |

@@ -504,7 +504,7 @@ export class IngestService {
       // Keys whose old computer has just left AD go to the computer that now holds them.
       const settled = run.mode === 'full' ? await settleKeyDuplicates(tx, id) : { moved: [], gone: 0 };
       if (settled.moved.length) await recomputeKeyStatuses(tx, [...new Set(settled.moved.flatMap((m) => [m.from_id, m.to_id]))]);
-      await finishRun(tx, id, { ...common, status: 'success' });
+      await finishRun(tx, id, { ...common, status: 'success', markedNotInAd: notInAd.length });
       return { status: 'success', run, markedDeleted: notInAd.length, notInAd, overall, settled };
     });
 

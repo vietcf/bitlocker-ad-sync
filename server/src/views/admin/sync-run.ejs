@@ -45,19 +45,21 @@
   <h3>Số liệu của lượt này</h3>
   <p class="muted small">Lượt delta chỉ đọc máy và key <strong>có thay đổi</strong> từ mốc USN lần trước, nên chỉ hiện những gì lượt này thấy, không so với toàn hệ thống (chỉ lượt full mới so sánh với dữ liệu đang có).</p>
   <table class="dense">
-    <thead><tr><th>Phạm vi</th><th class="num">Máy lượt này thấy</th><th class="num" title="Số máy lần đầu được thêm vào hệ thống bởi lượt này">Máy mới</th><th class="num">Key lượt này thấy</th><th class="num">Key mới thêm</th><th class="num">Key không đọc được mật khẩu</th></tr></thead>
+    <thead><tr><th>Phạm vi</th><th class="num">Máy lượt này thấy</th><th class="num" title="Số máy đang giám sát tại thời điểm lượt này kết thúc">Máy hiện tại</th><th class="num" title="Số máy lần đầu được thêm vào hệ thống bởi lượt này">Máy mới</th><th class="num">Key lượt này thấy</th><th class="num" title="Số key của các máy đang giám sát">Key hiện tại</th><th class="num">Key mới thêm</th><th class="num">Key không đọc được mật khẩu</th></tr></thead>
     <tbody>
     <% metrics.forEach((m) => { %>
       <tr class="<%= m.branch_id === null ? 'row-total' : '' %>">
         <td><%= m.branch_id === null ? 'Toàn hệ thống' : h.branchCode(m.branch_code) %></td>
         <td class="num"><%= h.number(m.computers_seen) %></td>
+        <td class="num"><%= h.number(m.computers_in_db) %></td>
         <td class="num"><%= h.number(m.computers_added) %></td>
         <td class="num"><%= m.branch_id === null ? h.number(m.keys_seen) : '—' %></td>
+        <td class="num"><%= m.branch_id === null ? h.number(m.keys_expected) : '—' %></td>
         <td class="num"><%= m.branch_id === null ? h.number(run.keys_added ?? 0) : '—' %></td>
         <td class="num"><%= m.branch_id === null ? h.number(m.keys_empty_pwd) : '—' %></td>
       </tr>
     <% }) %>
-    <% if (!metrics.length) { %><tr><td colspan="6" class="muted">Không có số liệu.</td></tr><% } %>
+    <% if (!metrics.length) { %><tr><td colspan="8" class="muted">Không có số liệu.</td></tr><% } %>
     </tbody>
   </table>
   <% } %>

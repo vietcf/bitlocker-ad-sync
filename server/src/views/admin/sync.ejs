@@ -141,7 +141,7 @@
 <section class="card">
   <h2>Các lượt sync gần đây</h2>
   <table class="dense">
-    <thead><tr><th>#</th><th>Bắt đầu</th><th>Kiểu</th><th>DC</th><th>Trạng thái</th><th class="num" title="Số máy lượt này thấy">Máy</th><th class="num" title="Lượt delta: số máy lần đầu được thêm vào hệ thống bởi lượt này">Máy mới</th><th class="num">Key mới</th><th>Ghi chú</th></tr></thead>
+    <thead><tr><th>#</th><th>Bắt đầu</th><th>Kiểu</th><th>DC</th><th>Trạng thái</th><th class="num" title="+ máy lần đầu được thêm vào hệ thống bởi lượt này; − máy bị gắn &quot;không còn trong phạm vi giám sát&quot; (lượt full)">Máy</th><th class="num" title="+ key mới thêm vào hệ thống (key không bao giờ bị xóa)">Key</th><th>Ghi chú</th></tr></thead>
     <tbody>
     <% runs.forEach((r) => { const st = h.runStatus(r.status); %>
       <tr>
@@ -151,8 +151,8 @@
         <td><%= r.dc_name %></td>
         <td><span class="badge badge-<%= st.tone %>"><%= st.label %></span></td>
         <td class="num"><%= h.number(r.computers_seen) %></td>
-        <td class="num"><%= r.mode === 'delta' ? h.number(r.computers_added) : '—' %></td>
-        <td class="num"><%= h.number(r.keys_added) %></td>
+        <td class="num"><% if (!r.computers_added && !r.marked_not_in_ad) { %>0<% } else { %><% if (r.computers_added) { %><span class="delta-up">+<%= h.number(r.computers_added) %></span><% } %><% if (r.marked_not_in_ad) { %> <span class="delta-down">−<%= h.number(r.marked_not_in_ad) %></span><% } %><% } %></td>
+        <td class="num"><% if (r.keys_added) { %><span class="delta-up">+<%= h.number(r.keys_added) %></span><% } else { %>0<% } %></td>
         <td>
           <% if (r.error_code) { %><code><%= r.error_code %></code><% } %>
           <% if (r.keys_empty_pwd) { %><span class="badge badge-warn"><%= r.keys_empty_pwd %> key rỗng</span><% } %>
