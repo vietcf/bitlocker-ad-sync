@@ -17,6 +17,8 @@ import {
   listRuns,
   markNotSeenAsDeleted,
   recomputeKeyStatuses,
+  getOpenDuplicate,
+  moveKey,
   reviewDuplicate,
   settleKeyDuplicates,
   peekSyncRequest,
@@ -27,6 +29,7 @@ import { runRef } from './run-ref.js';
 import { mailKeyDuplicates, notInAdEvents } from './ingest.service.js';
 
 const ackInput = z.object({ decision: z.enum(['accept', 'reject']) });
+const duplicateInput = z.object({ action: z.enum(['assign', 'share']) });
 const requestInput = z.object({ mode: z.enum(['delta', 'full']) });
 
 /** Admin HQ side of sync: health overview, manual run request, quarantine decisions. */
@@ -64,19 +67,36 @@ export class SyncAdminService {
     return { runs: withRef, heartbeats: workers, heartbeatMax, openAlerts, requested, lastSuccess, duplicates };
   }
 
-  /** Admin HQ has looked at a duplicate Key ID: closed for good (not mailed or shown again). */
-  async reviewKeyDuplicate(scope, id, client = {}) {
+  /**
+   * Admin HQ decides a duplicate Key ID (Quan tri > Sync AD):
+   *  - assign: compares the AD creation time of the two computers; the newer one is the current machine
+   *    (unjoin + rejoin, reinstall) so the key moves to it, the old one keeps its history. Refused (pair stays open)
+   *    when the passwords differ (the stored password belongs to the old machine), a creation time is unknown,
+   *    or the key holder is already the newer one.
+   *  - share: the key stays where it is; both computers show a note that the Key ID is shared. No permission change.
+   */
+  async reviewKeyDuplicate(scope, id, raw, client = {}) {
     this.#check(scope);
+    const { action } = parse(duplicateInput, raw);
     return withAllBranches(this.pool, async (tx) => {
-      const row = await reviewDuplicate(tx, id, scope.upn);
-      if (!row) throw notFound('Duplicate not found or already closed.');
+      const d = await getOpenDuplicate(tx, id);
+      if (!d) throw notFound('Duplicate not found or already closed.');
+      if (action === 'assign') {
+        if (!d.same_password) throw badRequest('The two computers have different passwords for this Key ID: the key cannot be moved.');
+        if (!d.owner_created || !d.other_created) throw badRequest('AD creation time of a computer is unknown: cannot tell which one is newer.');
+        if (new Date(d.other_created) <= new Date(d.owner_created)) throw badRequest('The computer holding the key is already the newer one: nothing to move.');
+        await moveKey(tx, { keyId: d.key_id, fromId: d.owner_id, toId: d.other_id, runId: null, reason: 'review_newer' });
+      } else {
+        await reviewDuplicate(tx, id, scope.upn, 'shared');
+      }
+      const result = action === 'assign' ? 'moved' : 'shared';
       await this.audit.append(tx, {
         ...this.audit.actor(scope, client),
         action: 'key_duplicate_review',
-        computerId: String(row.computer_id),
-        detail: { keyId: row.key_id, duplicateId: Number(row.id) },
+        computerId: String(result === 'moved' ? d.other_id : d.owner_id),
+        detail: { keyId: d.key_id, duplicateId: Number(d.id), result, from: d.owner_name, to: d.other_name, samePassword: d.same_password },
       });
-      return { id: Number(row.id) };
+      return { id: Number(d.id), result, from: d.owner_name, to: d.other_name };
     });
   }
 

@@ -45,7 +45,7 @@
     Key vẫn giữ ở máy đang giữ, không bị ghi đè. Không ảnh hưởng trạng thái Online / Offline. Tự đóng khi một trong hai máy rời phạm vi giám sát.</p>
   <div class="table-scroll">
   <table class="dense">
-    <thead><tr><th>Key ID</th><th>Máy đang giữ key</th><th>Máy cũng có Key ID này</th><th>Mật khẩu</th><th>Phát hiện</th><th></th></tr></thead>
+    <thead><tr><th>Key ID</th><th>Máy đang giữ key</th><th>Máy cũng có Key ID này</th><th>Mật khẩu</th><th>Ngày tạo trên AD</th><th>Phát hiện</th><th></th></tr></thead>
     <tbody>
     <% duplicates.forEach((d) => { %>
       <tr>
@@ -53,11 +53,13 @@
         <td><a href="/computers/<%= d.owner_id %>"><%= d.owner_name %></a><br><span class="guid"><%= d.owner_guid %></span></td>
         <td><a href="/computers/<%= d.other_id %>"><%= d.other_name %></a><br><span class="guid"><%= d.other_guid %></span></td>
         <td><% if (d.same_password) { %>giống nhau<% } else { %><span class="badge badge-bad">khác nhau</span><% } %></td>
+        <td class="small"><%= d.owner_name %>: <%= d.owner_created ? h.dateTime(d.owner_created) : "không rõ" %><br><%= d.other_name %>: <%= d.other_created ? h.dateTime(d.other_created) : "không rõ" %></td>
         <td><%= h.dateTime(d.detected_at) %><% if (d.notified_at) { %><br><span class="muted small">đã gửi mail</span><% } %></td>
         <td>
-          <form method="post" action="/admin/sync/key-duplicates/<%= d.id %>/review">
+          <form method="post" action="/admin/sync/key-duplicates/<%= d.id %>/review" class="inline-actions">
             <%- include('../partials/csrf') %>
-            <button type="submit" class="small secondary" title="Đóng cảnh báo cho cặp máy này; sẽ không cảnh báo lại">Đã xem xét</button>
+            <button type="submit" name="action" value="assign" class="small" title="So ngày tạo trên AD: key được gán cho máy tạo sau (cần mật khẩu giống nhau)">Gán cho máy mới hơn</button>
+            <button type="submit" name="action" value="share" class="small secondary" title="Key giữ nguyên ở máy đang giữ; trang của cả 2 máy hiện ghi chú dùng chung">Dùng chung 2 máy</button>
           </form>
         </td>
       </tr>
@@ -65,6 +67,9 @@
     </tbody>
   </table>
   </div>
+  <p class="muted small"><strong>Gán cho máy mới hơn:</strong> so ngày tạo (whenCreated) của 2 máy trên AD. Máy tạo sau là máy hiện tại (thường do unjoin rồi join lại, hoặc cài lại Windows), key được gán sang máy đó; máy cũ không bị xóa và vẫn xem được lịch sử chuyển key. Không thực hiện (cặp vẫn mở) nếu mật khẩu 2 máy khác nhau, thiếu ngày tạo, hoặc máy đang giữ key đã là máy mới hơn.<br>
+    <strong>Dùng chung 2 máy:</strong> key giữ nguyên ở máy đang giữ, không đổi quyền xem; trang của cả 2 máy hiện ghi chú "Key ID dùng chung với máy X". Dùng khi 2 máy cố ý dùng chung key (ví dụ clone image).<br>
+    Cả hai lựa chọn đóng cảnh báo cho cặp này và được ghi vào nhật ký truy cập.</p>
 </section>
 <% } %>
 

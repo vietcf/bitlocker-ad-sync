@@ -425,13 +425,48 @@ describe('same Key ID under another computer (unjoin / rejoin, cloned image)', (
     const page = await web.agent.get('/admin/sync');
     expect(page.text).toContain('Key ID trùng giữa nhiều máy (1)');
     const [{ id }] = await asOwner('SELECT id FROM key_duplicate');
-    const res = await web.agent.post(`/admin/sync/key-duplicates/${id}/review`).type('form').send({ _csrf: web.csrf });
+    const res = await web.agent.post(`/admin/sync/key-duplicates/${id}/review`).type('form').send({ _csrf: web.csrf, action: 'share' });
     expect(res.status).toBe(302);
-    expect(await asOwner('SELECT resolution, resolved_by FROM key_duplicate')).toEqual([{ resolution: 'reviewed', resolved_by: 'admin.hq' }]);
+    expect(await asOwner('SELECT resolution, resolved_by FROM key_duplicate')).toEqual([{ resolution: 'shared', resolved_by: 'admin.hq' }]);
     await runSync({ computers: fleet(), keys: [keyOf(1, 1), keyOf(1, 2)] });
-    expect(await asOwner('SELECT resolution FROM key_duplicate')).toEqual([{ resolution: 'reviewed' }]); // stays closed
+    expect(await asOwner('SELECT resolution FROM key_duplicate')).toEqual([{ resolution: 'shared' }]); // stays closed
     expect(duplicateMails()).toHaveLength(1);
     expect((await asOwner(`SELECT action FROM access_log WHERE action = 'key_duplicate_review'`))).toHaveLength(1);
+  });
+
+  it('"checked" gives the key to the computer created later in AD', async () => {
+    const withNewer = () => fleet().map((c) => (c.objectGuid === guid(2) ? { ...c, whenCreated: '2026-03-01T00:00:00Z' } : c));
+    await runSync({ computers: withNewer(), keys: [keyOf(1, 1)] });
+    await runSync({ computers: withNewer(), keys: [keyOf(1, 1), keyOf(1, 2)] });
+    expect((await ownerOf(1)).name).toBe('PC-1');
+    await addUser(pool, 'admin.hq', [{ branchId: null, role: 'admin' }]);
+    const web = await webLogin(app, 'admin.hq');
+    const [{ id }] = await asOwner('SELECT id FROM key_duplicate');
+    const res = await web.agent.post(`/admin/sync/key-duplicates/${id}/review`).type('form').send({ _csrf: web.csrf, action: 'assign' });
+    expect(res.status).toBe(302);
+    expect((await ownerOf(1)).object_guid).toBe(guid(2));
+    expect(await asOwner('SELECT resolution FROM key_duplicate')).toEqual([{ resolution: 'moved' }]);
+    expect(await asOwner('SELECT reason FROM key_owner_change')).toEqual([{ reason: 'review_newer' }]);
+    expect((await asOwner(`SELECT detail FROM access_log WHERE action = 'key_duplicate_review'`))[0].detail.result).toBe('moved');
+  });
+
+  it('"assign" is refused when the key holder is not the older computer; "share" shows a note on both pages', async () => {
+    await runSync({ computers: fleet(), keys: [keyOf(1, 1)] });
+    await runSync({ computers: fleet(), keys: [keyOf(1, 1), keyOf(1, 2)] }); // same creation time on both
+    await addUser(pool, 'admin.hq', [{ branchId: null, role: 'admin' }]);
+    const web = await webLogin(app, 'admin.hq');
+    const [{ id }] = await asOwner('SELECT id FROM key_duplicate');
+    const post = (action) => web.agent.post(`/admin/sync/key-duplicates/${id}/review`).type('form').send({ _csrf: web.csrf, action });
+    expect((await post('assign')).status).toBe(400);
+    expect((await ownerOf(1)).name).toBe('PC-1');
+    expect(await asOwner('SELECT resolved_at FROM key_duplicate')).toEqual([{ resolved_at: null }]); // still open
+    expect((await post('share')).status).toBe(302);
+    expect((await ownerOf(1)).name).toBe('PC-1'); // key stays
+    const ids = Object.fromEntries((await asOwner('SELECT name, id FROM computer WHERE name IN (\'PC-1\', \'PC-2\')')).map((r) => [r.name, r.id]));
+    for (const name of ['PC-1', 'PC-2']) {
+      const html = (await web.agent.get(`/computers/${ids[name]}`)).text;
+      expect(html).toContain('dùng chung');
+    }
   });
 
   it('never moves or overwrites a key seen with another password', async () => {

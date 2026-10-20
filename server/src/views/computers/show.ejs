@@ -45,11 +45,20 @@
     </div>
   <% }) %>
   <% dups.forEach((d) => { const isOwner = String(d.owner_id) === String(computer.id); %>
+    <% if (d.resolution === 'shared') { %>
+    <div class="notice notice-info">
+      Key ID <code><%= kid(d.key_id) %>…</code> được đánh dấu <strong>dùng chung</strong> giữa máy
+      <% if (d.owner_name) { %><a href="/computers/<%= d.owner_id %>"><%= d.owner_name %></a><% } else { %>một máy ở chi nhánh khác<% } %> (máy đang giữ key) và máy
+      <% if (d.other_name) { %><a href="/computers/<%= d.other_id %>"><%= d.other_name %></a><% } else { %>một máy ở chi nhánh khác<% } %>.
+      Key chỉ lưu ở máy <%= d.owner_name ?? 'đang giữ' %>; máy còn lại dùng chung key này.
+    </div>
+    <% } else { %>
     <div class="notice notice-warn">
       Key ID <code><%= kid(d.key_id) %>…</code>
       <% if (isOwner) { %>cũng nằm dưới máy <% if (d.other_name) { %><a href="/computers/<%= d.other_id %>"><%= d.other_name %></a> <span class="guid"><%= d.other_guid %></span><% } else { %>một máy ở chi nhánh khác<% } %><% } else { %>của máy <% if (d.owner_name) { %><a href="/computers/<%= d.owner_id %>"><%= d.owner_name %></a> <span class="guid"><%= d.owner_guid %></span><% } else { %>một máy ở chi nhánh khác<% } %> cũng nằm dưới máy này<% } %>
       (cả hai còn trong phạm vi giám sát<%= d.same_password ? '' : ', mật khẩu khác nhau' %>). Key vẫn giữ ở máy <%= d.owner_name ?? 'đang giữ' %>; xem Quản trị > Sync AD.
     </div>
+    <% } %>
   <% }) %>
   <% if (keys.length === 0) { %>
     <p>Máy này chưa có key nào trên AD (BitLocker chưa bật hoặc chưa lưu key lên AD).</p>

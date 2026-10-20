@@ -13,6 +13,12 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.5.0] - 2026-10-20
+
+### Thêm
+
+- Quản trị > Sync AD, mục Key ID trùng: hai nút xử lý. **Gán cho máy mới hơn** so ngày tạo trên AD của 2 máy và gán key cho máy tạo sau (cần mật khẩu giống nhau). **Dùng chung 2 máy** giữ key ở máy đang giữ và hiện ghi chú dùng chung ở cả 2 máy (không đổi quyền xem). Thêm cột ngày tạo trên AD và chú thích mô tả hai action; ghi nhật ký kèm kết quả. Migration 034 thêm lý do chuyển key `review_newer` và kết quả `shared`.
+
 ## [2.4.1] - 2026-10-20
 
 ### Sửa

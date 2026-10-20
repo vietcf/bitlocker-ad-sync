@@ -451,7 +451,8 @@ export async function settleKeyDuplicates(db, runId) {
 const DUPLICATE_COLUMNS = `
   d.id, d.key_id, d.same_password, d.detected_at, d.last_seen_at, d.notified_at, d.resolved_at, d.resolution, d.resolved_by,
   d.computer_id AS other_id, other.name AS other_name, other.object_guid AS other_guid,
-  k.computer_id AS owner_id, owner.name AS owner_name, owner.object_guid AS owner_guid`;
+  k.computer_id AS owner_id, owner.name AS owner_name, owner.object_guid AS owner_guid,
+  owner.ad_created_at AS owner_created, other.ad_created_at AS other_created`;
 const DUPLICATE_FROM = `
   FROM key_duplicate d
   JOIN recovery_key k ON k.key_id = d.key_id
@@ -474,12 +475,29 @@ export async function listOpenDuplicates(db) {
   return rows;
 }
 
-/** Admin HQ has looked at a duplicate: closed as 'reviewed' (stays closed). Returns the row or null. */
-export async function reviewDuplicate(db, id, by) {
+/** One open duplicate with the AD creation time of both computers (locked, for the review decision). */
+export async function getOpenDuplicate(db, id) {
   const { rows } = await db.query(
-    `UPDATE key_duplicate SET resolved_at = now(), resolution = 'reviewed', resolved_by = $2
+    `SELECT d.id, d.key_id, d.same_password, d.computer_id AS other_id, k.computer_id AS owner_id,
+            owner.name AS owner_name, other.name AS other_name,
+            owner.ad_created_at AS owner_created, other.ad_created_at AS other_created
+       FROM key_duplicate d
+       JOIN recovery_key k ON k.key_id = d.key_id
+       JOIN computer owner ON owner.id = k.computer_id
+       JOIN computer other ON other.id = d.computer_id
+      WHERE d.id = $1 AND d.resolved_at IS NULL
+      FOR UPDATE OF d, k`,
+    [id],
+  );
+  return rows[0] ?? null;
+}
+
+/** Admin HQ decided: closed as 'reviewed' or 'shared' (the key stays, both computers show a note). Returns the row or null. */
+export async function reviewDuplicate(db, id, by, resolution = 'reviewed') {
+  const { rows } = await db.query(
+    `UPDATE key_duplicate SET resolved_at = now(), resolution = $3, resolved_by = $2
       WHERE id = $1 AND resolved_at IS NULL RETURNING id, key_id, computer_id`,
-    [id, by],
+    [id, by, resolution],
   );
   return rows[0] ?? null;
 }
@@ -498,7 +516,8 @@ export async function keyHistoryOf(db, computerId) {
   );
   const { rows: duplicates } = await db.query(
     `SELECT ${DUPLICATE_COLUMNS} ${DUPLICATE_FROM}
-      WHERE d.resolved_at IS NULL AND (d.computer_id = $1 OR k.computer_id = $1)`,
+      WHERE (d.computer_id = $1 OR k.computer_id = $1)
+        AND (d.resolved_at IS NULL OR (d.resolution = 'shared' AND owner.deleted_in_ad_at IS NULL AND other.deleted_in_ad_at IS NULL))`,
     [computerId],
   );
   return { moves, duplicates };

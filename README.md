@@ -404,6 +404,24 @@ Build sẵn image trên một máy có internet, đóng thành một file, chép
 
 ---
 
+### 3.8. Thao tác hay dùng (Docker, chạy ở thư mục gốc dự án)
+
+Đặt tạm cho gọn: `C="docker compose -f docker-compose.prod.yml --profile db"` (DB ngoài Docker thì bỏ `--profile db`).
+
+| Việc | Lệnh |
+|---|---|
+| Bật tất cả | `$C up -d` |
+| Tắt tất cả (giữ dữ liệu) | `$C down` |
+| Xem trạng thái | `$C ps` |
+| Xem log server | `$C logs -f --tail=100 server` |
+| Khởi động lại server (sau khi sửa `server/.env`) | `$C up -d --force-recreate server` |
+| Cập nhật bản mới | `git fetch --tags && git checkout vX.Y.Z` rồi `BLK_VERSION=X.Y.Z $C up -d --build` |
+| Kiểm tra sức khỏe | `curl -k https://localhost/healthz` |
+
+Trạng thái bình thường: `db`, `server`, `nginx` là `Up (healthy)`; `migrate` là `Exited (0)` (chạy xong tự thoát).
+
+**Không** dùng `down -v`: `-v` xóa cả volume, mất toàn bộ database.
+
 ## 4. Cài sync worker trên Windows
 
 Có hai bản worker, làm cùng một việc. Chỉ cài **một** bản:
@@ -1180,7 +1198,7 @@ Hệ thống **không định danh theo tên**: máy theo `objectGUID` do AD c�
 | **Key mới cho cùng một ổ đĩa** (cùng `msFVE-VolumeGuid`) | Thêm key mới, không ghi đè: key mới **Đang dùng**, key cũ của ổ đó **Có key mới hơn** (vẫn giữ). Ổ khác không ảnh hưởng |
 | Đẩy lại đúng key cũ | Cùng Key ID: không có gì mới, không email |
 | **Unjoin rồi join lại, đẩy lại key cũ** (Key ID không đổi, nằm dưới object mới) | Key **chuyển sang máy mới** (không xóa, không nhân đôi) và ghi lịch sử chuyển. **Cùng tên, cùng domain**: chuyển ngay, máy cũ thành "ngoài phạm vi". **Khác tên**: tạm ghi là Key ID trùng, lượt full sau thấy máy cũ rời phạm vi thì chuyển và tự đóng, không mail |
-| **Cùng Key ID dưới 2 máy đều còn trong phạm vi** (clone image đã bật BitLocker) | Key **giữ ở máy đang giữ**, ghi Key ID trùng; sau khi lượt full xác nhận, gửi **1 mail** (mỗi cặp 1 lần). Xem ở Quản trị > Sync AD, nút **Đã xem xét** để đóng (ghi `key_duplicate_review`). Tự đóng khi một máy rời phạm vi |
+| **Cùng Key ID dưới 2 máy đều còn trong phạm vi** (clone image đã bật BitLocker) | Key **giữ ở máy đang giữ**, ghi Key ID trùng; sau khi lượt full xác nhận, gửi **1 mail** (mỗi cặp 1 lần). Xem ở Quản trị > Sync AD, hai nút: **Gán cho máy mới hơn** (so ngày tạo trên AD của 2 máy, key chuyển sang máy tạo sau; không thực hiện nếu mật khẩu khác nhau, thiếu ngày tạo hoặc máy đang giữ key đã là máy mới hơn) và **Dùng chung 2 máy** (key giữ nguyên, trang của cả 2 máy hiện ghi chú dùng chung, không đổi quyền xem). Cả hai đóng cảnh báo và ghi `key_duplicate_review` kèm kết quả. Tự đóng khi một máy rời phạm vi |
 | Cùng Key ID nhưng **mật khẩu khác** | Không chuyển, không ghi đè; xử lý như Key ID trùng |
 | Key bị xóa trong AD | Hệ thống vẫn giữ |
 

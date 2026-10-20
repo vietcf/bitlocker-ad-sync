@@ -41,7 +41,7 @@ export const ACTION_LABELS = {
   computer_moved: 'Máy đổi chi nhánh',
   sync_manual: 'Yêu cầu sync',
   sync_ack: 'Xử lý sync cách ly',
-  key_duplicate_review: 'Xem xét Key ID trùng',
+  key_duplicate_review: 'Kiểm tra Key ID trùng',
   backup_run: 'Sao lưu',
   backup_download: 'Tải file sao lưu',
 };

@@ -36,8 +36,14 @@ export function syncWeb({ syncAdmin }) {
   });
 
   r.post('/key-duplicates/:id/review', async (req, res) => {
-    await syncAdmin.reviewKeyDuplicate(req.scope, parse(id, req.params.id), clientInfo(req));
-    flash(req, 'success', 'Đã đánh dấu Key ID trùng là đã xem xét. Cặp máy này sẽ không được cảnh báo lại.');
+    const out = await syncAdmin.reviewKeyDuplicate(req.scope, parse(id, req.params.id), { action: req.body.action }, clientInfo(req));
+    flash(
+      req,
+      'success',
+      out.result === 'moved'
+        ? `Máy ${out.to} được tạo trên AD mới hơn ${out.from}, nên key đã được gán cho ${out.to} (máy cũ vẫn giữ lịch sử). Cặp này đã đóng.`
+        : `Đã đánh dấu Key ID dùng chung giữa ${out.from} và ${out.to}. Key vẫn giữ ở ${out.from}; trang của cả 2 máy hiển thị ghi chú. Cặp này đã đóng.`,
+    );
     res.redirect('/admin/sync');
   });
 

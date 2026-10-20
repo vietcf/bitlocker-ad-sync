@@ -1,0 +1,29 @@
+COMMON OPERATIONS - BitLocker Key Manager (Docker)
+Run in the project root directory (where docker-compose.prod.yml is).
+
+START ALL (database in Docker):
+  docker compose -f docker-compose.prod.yml --profile db up -d
+
+STOP ALL (data is kept):
+  docker compose -f docker-compose.prod.yml --profile db down
+
+STATUS:
+  docker compose -f docker-compose.prod.yml --profile db ps
+
+SERVER LOG (Ctrl+C to exit):
+  docker compose -f docker-compose.prod.yml logs -f --tail=100 server
+
+RESTART SERVER (after editing server/.env):
+  docker compose -f docker-compose.prod.yml --profile db up -d --force-recreate server
+
+UPDATE TO A NEW VERSION:
+  git fetch --tags
+  git checkout vX.Y.Z
+  BLK_VERSION=X.Y.Z docker compose -f docker-compose.prod.yml --profile db up -d --build
+
+Notes:
+- Database outside Docker: remove "--profile db" from the commands above.
+- Normal state: db, server, nginx are "Up (healthy)";
+  migrate is "Exited (0)" (it runs once and exits, this is not an error).
+- NEVER use "down -v": -v also deletes the volumes, so the whole database is lost.
+- Take a backup before updating (Admin > Backup).
