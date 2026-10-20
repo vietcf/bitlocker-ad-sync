@@ -851,31 +851,19 @@ sudo systemctl daemon-reload && sudo userdel blk-sync
 
 ## 5. Cấu hình lần đầu trong ứng dụng
 
-1. **Đăng nhập** bằng `admin` / `admin` rồi đổi mật khẩu.
-2. **Tạo chi nhánh** (Quản trị > Chi nhánh & OU): nhập mã, tên và các OU máy tính, ví dụ `OU=Computers,OU=HN,DC=corp,DC=local`. Một OU chỉ thuộc một chi nhánh; OU con thuộc cùng chi nhánh. Có màn hình xem trước; khi lưu, app **gán máy vào chi nhánh theo OU ngay**, không chờ sync.
-   - **Xóa chi nhánh**: Sửa > **Xóa chi nhánh…**; trang xác nhận cho biết số máy chuyển về N/A, OU và quyền bị gỡ; phải **gõ lại mã chi nhánh**. Máy chuyển về **N/A** (hoặc sang chi nhánh khác nếu nằm trong OU của chi nhánh đó); key và nhật ký giữ nguyên; không hoàn tác được.
-   - Chỉ **Admin HQ** thêm, sửa, xóa chi nhánh và OU.
-3. **Tạo người dùng** (Quản trị > Người dùng):
-   - **AD** (mặc định): nhập sAMAccountName (`nguyenvana`, `CORP\nguyenvana` hoặc `nguyenvana@corp.local`); đăng nhập bằng mật khẩu Windows. Chưa tạo trong app thì không đăng nhập được. Lần đăng nhập đầu, app gắn với objectGUID của AD; tài khoản AD bị xóa rồi tạo lại cùng tên thì bị từ chối cho tới khi admin bấm "Gỡ liên kết AD".
-   - **Local**: app cấp mật khẩu một lần, phải đổi ở lần đăng nhập đầu. Chỉ nên dùng cho admin dự phòng.
-   - **Họ tên và email:** tài khoản AD có thể để trống, app tự lấy từ AD (`displayName`, `mail`) ở lần đăng nhập đầu; đã có giá trị thì AD không bao giờ ghi đè. Tài khoản local bắt buộc nhập cả hai. Email lưu chữ thường; chưa có email thì không nhận được thư (danh sách gắn nhãn "Chưa có email"). Tài khoản `admin` mặc định chưa có email: nhập khi sửa lần đầu.
-   - **Xóa người dùng** (nút ở trang sửa): chỉ xóa được khi nhật ký chưa có dòng nào của người đó (đăng nhập, kể cả đăng nhập sai, xem key...). Đã có thì app báo "chỉ có thể vô hiệu hóa" (bỏ chọn **Đang hoạt động**), vì nhật ký phải khớp với một tài khoản còn tồn tại. Không xóa được chính mình và admin gốc; xóa admin khác chỉ admin gốc làm được. API: `DELETE /api/admin/users/{id}`.
-   - **Vai trò:**
+1. Đăng nhập `admin` / `admin`, đổi mật khẩu.
+2. **Chi nhánh & OU** (Quản trị): tạo chi nhánh và nhập OU máy tính, ví dụ `OU=Computers,OU=HN,DC=corp,DC=local`. Một OU thuộc một chi nhánh; lưu là gán máy theo OU ngay. Máy ngoài mọi OU là **N/A**, chỉ Admin HQ thấy. Xóa chi nhánh: máy về N/A, key và nhật ký giữ nguyên, không hoàn tác.
+3. **Người dùng** (Quản trị): tài khoản **AD** (nhập sAMAccountName, đăng nhập bằng mật khẩu Windows; chưa tạo trong app thì không đăng nhập được) hoặc **local** (chỉ nên dùng cho admin dự phòng). Họ tên và email của tài khoản AD để trống thì tự lấy từ AD, giá trị đã nhập không bị ghi đè; chưa có email thì không nhận mail. Người dùng đã có dòng nhật ký thì chỉ vô hiệu hóa được, không xóa.
 
-     | Vai trò | Quyền |
-     | --- | --- |
-     | `it` | Tìm máy, hiện key của chi nhánh được gán |
-     | `lead` | Như `it`, thêm xem nhật ký và báo cáo của chi nhánh |
-     | `admin` | Admin HQ: mọi chi nhánh (kể cả máy N/A) và toàn bộ menu Quản trị |
-     | `auditor` | Xem nhật ký và báo cáo của chi nhánh được gán, không hiện được key |
+   | Vai trò | Quyền |
+   | --- | --- |
+   | `it` | Tìm máy, hiện key của chi nhánh được gán |
+   | `lead` | Như `it`, thêm nhật ký và báo cáo của chi nhánh |
+   | `admin` | Admin HQ: mọi chi nhánh (kể cả N/A) và toàn bộ menu Quản trị |
+   | `auditor` | Xem nhật ký và báo cáo của chi nhánh được gán, không hiện được key |
 
-     **Chỉ Admin HQ xem mọi chi nhánh.** Vai trò khác luôn gán **theo từng chi nhánh** và mọi trang chỉ hiện dữ liệu chi nhánh đó (lọc 2 lớp: điều kiện truy vấn và Row-Level Security). Không tạo được quyền "tất cả chi nhánh" cho vai trò khác Admin HQ.
-
-     **Quy tắc gán quyền:** Admin HQ đứng một mình (không chọn kèm vai trò khác, vì đã bao hết mọi chi nhánh); mỗi chi nhánh chỉ một vai trò cho một người dùng; chi nhánh khác nhau có thể có vai trò khác nhau (ví dụ `it` ở HN, `lead` ở HCM). Form tự bỏ chọn khi tick trái quy tắc, và API/CLI trả 400 `admin_exclusive` / `one_role_per_branch`.
-4. **Kiểm tra sync** (Quản trị > Sync AD): lượt full đầu tiên, số máy, số key, cảnh báo đang mở.
-5. **Máy N/A**: máy ngoài mọi OU đã khai báo chỉ Admin HQ thấy. Bấm "Xem danh sách" (hoặc lọc Chi nhánh = N/A ở Tìm máy) rồi bổ sung OU cho chi nhánh.
-6. **Mail** (Quản trị > Mail server): nhập SMTP, bấm **Gửi thử**; rồi chọn thông báo ở Quản trị > Thông báo.
-7. **Tính năng và lưu trữ** (Quản trị > Tính năng, Lưu trữ): chọn ai được xuất kèm recovery key (mặc định tắt), thời gian giữ nhật ký, lịch sử sync, email.
+   Chỉ Admin HQ xem mọi chi nhánh; vai trò khác gán **theo từng chi nhánh** (lọc 2 lớp: truy vấn và Row-Level Security). Admin HQ đứng một mình; mỗi chi nhánh chỉ một vai trò cho một người.
+4. Kiểm tra sync (Quản trị > Đồng bộ AD), cấu hình mail (Quản trị > Mail server, **Gửi thử**; Thông báo), và Tính năng / Lưu trữ (ai được xuất kèm key, mặc định tắt; thời gian giữ dữ liệu).
 
 ---
 
@@ -919,117 +907,50 @@ Key mới trong lượt bị giữ vẫn được lưu ngay (key không bao gi�
 
 ### 6.2. Cảnh báo
 
-Watchdog chạy mỗi 5 phút và tách **hai loại sự cố**, mỗi loại một trạng thái và **một** email:
+Watchdog chạy mỗi 5 phút, hai trạng thái, mỗi loại **một** mail khi bắt đầu, nhắc tối đa 1 lần mỗi ngày, hết sự cố thì không gửi nữa:
 
-| | Worker (agent) Offline | Đồng bộ AD có sự cố |
-| --- | --- | --- |
-| Nghĩa là | Không có heartbeat quá ngưỡng (worker chết, máy tắt, mất mạng, sai API key / IP / chứng chỉ) | Worker **vẫn chạy** nhưng AD hoặc đồng bộ có vấn đề |
-| Điều kiện | Không có heartbeat | Không đọc được AD (DC offline, sai quyền, lỗi TLS), lâu không sync, lượt sync treo, canary cũ, USN đứng yên, chứng chỉ LDAPS sắp hết hạn, máy mới không lưu key, tỉ lệ máy chưa có key tăng |
+- **Worker Offline:** không có heartbeat quá ngưỡng (worker chết, máy tắt, mất mạng, sai API key / IP / chứng chỉ). Khi Offline, trạng thái AD là "chưa xác định".
+- **Đồng bộ AD có sự cố:** worker vẫn chạy nhưng AD hoặc sync có vấn đề. Gồm **sự cố hệ thống** (đo trực tiếp, tự hết khi sửa xong: không đọc được AD, sync quá hạn, lượt sync treo, canary, USN) và **cảnh báo dữ liệu** (tính từ dữ liệu: máy mới không có key, tỉ lệ không key tăng, full sync quá hạn, chứng chỉ DC sắp hết hạn).
 
-- Khi worker Offline, trạng thái AD là **chưa xác định** và các điều kiện cần worker chạy không báo thêm (tránh đọc nhầm "AD hỏng" thành "worker chết" và ngược lại).
-- Mỗi loại: gửi khi bắt đầu, nhắc lại tối đa 1 lần mỗi ngày, hết sự cố thì không gửi gì nữa.
-- Xem ở **Quản trị > Đồng bộ AD > Tình trạng sync** (hai ô Worker và Đồng bộ AD, bên dưới là cảnh báo đang mở), Tổng quan của Admin HQ và báo cáo email hằng ngày.
+Cảnh báo dữ liệu còn đúng nhiều ngày sau khi sửa nguyên nhân, nên có **Đã xử lý** (im lặng 30 ngày), **Bỏ qua 1/7/30 ngày** và công tắc **Bật/Tắt** từng loại. Ngưỡng và công tắc ở **Quản trị > Đồng bộ AD > Cảnh báo sync**.
 
-**Ô "Đồng bộ AD" gồm 2 phần:** **Sự cố hệ thống** (đo trực tiếp: không đọc được AD, sync quá hạn, lượt sync treo, canary, USN; tự hết khi sửa xong) và **Cảnh báo dữ liệu** (tính từ nội dung đã đồng bộ: máy mới không có key, tỉ lệ không key tăng, full sync quá hạn, chứng chỉ DC sắp hết hạn; hiện "Có cảnh báo nhẹ" và không làm dừng sync). Vì cảnh báo dữ liệu còn đúng nhiều ngày sau khi bạn đã sửa nguyên nhân, mỗi cảnh báo loại này có nút **Đã xử lý** (kèm ghi chú: ngừng gửi mail và không tính vào trạng thái trong **30 ngày** theo mặc định, chỉnh ở Ngưỡng cảnh báo; hết hạn mà điều kiện còn thì báo lại, điều kiện hết thì cảnh báo tự đóng) và **Bỏ qua 1/7/30 ngày** (cùng cách). Muốn **tắt hẳn** một loại cảnh báo dữ liệu: công tắc **Bật/Tắt** ngay cạnh ngưỡng của nó ở **Quản trị > Đồng bộ AD > Cảnh báo sync**; loại đã tắt không bao giờ mở, đang mở thì đóng, và ô trạng thái ghi "Đã tắt N loại". Sự cố hệ thống không tắt được. Sự cố hệ thống tự hết khi sửa xong nên không có nút nào. Chỉ Admin HQ bấm được; mọi thao tác ghi vào nhật ký truy cập (`alert_ack`, `alert_snooze`).
+Mail cảnh báo chia 4 nhóm, bật/tắt và chọn người nhận ở Quản trị > Thông báo (`NOTIFY_TO` luôn nhận nhóm đang bật; tắt nhóm thì vẫn hiện trong app): **Agent ngừng hoạt động**; **Kết nối AD và đồng bộ có vấn đề** (kể cả sync lỗi, lượt bị giữ lại, Key ID trùng); **Xem key ngoài giờ và bảo mật dữ liệu**; **Sao lưu lỗi**.
 
-**Email cảnh báo chia 4 nhóm**, mỗi nhóm bật/tắt và chọn người nhận riêng ở **Quản trị > Thông báo** (Admin HQ và/hoặc địa chỉ thêm; `NOTIFY_TO` luôn nhận nhóm đang bật). Tắt nhóm thì không gửi mail nhóm đó (cảnh báo vẫn hiện trong app):
+Ngưỡng mặc định: heartbeat 15 phút; lượt sync thành công 60 phút; lượt full 26 giờ; lượt "đang chạy" 2 giờ thì hủy; USN không đổi 6 giờ; canary 90 phút; máy mới (2–7 ngày) chưa có key 50% (từ 5 máy); tỉ lệ không key của chi nhánh tăng 5 điểm %; cảnh báo đã xử lý báo lại sau 30 ngày; "hoạt động gần đây" 3 tháng.
 
-| Nhóm | Gồm |
-| --- | --- |
-| **Agent (worker) ngừng hoạt động** | Worker Offline |
-| **Kết nối AD và đồng bộ có vấn đề** | Đồng bộ AD có sự cố, sync lỗi, sync bất thường bị giữ lại, Key ID trùng |
-| **Xem key ngoài giờ và bảo mật dữ liệu** | Hiện key ngoài giờ, xuất key hàng loạt |
-| **Sao lưu** | Một lượt sao lưu bị lỗi |
+### 6.3. Gửi mail
 
-Ngưỡng của watchdog (**Quản trị > Đồng bộ AD > Cảnh báo sync**):
+- Mọi email ghi vào bảng `mail_outbox` trước; job `mail-outbox` chạy mỗi phút để gửi. Lỗi tạm thời thử lại sau 1, 5, 15, 60, 240 phút rồi đánh dấu thất bại để Admin HQ gửi lại (Quản trị > Log email). Mail server chưa cấu hình: mail nằm ở **Chờ gửi** và tự gửi khi bật.
+- Mật khẩu SMTP mã hóa AES-256-GCM bằng khóa suy ra từ `SECRET_KEY`, không hiện lại (đổi `SECRET_KEY` thì nhập lại). Tắt mail server trong Quản trị thì app dùng `SMTP_URL` trong `.env` (nếu có).
+- **Máy mới / key mới:** sau mỗi lượt sync, mỗi người nhận **một** email gom các máy/key mới trong phạm vi của họ (không gửi cho lượt full đầu tiên). Recovery password **không bao giờ gửi qua email**.
+- Chỉ người dùng đang hoạt động và có email mới nhận. Không ai có email thì mail lưu với trạng thái **Không gửi (thiếu email)** kèm nội dung.
 
-| Ngưỡng | Mặc định |
-| --- | --- |
-| Không có heartbeat của worker quá | 15 phút |
-| Không có lượt sync thành công quá (cũng là mốc "dữ liệu cũ" ở Tổng quan) | 60 phút |
-| Không có lượt full thành công quá | 26 giờ |
-| Lượt "đang chạy" quá lâu thì hủy | 2 giờ |
-| Lượt đang chạy mà worker im lặng (crash) được giải phóng khi mở lượt mới | 30 phút không gọi API |
-| USN của DC không đổi quá | 6 giờ |
-| Giá trị canary cũ quá | 90 phút |
-| Máy mới (2–7 ngày) chưa có key quá | 50%, chỉ xét khi có từ 5 máy mới |
-| Tỉ lệ máy chưa có key của chi nhánh tăng quá (so với tuần trước) | 5 điểm % |
-| Cảnh báo dữ liệu đã xử lý tự báo lại sau nếu điều kiện còn | 30 ngày |
-| Máy được coi là "Hoạt động gần đây" nếu có đăng nhập AD trong (chỉ là nhãn, không tạo cảnh báo) | 3 tháng |
+### 6.4. Tìm máy, đăng nhập AD và xuất dữ liệu
 
-**Trang Tổng quan:** dòng "Dữ liệu cập nhật lần cuối" (chuyển thành cảnh báo khi quá ngưỡng sync), biểu đồ số máy và số key 30 ngày, lượt hiện key mỗi ngày 14 ngày (Trưởng IT, Admin HQ, Auditor), và khung **Theo chi nhánh**: mỗi chi nhánh một thanh, **xanh** là % máy đã có key, **đỏ** là % chưa có (bấm phần đỏ để mở danh sách máy chưa có key). Mặc định 10 chi nhánh nhiều máy nhất, bấm **Xem tất cả** để hiện đủ. Báo cáo theo kỳ ở mục 6.11.
+Mỗi máy và key có hai mốc: **Tạo trên AD** (`whenCreated`) và **Ghi nhận** (lần đầu hệ thống thấy qua sync).
 
-### 6.3. Trang Quản trị
+**Đăng nhập AD gần nhất:** worker đọc `lastLogonTimestamp` của máy (một DC là đủ; AD chỉ cập nhật khi giá trị cũ hơn ~14 ngày nên lệch tối đa ~14 ngày). Nhãn **Hoạt động gần đây** (mặc định trong 3 tháng, đổi ở Cảnh báo sync), **Không hoạt động gần đây** hoặc **Chưa có dữ liệu** (chưa từng đăng nhập hoặc worker chưa báo). Chỉ là "chưa thấy máy đăng nhập", không có nghĩa máy hỏng. Bộ lọc kết hợp hai ô: mốc (trong / quá 1, 3, 6, 9, 12, 24 tháng) và **Máy chưa có dữ liệu** (Không gồm / Gồm cả = HOẶC / Chỉ máy này). Cần worker từ 1.2.0 và một lượt full để có dữ liệu.
 
-Mọi cấu hình của Admin HQ nằm trong menu **Quản trị**, gom thành 4 nhóm; bấm một nhóm thì hàng dưới hiện các tab:
-
-| Nhóm | Tab | Nội dung |
-| --- | --- | --- |
-| Người dùng & chi nhánh | Chi nhánh & OU | Thêm/sửa/xóa chi nhánh và OU gốc (lưu là quét lại máy theo OU ngay; xóa thì máy về N/A, gõ mã để xác nhận). Máy ngoài mọi OU là N/A |
-| | Người dùng | Tài khoản, email, cách đăng nhập, quyền |
-| Đồng bộ AD | Tình trạng sync | Hai ô **Worker** Online / Offline (Online = có heartbeat trong ngưỡng, mặc định 15 phút) và **Đồng bộ AD** Bình thường / Có sự cố (mục 6.2); yêu cầu sync, chấp nhận / bác bỏ lượt bị giữ lại |
-| | Cảnh báo sync (Đồng bộ AD) | Ngưỡng giữ lại lượt sync (6.1), watchdog (6.2) và công tắc bật/tắt từng loại cảnh báo dữ liệu. Mỗi ô có khoảng cho phép và mặc định; ngoài khoảng bị từ chối. Ngưỡng trong khung viền xanh phải vượt cùng lúc (VÀ), còn lại độc lập (HOẶC). Có hiệu lực trong 30 giây, ghi nhật ký `settings_thresholds` |
-| Email | Thông báo | Email cảnh báo theo **4 nhóm** (Agent ngừng, AD/đồng bộ có vấn đề, xem key ngoài giờ và bảo mật dữ liệu, sao lưu; mục 6.2); email khi có **máy mới** / **key mới** (gửi người dùng chi nhánh và/hoặc Admin HQ); **báo cáo hằng ngày** (mục 6.11) |
-| | Mail server | SMTP: địa chỉ, cổng, STARTTLS/SSL/không mã hóa, tài khoản, địa chỉ gửi, địa chỉ web của app; nút **Gửi thử** |
-| | Log email | Mọi email hệ thống tạo ra (chờ gửi / đã gửi / thất bại / không gửi), ghi **đã gửi cho ai** và **ai lẽ ra nhận nhưng chưa có email**; lọc, tìm, xem nội dung, gửi lại mail thất bại |
-| Hệ thống | Bảo mật | Khóa tài khoản khi đăng nhập sai, chính sách mật khẩu, thời gian phiên (mục 6.14) |
-| | Sao lưu | Mục 6.8 |
-| | Tính năng | **Số dòng mỗi trang** (Tìm máy 25, Nhật ký 50, Log email 50, Báo cáo chi nhánh 20; 5–200); bật/tắt yêu cầu sync từ web, xuất CSV nhật ký / danh sách máy, cảnh báo xem key ngoài giờ, bắt buộc số ticket; ai được **xuất kèm recovery key**: tắt (mặc định) / chỉ Admin HQ / IT, Trưởng IT và Admin HQ |
-| | Lưu trữ | Số ngày giữ nhật ký, lịch sử sync, email (mục 6.7) |
-
-**Cách gửi mail**
-
-- Mọi email ghi vào bảng `mail_outbox` trước; job `mail-outbox` chạy mỗi phút để gửi. Lỗi tạm thời thử lại sau 1, 5, 15, 60, 240 phút, sau đó đánh dấu thất bại để Admin HQ gửi lại.
-- Mật khẩu SMTP mã hóa AES-256-GCM bằng khóa suy ra từ `SECRET_KEY`, không hiện lại (đổi `SECRET_KEY` thì nhập lại). Tắt mail server trong Quản trị thì app dùng `SMTP_URL` trong `.env` (nếu có); `NOTIFY_TO` luôn nhận email cảnh báo.
-- Mail server tắt hoặc chưa cấu hình: email nằm ở **Chờ gửi** và tự gửi khi bật.
-- **Máy mới / key mới**: sau mỗi lượt sync, mỗi người nhận **một** email gom các máy/key mới trong phạm vi của họ (IT, Trưởng IT: máy thuộc OU chi nhánh mình; Admin HQ: tất cả, kể cả N/A). Mặc định không gửi cho lượt full đầu tiên. Email ghi tên máy và Key ID đầy đủ; recovery password **không bao giờ gửi qua email**.
-- Chỉ người dùng đang hoạt động và có email mới nhận. Người lẽ ra nhận nhưng chưa có email được ghi trên đúng email đó ("Không có email: <tên>"). Không ai có email thì email lưu với trạng thái **Không gửi (thiếu email)** kèm nội dung (không tự gửi lại; thêm email ở Quản trị > Người dùng cho các lượt sau).
-
-### 6.4. Bộ lọc và xuất dữ liệu ở trang Tìm máy
-
-Mỗi máy và mỗi key có hai mốc: **Tạo trên AD** (`whenCreated`) và **Ghi nhận** (lần đầu hệ thống thấy qua sync). Cả hai hiện trong danh sách, trang chi tiết và file CSV.
-
-Bộ lọc danh sách: chi nhánh (kể cả N/A), tình trạng, có tính máy ngoài phạm vi giám sát hay không, và **khoảng ngày** theo *Ghi nhận* (mặc định) hoặc *Tạo trên AD* (tính cả hai đầu, theo `APP_TZ`). Ví dụ: máy mới tuần này = Ghi nhận, từ thứ Hai đến hôm nay.
-
-**Đăng nhập AD gần nhất:** worker đọc thêm thuộc tính `lastLogonTimestamp` của máy (AD đồng bộ giữa các DC nên chỉ cần hỏi một DC; AD chỉ cập nhật khi giá trị cũ hơn khoảng 14 ngày nên lệch tối đa ~14 ngày). Giá trị hiện ở danh sách, trang chi tiết và CSV (`last_logon_utc`), kèm nhãn **Hoạt động gần đây** (trong 3 tháng theo mặc định, đổi ở **Quản trị > Đồng bộ AD > Cảnh báo sync > Hoạt động của máy**), **Không hoạt động gần đây** hoặc **Chưa có dữ liệu** (máy chưa từng đăng nhập, hoặc worker chưa báo, ví dụ worker bản cũ). Đó chỉ là "chưa thấy máy đăng nhập domain", không có nghĩa máy đã hỏng hay bị bỏ. Bộ lọc gồm hai ô kết hợp được: **Đăng nhập AD** (Tất cả / trong N tháng gần nhất / quá N tháng chưa thấy, N = 1/3/6/9/12/24) và **Máy chưa có dữ liệu** (Không gồm / Gồm cả / Chỉ máy này; "Gồm cả" là HOẶC với mốc thời gian, ví dụ "quá 6 tháng chưa thấy" kèm "Gồm cả" ra danh sách máy ứng viên để dọn). Mặc định không lọc gì; chọn một mốc N tháng thì ô thứ hai tự là "Không gồm" (chỉ tính máy có bằng chứng).  Cần cập nhật worker (Go và .NET từ 1.2.0 có thuộc tính này) rồi chờ lượt sync full kế tiếp để dữ liệu có đủ.
-
-Hai nút xuất, đều xuất **toàn bộ** danh sách theo bộ lọc (không chỉ trang đang xem) và trong phạm vi chi nhánh của người xuất:
+Hai nút xuất, đều xuất **toàn bộ** danh sách theo bộ lọc, trong phạm vi chi nhánh của người xuất:
 
 | Nút | File CSV | Ai dùng | Nhật ký |
 | --- | --- | --- | --- |
-| **Xuất CSV** | Thông tin máy, số key, các mốc ngày, còn trong phạm vi hay không. **Không có key** | IT, Trưởng IT, Admin HQ (tắt được ở tab Tính năng) | `export_computers` |
-| **Xuất kèm key** | Mỗi dòng một key, kèm **recovery password** | Theo tab Tính năng: tắt (mặc định) / chỉ Admin HQ / IT, Trưởng IT và Admin HQ | Mỗi key một dòng `reveal` + một dòng `export_keys`; Admin HQ nhận cảnh báo |
+| **Xuất CSV** | Thông tin máy, số key, các mốc ngày. **Không có key** | IT, Trưởng IT, Admin HQ (tắt được ở Tính năng) | `export_computers` |
+| **Xuất kèm key** | Mỗi dòng một key kèm **recovery password** | Theo Tính năng: tắt (mặc định) / chỉ Admin HQ / IT, Trưởng IT và Admin HQ | Mỗi key một dòng `reveal` + `export_keys`; Admin HQ nhận cảnh báo |
 
-Xuất kèm key qua trang xác nhận (số key, số máy) và bắt chọn lý do như khi hiện key. CSV có BOM UTF-8 và vô hiệu ô bắt đầu bằng `= + - @`. **Lưu file có key ở nơi an toàn và xóa ngay khi dùng xong.**
+Xuất kèm key phải chọn lý do như khi hiện key. **Lưu file có key ở nơi an toàn và xóa ngay khi dùng xong.**
 
 ### 6.5. Thông tin bổ sung của máy và cách tìm
 
-Mỗi máy có hai trường do người dùng nhập: **Serial máy** và **Email người dùng** (sync không bao giờ ghi đè). Bấm **Sửa thông tin** ở trang chi tiết máy; ai xem được key của máy thì sửa được; để trống để xóa; mỗi lần lưu ghi `computer_edit` (giá trị trước và sau). Hai trường có trong cả hai file CSV. API: `PUT /api/computers/:id/info` `{ deviceSerial, ownerEmail }`.
+**Serial máy** và **Email người dùng** do người dùng nhập (sync không ghi đè), sửa ở trang chi tiết máy, ghi `computer_edit`. API: `PUT /api/computers/:id/info`.
 
-Ô **Tìm máy** (trong phạm vi chi nhánh của bạn, không phân biệt hoa thường):
-
-- **Key ID**: từ **4 ký tự đầu** (màn hình BitLocker hiện 8 ký tự), hoặc cả Key ID; có hay không dấu `-` đều được.
-- **Tên máy, serial, email**: một phần bất kỳ từ 3 ký tự, bỏ qua `-`, `_`, `.` và khoảng trắng (`lt0231` ra `HN-LT-0231`); 2 ký tự thì chỉ khớp phần đầu. Khớp đúng xếp trước.
-- Chuỗi vừa giống Key ID vừa là một phần tên máy (`0231`): hiện cả hai kết quả.
-- **GUID máy** (objectGUID): dán cả GUID.
+Ô Tìm máy: **Key ID** từ 4 ký tự đầu (có hay không dấu `-`); **tên máy, serial, email** từ 3 ký tự bất kỳ, bỏ qua `-`, `_`, `.` và khoảng trắng (`lt0231` ra `HN-LT-0231`); **GUID máy** dán cả GUID.
 
 ### 6.6. Mẫu email
 
-Nội dung mọi email và tin Teams nằm trong **một file**: `server/templates/mail-templates.yaml`, có sẵn đủ mẫu tiếng Việt; chỉ sửa khi muốn đổi câu chữ. Đầu file có bảng giải thích từng mẫu và biến. Mỗi mẫu có `subject` và `body` (phần bạn sửa), cùng `used_by`, `sent_when`, `recipients`, `variables` để tra cứu.
+Nội dung mọi email và tin Teams nằm trong **một file** `server/templates/mail-templates.yaml` (đầu file có bảng giải thích mẫu và biến). Chỉ sửa `subject` / `body`, giữ tên mẫu và thụt lề YAML, chỉ dùng biến có trong `variables` của mẫu (không biến nào chứa recovery password). Lưu file là xong, **không cần khởi động lại**; file hỏng thì app giữ bản tốt trước đó (khi khởi động, file hỏng làm app từ chối chạy). Thử bằng **Gửi thử** ở Quản trị > Mail server.
 
-Các mẫu chính: `sync_failed`, `sync_anomaly`, `worker_offline`, `sync_problem`, `backup_failed`, `key_duplicate`, `reveal_out_of_hours`, `key_export`, `new_objects`, `daily_report`, `smtp_test` (và bản `_recovered` của một số mẫu). Các điều kiện của watchdog (`sync_stale`, `ldap_error`...) không gửi mail riêng, chỉ hiện trong app và trong mail `sync_problem`. Mẫu cảnh báo (`kind: alert`) được thêm tiền tố `alert_subject_prefix` (`[BitLocker][HIGH] `...) ở dòng đầu file.
-
-**Cách sửa:** sửa `subject` / `body`, giữ tên mẫu và thụt lề YAML (`body: |` cho nhiều dòng); chỉ dùng biến có trong `variables` của mẫu (sai tên thì hiện nguyên `{{tên_sai}}`); không biến nào chứa recovery password. Lưu file là xong, **không cần khởi động lại**. File hỏng thì app giữ bản tốt trước đó và ghi lỗi `mail templates: bad edit ignored`; lúc khởi động, file hỏng làm app từ chối chạy. Thử bằng **Gửi thử** ở Quản trị > Mail server.
-
-**File cần sửa ở đâu:**
-
-| Môi trường | File |
-| --- | --- |
-| Dev | `server/templates/mail-templates.yaml` (watch tự chép) |
-| Production Docker | Chép ra máy chủ (ví dụ `/etc/blk/mail-templates.yaml`), mount `-v /etc/blk/mail-templates.yaml:/app/config/mail-templates.yaml:ro` và đặt `MAIL_TEMPLATES_FILE=/app/config/mail-templates.yaml`, để cập nhật app không ghi đè bản sửa |
-| Production không Docker | `server/templates/mail-templates.yaml` hoặc `MAIL_TEMPLATES_FILE` |
-
-Khi nâng cấp app, so file mẫu mới với bản của bạn: nếu thiếu mẫu mới, app báo lỗi.
+Production Docker: chép file ra máy chủ (ví dụ `/etc/blk/mail-templates.yaml`), mount `-v /etc/blk/mail-templates.yaml:/app/config/mail-templates.yaml:ro` và đặt `MAIL_TEMPLATES_FILE=/app/config/mail-templates.yaml` để cập nhật app không ghi đè bản sửa; khi nâng cấp, so với file mẫu mới (thiếu mẫu thì app báo lỗi).
 
 ### 6.7. Thời gian lưu trữ
 
@@ -1130,25 +1051,9 @@ docker compose exec server node src/cli/users.js enable <user>           # bật
 
 ### 6.10. Truy vết sync trong log
 
-**Số của lượt sync.** Mỗi lượt có **STT** `runId` (số nguyên tăng dần, khóa nội bộ, worker dùng số này) và **mã hiển thị** `runRef` dạng `YYYYMMDD-NNNN` (ngày chạy theo `APP_TZ` + STT 4 chữ số, ví dụ `20261018-0042`). Giao diện, email và log hiện mã hiển thị; STT có trong tooltip và JSON. Không dùng thời gian làm số chính vì đồng hồ có thể lùi (NTP, khôi phục máy ảo) làm sai thứ tự; STT luôn tăng. Khôi phục DB từ bản sao lưu thì STT quay về giá trị lúc sao lưu, ngày trong mã giúp phân biệt.
+Mỗi lượt sync có **STT** `runId` (số nguyên tăng dần, worker dùng) và **mã hiển thị** `runRef` dạng `YYYYMMDD-NNNN` (ngày chạy theo `APP_TZ`). Mọi thay đổi do sync tạo ra được ghi vào log ứng dụng (JSON, mỗi dòng một sự kiện, tiếng Anh) với `"component":"sync"` và `runId`: mở / kết thúc / lỗi lượt, máy mới, máy đổi tên hoặc đổi chi nhánh, máy trở lại hoặc bị gắn "Không còn trong phạm vi giám sát", key mới hoặc không đọc được mật khẩu, bất thường và lượt bị giữ lại (mục 6.1). Máy / key không đổi thì không ghi.
 
-Mọi thay đổi do sync tạo ra được ghi vào log ứng dụng (JSON, mỗi dòng một sự kiện, tiếng Anh) với `"component":"sync"` và `runId`, sau khi dữ liệu đã commit. Máy / key không đổi chỉ được đếm trong dòng tổng kết nên lượt full 22k máy không làm ngập log. Log không bao giờ chứa recovery password.
-
-| `msg` | Khi nào |
-| --- | --- |
-| `sync run opened` / `sync run completed` / `sync run failed` | Mở / kết thúc lượt (mode, dc, số máy / key thấy, `highestUsn`, `markedNotInAd` hoặc `errorCode`) |
-| `computer added` | Máy mới |
-| `computer moved to another branch` | DN đổi sang OU chi nhánh khác (cũng ghi `computer_moved` vào Nhật ký) |
-| `computer renamed or moved in AD` | Đổi tên, hoặc đổi OU trong cùng chi nhánh |
-| `computer back in AD` | Máy từng "Không còn trong phạm vi giám sát" xuất hiện lại |
-| `computer not seen by the full run: flagged not in AD` | Máy bị gắn nhãn "Không còn trong phạm vi giám sát" |
-| `key added`, `key volume recorded`, `key superseded ...` | Key mới, bổ sung ổ đĩa, đổi trạng thái |
-| `key without a readable password`, `key with a malformed password` (warn) | Key không lưu được: mật khẩu rỗng (thiếu quyền) hoặc sai định dạng |
-| `key for an unknown computer (sent back as orphan)` | Key của máy chưa có trong DB |
-| `computer batch stored`, `key batch stored` | Tổng kết một lô (received, added, unchanged...) |
-| `sync anomaly` (warn), `sync run quarantined`, `quarantined sync run decided` | Bất thường, lượt bị giữ lại, Admin HQ chấp nhận / bác bỏ (mục 6.1) |
-
-Truy vết: lọc theo `"runId":812`, `"name":"HN-LT-0231"`, `"objectGuid":"..."` hoặc `"keyId":"..."`, ví dụ:
+Truy vết: lọc theo `"runId":812`, `"name":"HN-LT-0231"`, `"objectGuid":"..."` hoặc `"keyId":"..."`:
 
 ```bash
 docker compose logs server | grep '"component":"sync"' | grep '"runId":812'
@@ -1156,48 +1061,17 @@ docker compose logs server | grep '"component":"sync"' | grep '"runId":812'
 
 #### Log nằm ở đâu, rotate thế nào
 
-App không tự ghi file: mọi log (kể cả sync) in ra **stdout** dạng JSON, môi trường chạy app giữ và xoay vòng.
-
-| Cách chạy | Log nằm ở | Rotate |
-| --- | --- | --- |
-| `docker compose` | `docker compose logs server` | Đã cấu hình sẵn trong file compose (driver `local`, có nén) |
-| Node bằng systemd | `journalctl -u blk` | journald tự xoay vòng; giới hạn bằng `SystemMaxUse=2G` |
-| Node ghi ra file | File bạn chọn | logrotate với `copytruncate` |
-
-Trên Linux, Docker mặc định dùng `json-file` **không rotate**, log lớn mãi tới khi đầy đĩa: luôn đặt một cấu hình ở trên. Muốn giữ lâu và tìm kiếm, đẩy log JSON về hệ thống tập trung (Loki, ELK / OpenSearch, Graylog, SIEM; mục 6.15). Nhật ký truy cập (ai xem key) nằm trong database, không phải log này.
+App không tự ghi file: mọi log in ra **stdout** dạng JSON, môi trường chạy giữ và xoay vòng. `docker compose`: `docker compose logs server` (file compose đã cấu hình rotate sẵn); Node bằng systemd: `journalctl -u blk` (giới hạn bằng `SystemMaxUse=2G`); Node ghi ra file: logrotate với `copytruncate`. Docker mặc định `json-file` **không rotate**, log lớn mãi tới khi đầy đĩa: luôn đặt một cấu hình ở trên. Muốn giữ lâu và tìm kiếm, đẩy log JSON về hệ thống thu log (mục 6.15).
 
 ---
 
 ### 6.11. Trang Báo cáo
 
-Dành cho Trưởng IT, Admin HQ và Auditor, trong phạm vi chi nhánh của người xem. Chọn **kỳ báo cáo**
-(mặc định 30 ngày gần nhất, tối đa 366 ngày, có nút nhanh 7 / 30 / 90 ngày), hoặc tích **Toàn bộ thời gian**
-(nút nhanh **Toàn bộ**: từ ngày đầu tiên có dữ liệu đến hôm nay, không giới hạn 366 ngày, bỏ qua ô ngày); có thể
-chọn một chi nhánh. Nút **Xuất Excel** xuất đúng kỳ đang xem, kể cả Toàn bộ thời gian. Đổi ngày, chi nhánh hoặc tick "Toàn bộ thời gian" thì trang **tự áp dụng** (không cần bấm "Lọc"); nút nhanh đang dùng được tô nổi. Bộ lọc ở Máy, Báo cáo, Nhật ký truy cập, Log email cùng một kiểu: tự áp dụng khi đổi, có nút **Lọc** và **Xóa lọc**.
-Hai ô **Đăng nhập AD** và **Chưa có dữ liệu đăng nhập AD** (giống Tìm máy, mục 6.4) lọc các máy được tính trong báo cáo, cả trên trang lẫn trong file Excel (Excel ghi dòng "Lọc đăng nhập AD" ở sheet Tổng quan): số máy, số key, máy mới và máy rời phạm vi chỉ tính máy khớp; lượt hiện key không bị lọc. Số máy, số key là số **hiện tại**; máy mới, key mới, máy rời phạm vi giám sát và lượt hiện key tính **trong kỳ**.
+Cho Trưởng IT, Admin HQ và Auditor, trong phạm vi chi nhánh của người xem. Chọn kỳ (mặc định 30 ngày, tối đa 366, hoặc **Toàn bộ thời gian**), chi nhánh và bộ lọc đăng nhập AD (như Tìm máy, mục 6.4; áp dụng cho số máy và số key, không áp dụng cho lượt hiện key). Gồm: tổng quan, chi tiết từng chi nhánh, hoạt động của máy theo đăng nhập AD, xem key theo chi nhánh, máy chưa có key. Số máy và số key là số **hiện tại**; máy mới, key mới, máy rời phạm vi và lượt hiện key tính **trong kỳ**; "ngoài giờ" chỉ tính khi đã cấu hình giờ làm việc.
 
-| Phần | Nội dung |
-| --- | --- |
-| Tổng quan | Số chi nhánh, máy trong phạm vi giám sát, % máy có key, số key, máy/key mới và máy rời phạm vi giám sát trong kỳ, lượt hiện key (số người, số máy, số lượt ngoài giờ) |
-| Chi tiết theo chi nhánh | **Liệt kê mọi chi nhánh**, kể cả chi nhánh chưa có máy hoặc chưa có key (ghi 0), chia trang theo "Số dòng mỗi trang" (mục 6.3); mỗi chi nhánh: máy, có key, chưa có key, % có key (dưới 90% được tô màu), số key, máy mới, key mới, rời phạm vi giám sát; dòng tổng |
-| Hoạt động của máy | Theo lần đăng nhập AD gần nhất: mỗi chi nhánh có số máy **hoạt động gần đây**, **không hoạt động gần đây**, **chưa có dữ liệu** và % hoạt động (tính trên máy đã có dữ liệu); bấm số để mở danh sách ở trang Tìm máy với bộ lọc tương ứng. Ngưỡng "gần đây" ở Ngưỡng cảnh báo (mặc định 3 tháng) |
-| Xem key theo chi nhánh | Mỗi chi nhánh: lượt hiện key, số người xem, số máy được xem, ngoài giờ, xuất kèm file, lý do nhiều nhất; bên dưới là bảng người xem key theo chi nhánh |
-| Máy chưa có key | Máy còn trong phạm vi giám sát chưa lưu key (trạng thái hiện tại, không theo kỳ). **Tất cả chi nhánh**: chỉ bảng tổng quan theo chi nhánh (chưa có key, lâu hơn 7 ngày, mới ≤ 7 ngày, link **Xem danh sách** sang trang Tìm máy), xếp chi nhánh nhiều máy lâu chưa có key lên đầu. **Một chi nhánh** (hoặc người xem chỉ có một chi nhánh): danh sách từng máy, máy lâu nhất lên đầu, cột số ngày chưa có key, nhãn "mới". Máy mới ghi nhận ≤ 7 ngày có thể vẫn đang chờ GPO. File Excel theo cùng quy tắc: tất cả chi nhánh thì sheet "Máy chưa có key" chỉ là bảng tổng hợp theo chi nhánh; một chi nhánh thì có danh sách từng máy |
-| Máy đã có key (chỉ trong file Excel của **một chi nhánh**) | Sheet **"Máy đã có key"**, đặt ngay trước sheet "Máy chưa có key": mỗi máy còn được giám sát có ít nhất một key, kèm **số key** của máy (cột "Số key"), ngày tạo key mới nhất, tên, hệ điều hành, serial, email người dùng, DN; dòng cuối là tổng số máy và tổng số key. Không có Key ID hay mật khẩu. File Excel của tất cả chi nhánh không có sheet này |
+**Xuất Excel** (`.xlsx`, đúng kỳ, chi nhánh và bộ lọc đang chọn): các sheet *Tổng quan*, *Theo chi nhánh*, *Xem key theo CN*, *Người xem key*, *Máy chưa có key*, *Máy rời phạm vi*; một chi nhánh có thêm sheet *Máy đã có key*. File **không bao giờ chứa recovery key**; mỗi lần xuất ghi `export_report`.
 
-"Ngoài giờ" chỉ được tính khi đã cấu hình giờ làm việc (cảnh báo xem key ngoài giờ).
-
-Nút **Xuất Excel** tải file `.xlsx` theo đúng kỳ và chi nhánh đang chọn, gồm 6 sheet: *Tổng quan*,
-*Theo chi nhánh*, *Xem key theo CN* (thêm một cột cho mỗi lý do), *Người xem key*, *Máy chưa có key*, *Máy rời phạm vi* (máy rời phạm vi giám sát trong kỳ, kèm số key vẫn lưu).
-Sheet *Tổng quan* và *Theo chi nhánh* có thêm số máy hoạt động / không hoạt động / chưa có dữ liệu, các sheet danh sách máy có cột "Đăng nhập AD gần nhất". Mỗi sheet có dòng tiêu đề cố định và bộ lọc; ngày giờ theo `APP_TZ`. File **không bao giờ chứa
-recovery key**. Mỗi lần xuất ghi một dòng `export_report` vào nhật ký.
-
-**Báo cáo hằng ngày bằng email** (Quản trị > Thông báo, mặc định tắt):
-
-- Mỗi ngày **một** email (HTML + bản chữ thường) gửi Admin HQ có email (nếu chọn) và các địa chỉ thêm. **Giờ gửi** theo `APP_TZ` (mặc định 07:30); quá giờ mà hôm nay chưa gửi thì gửi (app tắt lúc đến giờ thì gửi bù). Bật sau giờ gửi thì báo cáo đầu tiên vào ngày mai.
-- **Số liệu của**: *Hôm qua (cả ngày)* hợp gửi buổi sáng; *Hôm nay, tính đến giờ gửi* hợp gửi cuối ngày.
-- Nội dung: trạng thái **Worker** và **Đồng bộ AD** (từng worker: heartbeat, LDAP, DC), lượt sync thành công / lỗi / bị giữ lại, cảnh báo đang mở, Key ID trùng chưa xem xét; tổng **máy** và **key** kèm tăng / giảm; máy / key mới, máy rời phạm vi giám sát, key chuyển máy; tối đa 15 chi nhánh có thay đổi; biểu đồ cột 10 ngày gần nhất (bảng HTML nên hiện được trên Outlook, Gmail, điện thoại). Không có recovery key, không liệt kê máy.
-- Tiêu đề và câu mở đầu sửa ở mẫu `daily_report` (mục 6.6). **Gửi thử báo cáo ngay** gửi tức thì (không tính là báo cáo theo lịch); Log email có nút **Xem bản HTML**.
+**Báo cáo hằng ngày bằng email** (Quản trị > Thông báo, mặc định tắt): mỗi ngày một email cho Admin HQ và các địa chỉ thêm, giờ gửi theo `APP_TZ` (mặc định 07:30; app tắt lúc đến giờ thì gửi bù), số liệu của *hôm qua* hoặc *hôm nay tính đến giờ gửi*. Nội dung: trạng thái Worker và Đồng bộ AD, lượt sync, cảnh báo đang mở, tổng máy và key kèm tăng giảm, máy và key mới. Câu chữ sửa ở mẫu `daily_report` (mục 6.6); có nút **Gửi thử báo cáo ngay**.
 
 ### 6.12. Định danh máy và key, các tình huống thường gặp
 
@@ -1221,30 +1095,15 @@ Khi xóa máy khỏi AD, AD xóa luôn key của máy. Xóa **nhiều** máy cù
 
 ### 6.13. Hiện key và sao chép
 
-Trang hiện key cho thấy 8 nhóm số và tự ẩn sau 60 giây. **Sao chép key** chép cả key kèm dấu gạch ngang (dán thẳng vào màn hình BitLocker); khi key ẩn, trang cố xóa clipboard (trình duyệt có thể không cho, nên tự copy nội dung khác sau khi dùng). Sao chép cần HTTPS hoặc localhost, không được thì trang chọn sẵn key để bấm Ctrl+C. Mọi lần hiện key đều được ghi nhật ký kèm lý do.
+Trang hiện key tự ẩn sau 60 giây; **Sao chép key** chép cả key kèm dấu gạch ngang (cần HTTPS hoặc localhost). Mọi lần hiện key đều ghi nhật ký.
 
 ### 6.14. Bảo mật tài khoản: 2 bước, khóa, mật khẩu, phiên, admin gốc
 
-**Xác thực 2 bước** (TOTP, Microsoft/Google Authenticator), bật **từng người** ở Quản trị > Người dùng > ô **Bắt buộc xác thực 2 bước** (tài khoản AD và nội bộ đều dùng được).
-
-- Lần đăng nhập đầu sau khi bật: nhập mật khẩu, quét **mã QR** (hoặc nhập khóa), nhập mã 6 số. Từ lần sau: mật khẩu rồi mã 6 số. Chưa đúng mã thì chưa đăng nhập; trang nhập mã hết hạn sau 5 phút.
-- Mã đổi mỗi 30 giây, **mỗi mã dùng một lần**. Sai mã tính như sai mật khẩu (xem khóa tài khoản).
-- Khóa bí mật được mã hóa (khóa suy ra từ `SECRET_KEY`) và không hiện lại; đổi `SECRET_KEY` thì mọi người phải thiết lập lại.
-- **Mất / đổi điện thoại**: Admin HQ bấm **Đặt lại xác thực 2 bước** ở trang sửa người dùng (hoặc CLI `reset-2fa`, mục 6.9). Bỏ chọn ô Bắt buộc rồi lưu thì tắt hẳn.
-- API: `POST /api/auth/login` trả `{ secondFactor: 'setup' | 'code', csrfToken }`; lần đầu `GET /api/auth/2fa/setup`, rồi `POST /api/auth/2fa` `{ code }`. Tài khoản dùng cho script nên tắt 2 bước.
-
-**Khóa tài khoản khi đăng nhập sai** (Quản trị > Bảo mật, áp dụng ngay): số lần sai liên tiếp (3–20, mặc định 5), thời gian khóa (mặc định 15 phút; **0 = khóa tới khi Admin HQ mở**), có áp dụng cho Admin HQ hay không (mặc định có), hoặc tắt hẳn. **Mở khóa**: Admin HQ vào Người dùng > Sửa > **Mở khóa**; nếu chính Admin bị khóa, dùng CLI `unlock <tên>` (mục 6.9). Nên có một Admin dự phòng.
-
-**Mật khẩu tài khoản nội bộ** (Quản trị > Bảo mật): độ dài tối thiểu (8–64, mặc định 12) và bắt buộc chữ hoa / thường / số / ký tự đặc biệt (tùy chọn); luôn không chứa tên đăng nhập và khác mật khẩu hiện tại. Mật khẩu một lần do hệ thống tạo luôn đạt chính sách; tài khoản AD theo chính sách của AD. **Bắt đổi mật khẩu ở lần đăng nhập sau**: ô ở trang sửa người dùng (chỉ tài khoản nội bộ; tài khoản mới và mật khẩu vừa đặt lại luôn phải đổi).
-
-**Thời gian phiên** (Quản trị > Bảo mật, áp dụng trong 30 giây): **tự đăng xuất sau X phút không hoạt động** (mặc định `SESSION_IDLE_MINUTES`, 15; trang đang mở cũng chuyển về đăng nhập) và **thời gian tối đa của phiên** (mặc định `SESSION_MAX_HOURS`, 8).
-
-**Admin gốc (siêu quản trị).** Tài khoản `admin` tạo lúc khởi tạo, có nhãn **Superadmin** ở Quản trị > Người dùng:
-
-- **Không admin nào khác** đổi được nó (sửa, đặt lại mật khẩu / 2 bước, gỡ liên kết AD, mở khóa: web và API trả 403); chỉ chính nó tự đổi.
-- Chỉ nó được **bỏ quyền admin hoặc khóa** admin khác. Admin thường vẫn sửa email, chi nhánh, 2 bước... của admin khác.
-- Nó không tự bỏ quyền hay tự khóa mình, nên luôn còn ít nhất một admin.
-- Khi web hỏng hoặc mất mật khẩu / điện thoại: dùng CLI trên máy chủ (mục 6.9), áp dụng cho mọi tài khoản kể cả admin gốc.
+- **Xác thực 2 bước** (TOTP): bật từng người ở Quản trị > Người dùng (AD và nội bộ đều dùng được). Mã dùng một lần; khóa bí mật mã hóa bằng khóa suy ra từ `SECRET_KEY` (đổi `SECRET_KEY` thì mọi người phải thiết lập lại). Mất điện thoại: Admin HQ bấm **Đặt lại xác thực 2 bước** (hoặc CLI `reset-2fa`, mục 6.9). Tài khoản dùng cho script nên tắt 2 bước.
+- **Khóa khi đăng nhập sai** (Quản trị > Bảo mật): mặc định 5 lần sai liên tiếp thì khóa 15 phút (0 = khóa tới khi Admin HQ mở); mở khóa ở Người dùng hoặc CLI `unlock`.
+- **Mật khẩu nội bộ:** tối thiểu 12 ký tự (8–64), tùy chọn bắt buộc chữ hoa / thường / số / ký tự đặc biệt; không chứa tên đăng nhập. Tài khoản AD theo chính sách của AD.
+- **Phiên:** tự đăng xuất sau 15 phút không hoạt động (`SESSION_IDLE_MINUTES`), tối đa 8 giờ (`SESSION_MAX_HOURS`); chỉnh ở Bảo mật.
+- **Admin gốc** (`admin` tạo lúc khởi tạo, nhãn Superadmin): không admin nào khác đổi được nó (403), chỉ nó bỏ quyền hoặc khóa admin khác, và không tự bỏ quyền hay tự khóa mình. Khi web hỏng hoặc mất mật khẩu / điện thoại: dùng CLI trên máy chủ (mục 6.9), áp dụng cho mọi tài khoản.
 
 ### 6.15. Log ra stdout cho hệ thống thu log (SIEM...)
 
@@ -1336,60 +1195,28 @@ Giờ đọc AD của **worker** (delta 15 phút, full 01:00, heartbeat 5 phút)
 
 ### 8.2. API cho người dùng
 
-Danh sách đầy đủ endpoint, tham số và quyền nằm ở **Swagger**: `https://<server>/api/docs` (dev: https://localhost/api/docs), mở sau khi đăng nhập web (dùng luôn phiên đó). Spec gốc: `/api/docs/openapi.yaml` hoặc `.json` (file `server/openapi/app.openapi.yaml`, mỗi thao tác có `operationId` để sinh client). Một test đối chiếu mọi route trong code với spec, nên thêm API mà quên cập nhật spec thì test báo lỗi. Muốn bấm "Try it out" cho POST/PUT/DELETE: gọi `GET /api/me`, chép `csrfToken`, bấm **Authorize** và dán vào `csrfHeader`.
+Danh sách endpoint, tham số và quyền nằm ở **Swagger**: `https://<server>/api/docs` (mở sau khi đăng nhập web). Lỗi trả về dạng `{ "error": "<mã>", "message": "<tiếng Anh>" }`.
 
-Lỗi trả về dạng `{ "error": "<mã>", "message": "<tiếng Anh>" }`.
+**Gọi API từ script** (cùng cách đăng nhập với web, không có API key riêng):
 
-#### Gọi API từ script
-
-API dùng **cùng cách đăng nhập với web**, không có API key riêng: script đăng nhập, giữ cookie phiên rồi gửi kèm mỗi request.
-
-1. **Tài khoản**: API chỉ nhận tài khoản **local** (tài khoản AD đăng nhập trên web; gọi API bằng tài khoản AD nhận 403 `api_requires_local`, để mật khẩu Windows không nằm trong script). Tạo riêng cho script (Quản trị > Người dùng, cách đăng nhập "Nội bộ"), chỉ cấp vai trò và chi nhánh cần thiết (ví dụ `auditor` để đọc nhật ký / báo cáo). Tài khoản local mới tạo phải đổi mật khẩu trước (`mustChangePassword: true` → `POST /api/auth/change-password`). Không lưu mật khẩu trong script.
-2. **Đăng nhập**: `POST /api/auth/login` `{ "username", "password" }` → cookie `blk.sid` và `csrfToken`. Có 2 bước thì thêm `POST /api/auth/2fa` (mục 6.14).
-3. **Gọi API** kèm cookie; POST/PUT/DELETE thêm `X-CSRF-Token: <csrfToken>` và `Content-Type: application/json` (thiếu thì 403 `csrf_failed` / 415 `json_required`).
-4. **Đăng xuất**: `POST /api/auth/logout`.
-
-Phiên hết hạn theo Quản trị > Bảo mật (nhận 401 thì đăng nhập lại); cookie có cờ `Secure` nên phải gọi qua HTTPS; đăng nhập sai nhiều lần thì khóa như trên web. Mọi thao tác (hiện key, xuất CSV / Excel, thay đổi quản trị) đều ghi nhật ký; hiện key vẫn bắt chọn lý do.
+1. API chỉ nhận tài khoản **local** (tài khoản AD gọi API nhận 403 `api_requires_local`).
+2. `POST /api/auth/login` `{ "username", "password" }` → cookie `blk.sid` và `csrfToken` (có 2 bước thì thêm `POST /api/auth/2fa`, mục 6.14).
+3. Gọi API kèm cookie; POST/PUT/DELETE thêm `X-CSRF-Token: <csrfToken>` và `Content-Type: application/json`. Phải gọi qua HTTPS; phiên hết hạn thì đăng nhập lại.
 
 ```bash
 BASE=https://blk.corp.local
-# Đăng nhập (mật khẩu lấy từ biến môi trường), giữ cookie trong cookies.txt
 CSRF=$(curl -s -c cookies.txt -H 'Content-Type: application/json' \
   -d "{\"username\":\"svc-report\",\"password\":\"$BLK_PASSWORD\"}" "$BASE/api/auth/login" | jq -r .csrfToken)
-
-# Đọc (GET không cần CSRF)
 curl -s -b cookies.txt "$BASE/api/computers?q=HN-LT" | jq '.rows[] | {name, branch_code}'
 curl -s -b cookies.txt -o bao-cao.xlsx "$BASE/api/reports/summary?from=2026-10-01&to=2026-10-31&format=xlsx"
-
-# Ghi (cần X-CSRF-Token): cập nhật serial / email của máy 42
-curl -s -b cookies.txt -X PUT -H 'Content-Type: application/json' -H "X-CSRF-Token: $CSRF" \
-  -d '{"deviceSerial":"5CG1234XYZ","ownerEmail":"nguyenvana@corp.local"}' "$BASE/api/computers/42/info"
-
 curl -s -b cookies.txt -X POST -H "X-CSRF-Token: $CSRF" "$BASE/api/auth/logout"
 ```
 
-PowerShell (`WebSession` tự giữ cookie):
-
-```powershell
-$base = 'https://blk.corp.local'
-$cred = Get-Credential
-$body = @{ username = $cred.UserName; password = $cred.GetNetworkCredential().Password } | ConvertTo-Json
-$login = Invoke-RestMethod "$base/api/auth/login" -Method Post -Body $body -ContentType 'application/json' -SessionVariable s
-$h = @{ 'X-CSRF-Token' = $login.csrfToken }
-
-(Invoke-RestMethod "$base/api/dashboard" -WebSession $s).totals                                   # đọc
-$info = @{ deviceSerial = '5CG1234XYZ'; ownerEmail = 'nguyenvana@corp.local' } | ConvertTo-Json
-Invoke-RestMethod "$base/api/computers/42/info" -Method Put -WebSession $s -Headers $h -ContentType 'application/json' -Body $info   # ghi
-Invoke-RestMethod "$base/api/auth/logout" -Method Post -WebSession $s -Headers $h
-```
-
-Dev: `BASE=https://localhost`; chứng chỉ tự ký thì curl thêm `--cacert cert/ca.crt` (hoặc `-k`), PowerShell 7 thêm `-SkipCertificateCheck`.
+Chứng chỉ tự ký: thêm `--cacert cert/ca.crt` cho `curl` (PowerShell 7: `-SkipCertificateCheck`).
 
 ### 8.3. Ingest API (cho worker)
 
-API **riêng cho sync worker**, cổng riêng (`INGEST_PORT`, mặc định 8443), không có phiên đăng nhập và không endpoint nào trả key ra. Đặc tả: `server/openapi/ingest.openapi.yaml`, Swagger UI `https://<server>:8443/docs`. Bình thường worker tự gọi; chỉ gọi tay để kiểm tra kết nối hoặc khi viết nguồn dữ liệu khác thay worker.
-
-Endpoint (chi tiết trong đặc tả): `GET /sync-runs/last`, `POST /sync-runs`, `POST /computers`, `POST /keys`, `POST /sync-runs/:id/complete`, `POST /heartbeat`, đều dưới `/api/ingest`. Body JSON tối đa 2 MB, mỗi lô tối đa 500 máy hoặc 500 key.
+API **riêng cho sync worker**, cổng riêng (`INGEST_PORT`, mặc định 8443), không có phiên đăng nhập và không endpoint nào trả key ra. Đặc tả: `server/openapi/ingest.openapi.yaml` (Swagger: `https://localhost:8443/docs`, cần API key). Endpoint dưới `/api/ingest`: `GET /sync-runs/last`, `POST /sync-runs`, `POST /computers`, `POST /keys`, `POST /sync-runs/:id/complete`, `POST /heartbeat`.
 
 **Xác thực: ba lớp, đều bắt buộc trên production**
 
@@ -1399,58 +1226,17 @@ Endpoint (chi tiết trong đặc tả): `GET /sync-runs/last`, `POST /sync-runs
 | IP được phép | `INGEST_ALLOWED_IPS` (IP nginx ghi vào `X-Forwarded-For`, client không giả được) | 403 `forbidden` |
 | API key | `INGEST_API_KEY`, header `Authorization: Bearer <key>` | 401 `bad_api_key` |
 
-**Gọi thử** (chỉ đọc hoặc vô hại), chạy trên máy worker (đúng IP được phép):
+Gọi thử trên máy worker (đúng IP được phép):
 
 ```bash
 INGEST=https://blk.corp.local:8443/api/ingest
 curl -s -H "Authorization: Bearer $INGEST_API_KEY" "$INGEST/sync-runs/last"      # thêm --cacert nếu máy chưa tin CA
-# Heartbeat: worker hiện ở Quản trị > Đồng bộ AD; trả về syncRequested (delta | full | null)
-curl -s -H "Authorization: Bearer $INGEST_API_KEY" -H 'Content-Type: application/json' \
-  -d '{"workerId":"TEST-CURL","version":"manual","ldapOk":true}' "$INGEST/heartbeat"
 ```
 
-```powershell
-Invoke-RestMethod 'https://blk.corp.local:8443/api/ingest/sync-runs/last' -Headers @{ Authorization = "Bearer $env:INGEST_API_KEY" }
-```
-
-**Gửi dữ liệu thật** (nguồn thay worker), theo trình tự: (1) `POST /sync-runs` `{ "mode": "delta"|"full", "dcName" }`, dùng `runId`, `mode`, `sinceUsn` server trả về (server có thể đổi delta thành full); (2) `POST /computers` từng lô, **máy trước**; (3) `POST /keys` từng lô (key trong `orphans` thì gửi máy cha rồi gửi lại); (4) `POST /sync-runs/{runId}/complete` với số đếm và `highestUsn` (lỗi thì `status: failed` + `errorCode`).
-
-Cẩn thận:
-
-- Lượt **full** coi mọi máy không được gửi là "Không còn trong phạm vi giám sát": đừng chạy full thử với dữ liệu thiếu trên hệ thống thật (lượt bất thường bị giữ lại chờ duyệt, mục 6.1).
-- Chỉ một lượt mở tại một thời điểm (409 `run_in_progress`; lượt im lặng quá 30 phút được giải phóng): dừng worker thật trước khi gọi tay.
-- Mỗi lô gửi lại được (idempotent): 5xx / lỗi mạng thì thử lại với backoff, 4xx thì sửa dữ liệu. Không ghi log hay lưu recovery password ở phía gọi.
-- Dev: `https://localhost:8443/api/ingest` (CA `cert/ca.crt`), API key trong `server/.env`.
+Cẩn thận khi gửi dữ liệu tay: lượt **full** coi mọi máy không được gửi là "Không còn trong phạm vi giám sát" (đừng chạy full thử với dữ liệu thiếu trên hệ thống thật); chỉ một lượt mở tại một thời điểm (409 `run_in_progress`), nên dừng worker thật trước; mỗi lô gửi lại được (idempotent); không log hay lưu recovery password ở phía gọi.
 
 ### 8.4. Cấu trúc code (`server/src`)
 
-```
-app.js                  app cho người dùng: file tĩnh, /healthz, /api, trang web
-services.js             tạo mọi service một lần; web, API, ingest, job và CLI dùng chung
-api/index.js            router /api: phiên đăng nhập, chỉ nhận JSON, CSRF header, lỗi dạng JSON
-web/                    router trang web, biến dùng chung cho template, flash, dịch lỗi sang tiếng Việt (messages.js)
-ingest/ingest.app.js    API cho worker trên cổng riêng (API key + lọc IP; HTTPS ở nginx)
-jobs/                   lịch chạy job (mỗi job một instance nhờ advisory lock), watchdog sync
-http/                   AppError, kiểm tra dữ liệu (zod), CSRF, header bảo mật
-db/                     pool, chạy migration, withScope (phạm vi RLS theo transaction), dữ liệu mẫu
-domain/                 vai trò -> quyền -> tập chi nhánh; giờ làm việc
-modules/<tính năng>/
-  *.repo.js             chỉ SQL
-  *.service.js          nghiệp vụ (phân quyền, ghi nhật ký); không biết HTTP
-  *.api.js              route JSON -> service
-  *.web.js              route HTML -> cùng service -> view EJS
-views/                  template EJS
-```
+`app.js` (app người dùng), `services.js` (tạo mọi service một lần, dùng chung cho web, API, ingest, job, CLI), `api/`, `web/`, `ingest/` (API cho worker, cổng riêng), `jobs/` (job và watchdog), `http/` (lỗi, zod, CSRF), `db/` (pool, migration, `withScope` cho RLS), `domain/` (vai trò, quyền). Mỗi tính năng ở `modules/<tên>/`: `*.repo.js` (chỉ SQL), `*.service.js` (nghiệp vụ, phân quyền, ghi nhật ký), `*.api.js`, `*.web.js`. Ngoài `src/`: `db/migrations/`, `openapi/`, `templates/mail-templates.yaml`, `public/`, `test/` (vitest).
 
-Ngoài `src/`: `db/migrations/` (SQL, chạy theo thứ tự), `openapi/` (spec Swagger của API người dùng và
-ingest), `templates/mail-templates.yaml` (mẫu email), `public/` (CSS, JS), `test/` (vitest).
-
-Quy tắc:
-
-- Route chỉ mỏng. Mọi kiểm tra quyền và ghi nhật ký nằm trong service, nên trang web và API không
-  bao giờ lệch nhau.
-- Giá trị key chỉ được đọc trong `keys.repo.js`: `readRecoveryPassword` (hiện một key) và
-  `keysForExport` (xuất kèm key), đều bên trong transaction có ghi nhật ký.
-- Không log body request/response. Logger tự che mọi chuỗi có dạng recovery key.
-
-Hướng dẫn chi tiết về worker (cấu trúc code, phát triển với AD giả): xem `worker/README.md`.
+Quy tắc: route chỉ mỏng, mọi kiểm tra quyền và nhật ký nằm trong service (web và API không lệch nhau); giá trị key chỉ đọc trong `keys.repo.js` (`readRecoveryPassword`, `keysForExport`) bên trong transaction có ghi nhật ký; không log body request/response, logger che mọi chuỗi giống recovery key. Worker: xem `worker/README.md`.
