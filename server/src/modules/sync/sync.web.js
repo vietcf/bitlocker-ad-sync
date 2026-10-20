@@ -35,6 +35,20 @@ export function syncWeb({ syncAdmin }) {
     res.redirect('/admin/sync');
   });
 
+  r.post('/alerts/:id/ack', async (req, res) => {
+    const a = await syncAdmin.ackAlert(req.scope, parse(id, req.params.id), { note: req.body.note || undefined }, clientInfo(req));
+    flash(req, 'success', a.silences
+      ? 'Đã đánh dấu cảnh báo là đã xử lý. Sẽ không gửi mail nữa; cảnh báo tự đóng khi điều kiện hết, và báo lại nếu tái phát.'
+      : 'Đã ghi nhận bạn đã xem cảnh báo này. Đây là lỗi đo trực tiếp nên vẫn hiện cho đến khi hết sự cố.');
+    res.redirect('/admin/sync');
+  });
+
+  r.post('/alerts/:id/snooze', async (req, res) => {
+    const a = await syncAdmin.snoozeAlert(req.scope, parse(id, req.params.id), { days: req.body.days, note: req.body.note || undefined }, clientInfo(req));
+    flash(req, 'success', `Đã bỏ qua cảnh báo đến ${a.snoozed_until.toLocaleString('vi-VN')}. Hết hạn mà điều kiện còn thì báo lại.`);
+    res.redirect('/admin/sync');
+  });
+
   r.post('/key-duplicates/:id/review', async (req, res) => {
     const out = await syncAdmin.reviewKeyDuplicate(req.scope, parse(id, req.params.id), { action: req.body.action }, clientInfo(req));
     flash(

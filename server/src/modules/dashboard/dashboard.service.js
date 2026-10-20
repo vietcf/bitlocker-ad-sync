@@ -1,4 +1,5 @@
 import { withAllBranches, withScope } from '../../db/scoped.js';
+import { DATA_ALERT_TYPES } from '../alerts/alerts.service.js';
 import { branchesFor, can } from '../../domain/scope.js';
 import { forbidden } from '../../http/errors.js';
 import { lastSuccessfulRun, listHeartbeats } from '../sync/sync.repo.js';
@@ -82,14 +83,16 @@ export class DashboardService {
       const SUMMARY = ['worker_offline', 'sync_problem', 'sync_offline'];
       const offline = openAlerts.find((a) => a.type === 'worker_offline') ?? null;
       const problem = openAlerts.find((a) => a.type === 'sync_problem') ?? null;
-      const others = openAlerts.filter((a) => !SUMMARY.includes(a.type));
+      const live = openAlerts.filter((a) => !SUMMARY.includes(a.type) && !DATA_ALERT_TYPES.includes(a.type)); // system faults, measured live
+      const dataAlerts = openAlerts.filter((a) => DATA_ALERT_TYPES.includes(a.type) && !a.silenced); // handled / snoozed ones do not count
       sync = {
         lastSuccessAt: last?.finished_at ?? null,
         lastHeartbeatAt: heartbeats[0]?.at ?? null,
         workerOfflineSince: offline?.opened_at ?? null,
-        problemSince: problem?.opened_at ?? null,
-        openAlerts: others.length,
-        highAlerts: others.filter((a) => a.severity === 'high').length,
+        problemSince: problem && live.length ? problem.opened_at : null,
+        openAlerts: live.length,
+        dataAlerts: dataAlerts.length,
+        highAlerts: live.filter((a) => a.severity === 'high').length,
       };
     }
 

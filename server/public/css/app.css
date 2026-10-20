@@ -319,6 +319,9 @@ tr.row-total td { font-weight: 600; }
 .status-box.is-ok { border-left-color: var(--good); }
 .status-box.is-bad { border-left-color: var(--bad); }
 .status-box.is-unknown { border-left-color: var(--muted); }
+.status-box.is-warn { border-left-color: var(--warn); }
+.status-row { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; margin-top: 4px; }
+.status-row > .status-label { min-width: 9.5rem; color: var(--muted); }
 .status-title { font-weight: 600; margin-bottom: 4px; }
 
 .run-summary { margin-top: 4px; font-size: 13px; }

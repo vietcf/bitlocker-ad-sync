@@ -1,4 +1,5 @@
 import { withAllBranches } from '../../db/scoped.js';
+import { DATA_ALERT_TYPES } from '../alerts/alerts.service.js';
 import { niceRange } from '../../web/charts.js';
 import { inventoryPerDay } from '../dashboard/dashboard.repo.js';
 import { adminEmails, adminsWithoutEmail } from '../mail/mail.repo.js';
@@ -141,7 +142,10 @@ export class DailyReportService {
       );
       const { rows: alerts } = await tx.query(
         `SELECT type, severity, opened_at, detail->>'subject' AS subject FROM sync_alert
-          WHERE resolved_at IS NULL ORDER BY severity, opened_at`,
+          WHERE resolved_at IS NULL
+            AND NOT (type = ANY($1::text[]) AND (acked_at IS NOT NULL OR snoozed_until > now()))
+          ORDER BY severity, opened_at`,
+        [DATA_ALERT_TYPES],
       );
       const { rows: [dup] } = await tx.query('SELECT count(*)::int AS n FROM key_duplicate WHERE resolved_at IS NULL');
 

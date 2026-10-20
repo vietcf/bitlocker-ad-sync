@@ -356,6 +356,45 @@ describe('heartbeat, manual sync and watchdog', () => {
     expect(sent.some((m) => m.subject.includes('Đã khôi phục'))).toBe(false);
   });
 
+  it('Admin HQ can mark a data alert handled or snooze it; live errors can only be marked as seen', async () => {
+    await heartbeat();
+    await runSync({ computers: [computer(1)] }); // a full run, then it gets old
+    await asOwner("UPDATE sync_run SET finished_at = now() - interval '3 days'");
+    await runSync({ mode: 'delta', computers: [computer(1)] }); // recent delta: only full_stale is left (data alert)
+    expect((await watchdog()).problems).toEqual(['full_stale']);
+    await addUser(pool, 'admin.hq', [{ branchId: null, role: 'admin' }]);
+    const web = await webLogin(app, 'admin.hq');
+    const alertId = async (type) => (await asOwner(`SELECT id FROM sync_alert WHERE type = '${type}' AND resolved_at IS NULL`))[0].id;
+    const post = async (type, action, body = {}) =>
+      web.agent.post(`/admin/sync/alerts/${await alertId(type)}/${action}`).type('form').send({ _csrf: web.csrf, ...body });
+
+    expect((await post('full_stale', 'ack', { note: 'GPO da sua' })).status).toBe(302);
+    expect(await services.alerts.isSilenced('full_stale')).toBe(true);
+    expect(await watchdog()).toMatchObject({ problems: [] }); // the overall status is back to normal
+    expect(await openTypes()).not.toContain('sync_problem');
+    expect(await openTypes()).toContain('full_stale'); // still listed, marked handled
+    const page = (await web.agent.get('/admin/sync')).text;
+    expect(page).toContain('GPO da sua');
+    expect(page).toContain('Sự cố hệ thống');
+    expect(page).toContain('Cảnh báo dữ liệu');
+    expect((await asOwner(`SELECT detail FROM access_log WHERE action = 'alert_ack'`))[0].detail.type).toBe('full_stale');
+
+    // snooze: silent until the time is over, then it counts again
+    await asOwner(`UPDATE sync_alert SET acked_at = NULL WHERE type = 'full_stale'`);
+    expect((await post('full_stale', 'snooze', { days: '7' })).status).toBe(302);
+    expect((await watchdog()).problems).toEqual([]);
+    await asOwner(`UPDATE sync_alert SET snoozed_until = now() - interval '1 minute' WHERE type = 'full_stale'`);
+    expect((await watchdog()).problems).toEqual(['full_stale']);
+
+    // a live error is never silenced: "seen" only records it, and it cannot be snoozed
+    await heartbeat({ ldapOk: false, lastErrorCode: 'ldap_bind_failed' });
+    await watchdog();
+    expect((await post('ldap_error', 'ack')).status).toBe(302);
+    expect(await services.alerts.isSilenced('ldap_error')).toBe(false);
+    expect((await post('ldap_error', 'snooze', { days: '7' })).status).toBe(400);
+    expect((await watchdog()).problems).toContain('ldap_error');
+  });
+
   it('the worker going down while a problem is open closes it quietly (Offline wins), and comes back as a problem if it persists', async () => {
     await heartbeat({ ldapOk: false, lastErrorCode: 'ldap_bind_failed' });
     await watchdog();

@@ -146,6 +146,7 @@ describe('Tinh trang sync: two separate statuses', () => {
     const { agent } = await webLogin(app, 'status.admin');
     // Worker alive, AD problem.
     await asOwner(`INSERT INTO worker_heartbeat (worker_id, version, at, ldap_ok, last_error_code) VALUES ('w1', '1', now(), false, 'ldap_tls_failed')`);
+    await asOwner(`INSERT INTO sync_alert (type, severity, detail) VALUES ('ldap_error', 'high', '{"subject":"Khong doc duoc AD","text":"y"}')`);
     await asOwner(`INSERT INTO sync_alert (type, severity, detail) VALUES ('sync_problem', 'high', '{"subject":"x","text":"y"}')`);
     let page = (await agent.get('/admin/sync')).text;
     expect(page).toMatch(/Worker \(agent\)[\s\S]*?badge-good[^>]*>● Online/);

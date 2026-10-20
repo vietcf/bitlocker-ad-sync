@@ -40,7 +40,8 @@ export async function runSyncWatchdog({ pool, alerts, settings }) {
   const flag = async (type, severity, vars) => {
     raised.push(type);
     const subject = await alerts.record(type, severity, vars);
-    if (type !== 'worker_silent') problems.push({ type, subject, severity });
+    // a data alert marked handled / snoozed by Admin HQ no longer counts as a sync problem
+    if (type !== 'worker_silent' && !(await alerts.isSilenced(type))) problems.push({ type, subject, severity });
   };
   const quiet = (type) => alerts.clear(type, {}, { announce: false });
   const check = async (type, isBad, severity, vars) => (isBad ? flag(type, severity, vars) : quiet(type));

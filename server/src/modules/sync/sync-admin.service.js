@@ -30,6 +30,8 @@ import { mailKeyDuplicates, notInAdEvents } from './ingest.service.js';
 
 const ackInput = z.object({ decision: z.enum(['accept', 'reject']) });
 const duplicateInput = z.object({ action: z.enum(['assign', 'share']) });
+const alertAckInput = z.object({ note: z.string().trim().max(300).optional() });
+const alertSnoozeInput = alertAckInput.extend({ days: z.coerce.number().int().refine((d) => [1, 7, 30].includes(d)) });
 const requestInput = z.object({ mode: z.enum(['delta', 'full']) });
 
 /** Admin HQ side of sync: health overview, manual run request, quarantine decisions. */
@@ -98,6 +100,26 @@ export class SyncAdminService {
       });
       return { id: Number(d.id), result, from: d.owner_name, to: d.other_name };
     });
+  }
+
+  /** "Handled" on an alert (Quan tri > Sync AD). A data alert goes quiet until it clears; others only record who looked. */
+  async ackAlert(scope, id, raw, client = {}) {
+    this.#check(scope);
+    const { note } = parse(alertAckInput, raw);
+    const a = await this.alerts.acknowledge(id, { by: scope.upn, note });
+    if (!a) throw notFound('Alert not found or already closed.');
+    await this.audit.log({ ...this.audit.actor(scope, client), action: 'alert_ack', detail: { alertId: Number(a.id), type: a.type, silences: a.silences, note: note ?? null } });
+    return a;
+  }
+
+  /** "Skip for N days" on a data alert. */
+  async snoozeAlert(scope, id, raw, client = {}) {
+    this.#check(scope);
+    const { days, note } = parse(alertSnoozeInput, raw);
+    const a = await this.alerts.snooze(id, { by: scope.upn, days, note });
+    if (!a) throw badRequest('Only alerts computed from data (not live sync errors) can be skipped.');
+    await this.audit.log({ ...this.audit.actor(scope, client), action: 'alert_snooze', detail: { alertId: Number(a.id), type: a.type, days, note: note ?? null } });
+    return a;
   }
 
   /** Queues a run; the worker picks it up on its next heartbeat (within ~5 minutes). */

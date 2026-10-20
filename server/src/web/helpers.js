@@ -42,6 +42,8 @@ export const ACTION_LABELS = {
   sync_manual: 'Yêu cầu sync',
   sync_ack: 'Xử lý sync cách ly',
   key_duplicate_review: 'Kiểm tra Key ID trùng',
+  alert_ack: 'Xử lý cảnh báo sync',
+  alert_snooze: 'Bỏ qua cảnh báo sync',
   backup_run: 'Sao lưu',
   backup_download: 'Tải file sao lưu',
 };

@@ -24,11 +24,12 @@
   </div>
 <% } %>
 
-<% if (sync && (sync.workerOfflineSince || sync.problemSince || sync.highAlerts || sync.openAlerts)) { %>
+<% if (sync && (sync.workerOfflineSince || sync.problemSince || sync.highAlerts || sync.openAlerts || sync.dataAlerts)) { %>
   <a class="notice notice-<%= sync.workerOfflineSince || sync.highAlerts ? 'error' : 'warn' %> block-link" href="/admin/sync">
     <% if (sync.workerOfflineSince) { %><strong>Worker đang Offline</strong> từ <%= h.dateTime(sync.workerOfflineSince) %> · <% } %>
     <% if (sync.problemSince) { %><strong>Đồng bộ AD có sự cố</strong> từ <%= h.dateTime(sync.problemSince) %> · <% } %>
-    <% if (sync.openAlerts) { %><strong><%= sync.openAlerts %> cảnh báo sync đang mở</strong><% if (sync.highAlerts) { %> (<%= sync.highAlerts %> mức cao)<% } %> · <% } %>xem chi tiết →
+    <% if (sync.dataAlerts) { %><strong><%= sync.dataAlerts %> cảnh báo dữ liệu</strong> (nhẹ) · <% } %>
+    <% if (sync.openAlerts) { %><strong><%= sync.openAlerts %> sự cố sync đang mở</strong><% if (sync.highAlerts) { %> (<%= sync.highAlerts %> mức cao)<% } %> · <% } %>xem chi tiết →
   </a>
 <% } %>
 

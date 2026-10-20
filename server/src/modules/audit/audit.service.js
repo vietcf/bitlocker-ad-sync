@@ -22,6 +22,8 @@ export const AUDIT_ACTIONS = [
   'sync_manual',
   'sync_ack',
   'key_duplicate_review',
+  'alert_ack',
+  'alert_snooze',
   'backup_run',
   'backup_download',
 ];

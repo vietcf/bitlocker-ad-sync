@@ -6,6 +6,13 @@
 
 export const REMIND_HOURS = 4;
 
+/**
+ * Alerts computed from stored data / trends: they stay true for days after the cause is fixed, so Admin HQ can
+ * mark them handled or snooze them. The other alerts (worker, AD, sync) are measured live and clear themselves.
+ */
+export const DATA_ALERT_TYPES = ['escrow_broken', 'no_key_rising', 'full_stale', 'dc_cert_expiring'];
+const SILENCED = '(type = ANY($1::text[]) AND (acked_at IS NOT NULL OR snoozed_until > now()))';
+
 /** 'YYYY-MM-DD' of a date in the app's time zone. */
 const dayOf = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: process.env.APP_TZ ?? 'Asia/Ho_Chi_Minh' }).format(d);
 
@@ -88,10 +95,41 @@ export class AlertsService {
 
   async listOpen() {
     const { rows } = await this.pool.query(
-      `SELECT id, type, severity, opened_at, last_notified_at, detail
+      `SELECT id, type, severity, opened_at, last_notified_at, detail, acked_at, acked_by, ack_note, snoozed_until,
+              ${SILENCED} AS silenced
          FROM sync_alert WHERE resolved_at IS NULL ORDER BY severity, opened_at`,
+      [DATA_ALERT_TYPES],
     );
     return rows;
+  }
+
+  /** True while the open alert of this type is marked handled / snoozed (data alerts only). */
+  async isSilenced(type) {
+    const { rows } = await this.pool.query(
+      `SELECT 1 FROM sync_alert WHERE type = $2 AND resolved_at IS NULL AND ${SILENCED}`,
+      [DATA_ALERT_TYPES, type],
+    );
+    return rows.length > 0;
+  }
+
+  /** "Handled": a data alert goes quiet until it clears; any other alert only records who looked at it. */
+  async acknowledge(id, { by, note }) {
+    const { rows } = await this.pool.query(
+      `UPDATE sync_alert SET acked_at = now(), acked_by = $2, ack_note = $3, snoozed_until = NULL
+        WHERE id = $1 AND resolved_at IS NULL RETURNING id, type, (type = ANY($4::text[])) AS silences`,
+      [id, by, note || null, DATA_ALERT_TYPES],
+    );
+    return rows[0] ?? null;
+  }
+
+  /** Snooze a data alert for N days; it is reported again when the time is over and the condition remains. */
+  async snooze(id, { by, days, note }) {
+    const { rows } = await this.pool.query(
+      `UPDATE sync_alert SET snoozed_until = now() + make_interval(days => $3), acked_at = NULL, acked_by = $2, ack_note = $4
+        WHERE id = $1 AND resolved_at IS NULL AND type = ANY($5::text[]) RETURNING id, type, snoozed_until`,
+      [id, by, days, note || null, DATA_ALERT_TYPES],
+    );
+    return rows[0] ?? null;
   }
 
   async listRecent(limit = 20) {
