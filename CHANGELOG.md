@@ -13,6 +13,12 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.12.2] - 2026-10-20
+
+### Sửa
+
+- Bộ lọc đăng nhập AD gọn hơn: hai ô cùng một dòng, nhãn nằm trên ô chọn như các ô khác, khoanh bằng một viền mờ (bỏ khung trắng cao và tiêu đề riêng). Tìm máy và Báo cáo.
+
 ## [2.12.1] - 2026-10-20
 
 ### Sửa
