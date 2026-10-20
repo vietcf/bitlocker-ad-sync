@@ -398,7 +398,27 @@ Build sẵn image trên một máy có internet, đóng thành một file, chép
 
 6. Kiểm tra: script tự in `OK` khi `healthz` trả `"dbOk": true`; hoặc `curl -k https://localhost/healthz`.
 
-**Cập nhật lên bản mới:** làm lại bước 1 đến 3 trên máy có internet với tag mới, chép gói sang máy chủ, giải nén vào thư mục **mới**, chạy `bash load.sh`, rồi chạy lại `bash install.sh --db ... --up` trong thư mục cũ có `server/.env` (hoặc chép `server/.env`, `server/db.env`, `cert/`, `backups/` sang thư mục mới rồi chạy `bash install.sh --db ... --up` ở đó). Migration tự chạy. Nên sao lưu database trước.
+**Cập nhật lên bản mới** (máy chủ không có internet). Giải nén **đè vào chính thư mục đang chạy**, đừng tạo thư mục mới: Docker Compose đặt tên project và volume database theo tên thư mục, đổi thư mục là DB mới trống và cổng bị trùng với container cũ.
+
+1. Trên máy có internet: lấy tag mới (`git fetch --tags && git checkout vX.Y.Z`), chạy `bash tools/build-offline.sh` (thêm `--no-db` nếu DB ngoài Docker), chép `blk-offline-X.Y.Z.tar.gz` sang máy chủ. Build lại gói cho mỗi bản, vì gói mang cả image và `install.sh` mới.
+2. Trên máy chủ: **sao lưu database trước** (Quản trị > Sao lưu > chạy ngay).
+3. Vào thư mục đang chạy (nơi có `server/.env`), giải nén đè lên. Gói chỉ chứa file mẫu (`.env.example`...), không ghi đè `server/.env`, `server/db.env`, `cert/server.*` của bạn (nhưng `docker-compose.prod.yml` và `nginx/*.conf` được thay bằng bản mới: nếu đã sửa tay thì lưu bản sao trước). Rồi nạp image:
+
+   ```bash
+   cd /duong/dan/thu-muc-dang-chay
+   tar xzf /noi/chua/blk-offline-X.Y.Z.tar.gz --strip-components=1
+   bash load.sh
+   ```
+
+4. Chạy lại installer: giữ nguyên các khóa cũ, chỉ bổ sung dòng còn thiếu (ví dụ `BACKUP_DATABASE_URL`), rồi khởi động bằng image vừa nạp (không build):
+
+   ```bash
+   bash install.sh --db docker --up     # DB ngoài Docker: --db external
+   ```
+
+5. Kiểm tra: `docker compose -f docker-compose.prod.yml --profile db ps` (`db`, `server`, `nginx` là `Up (healthy)`, `migrate` là `Exited (0)`) và log server hiện đúng phiên bản (`docker compose -f docker-compose.prod.yml logs --tail=20 server`). Migration tự chạy khi `migrate` chạy.
+
+Không dùng `down -v`: `-v` xóa cả volume, mất toàn bộ database.
 
 **Quay về bản cũ (rollback):** image bản cũ vẫn còn trong Docker nếu bạn chưa xóa. Chạy `BLK_VERSION=2.0.1 docker compose -f docker-compose.prod.yml up -d --no-build` (đổi `2.0.1` thành tag cũ). Lưu ý migration của bản mới đã chạy và không tự hoàn tác, nên chỉ quay về nếu bản cũ chạy được với schema mới, hoặc khôi phục database từ bản sao lưu trước khi nâng cấp.
 
