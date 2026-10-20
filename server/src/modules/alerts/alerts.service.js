@@ -113,14 +113,21 @@ export class AlertsService {
     return rows.length > 0;
   }
 
-  /** "Handled": a data alert goes quiet for `days` (or until it clears). Live system faults clear themselves and cannot be marked. */
-  async acknowledge(id, { by, note, days }) {
+  /**
+   * "Handled" (the cause was fixed): the data alert is closed now, with who and why. The watchdog is told to leave this
+   * type alone for a while (see SyncAdminService.ackAlert), then it looks again: still true -> a new alert opens.
+   * Live system faults clear themselves and cannot be marked.
+   */
+  async acknowledge(id, { by, note }) {
     const { rows } = await this.pool.query(
-      `UPDATE sync_alert SET acked_at = now(), acked_by = $2, ack_note = $3, snoozed_until = now() + make_interval(days => $5)
-        WHERE id = $1 AND resolved_at IS NULL AND type = ANY($4::text[]) RETURNING id, type, snoozed_until`,
-      [id, by, note || null, DATA_ALERT_TYPES, days],
+      `UPDATE sync_alert SET acked_at = now(), acked_by = $2, ack_note = $3, snoozed_until = NULL, resolved_at = now()
+        WHERE id = $1 AND resolved_at IS NULL AND type = ANY($4::text[])
+        RETURNING id, type, severity, resolved_at, detail->>'subject' AS subject`,
+      [id, by, note || null, DATA_ALERT_TYPES],
     );
-    return rows[0] ?? null;
+    const a = rows[0] ?? null;
+    if (a) this.eventLog?.emit('alert', { event: 'resolved', time: a.resolved_at, alert_id: Number(a.id), type: a.type, severity: a.severity, subject: a.subject });
+    return a;
   }
 
   /** Snooze a data alert for N days; it is reported again when the time is over and the condition remains. */

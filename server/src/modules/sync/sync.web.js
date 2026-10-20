@@ -53,7 +53,7 @@ export function syncWeb({ syncAdmin }) {
 
   r.post('/alerts/:id/ack', refusal(async (req, res) => {
     const a = await syncAdmin.ackAlert(req.scope, parse(id, req.params.id), { note: req.body.note || undefined }, clientInfo(req));
-    flash(req, 'success', `Đã đánh dấu cảnh báo là đã xử lý. Không gửi mail và không tính vào trạng thái đến ${a.snoozed_until.toLocaleString('vi-VN')}; hết hạn mà điều kiện còn thì báo lại. Cảnh báo tự đóng khi điều kiện hết.`);
+    flash(req, 'success', `Đã đóng cảnh báo. Theo dõi lại sau ${a.hours} giờ; nếu lúc đó điều kiện còn thì báo lại.`);
     res.redirect('/admin/sync');
   }));
 

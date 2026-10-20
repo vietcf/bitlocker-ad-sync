@@ -440,26 +440,27 @@ describe('heartbeat, manual sync and watchdog', () => {
     const post = async (type, action, body = {}) =>
       web.agent.post(`/admin/sync/alerts/${await alertId(type)}/${action}`).type('form').send({ _csrf: web.csrf, ...body });
 
+    // "Da xu ly" = the cause was fixed: the alert closes now (with who / why) and is looked at again after the grace period
     expect((await post('full_stale', 'ack', { note: 'GPO da sua' })).status).toBe(302);
-    expect(await services.alerts.isSilenced('full_stale')).toBe(true);
-    expect(await watchdog()).toMatchObject({ problems: [] }); // the overall status is back to normal
+    expect(await openTypes()).not.toContain('full_stale'); // closed at once
+    const [closed] = await asOwner(`SELECT acked_by, ack_note, resolved_at FROM sync_alert WHERE type = 'full_stale' ORDER BY id DESC LIMIT 1`);
+    expect(closed).toMatchObject({ acked_by: 'admin.hq', ack_note: 'GPO da sua' });
+    expect(closed.resolved_at).not.toBeNull();
+    expect(await watchdog()).toMatchObject({ problems: [] }); // within the grace period: not raised again
     expect(await openTypes()).not.toContain('sync_problem');
-    expect(await openTypes()).toContain('full_stale'); // still listed, marked handled
+    expect(await openTypes()).not.toContain('full_stale');
     const page = (await web.agent.get('/admin/sync')).text;
-    expect(page).toContain('GPO da sua');
     expect(page).toContain('Sự cố hệ thống');
     expect(page).toContain('Cảnh báo dữ liệu');
-    expect((await asOwner(`SELECT detail FROM access_log WHERE action = 'alert_ack'`))[0].detail.type).toBe('full_stale');
-    // "handled" is not forever: it lasts alerts.ack_reopen_days (default 30), then the alert counts again
-    const [{ days }] = await asOwner(`SELECT round(extract(epoch FROM snoozed_until - now()) / 86400)::int AS days FROM sync_alert WHERE type = 'full_stale'`);
-    expect(days).toBe(30);
-    await asOwner(`UPDATE sync_alert SET snoozed_until = now() - interval '1 minute' WHERE type = 'full_stale'`);
+    const [{ detail }] = await asOwner(`SELECT detail FROM access_log WHERE action = 'alert_ack'`);
+    expect(detail).toMatchObject({ type: 'full_stale', graceHours: 24 });
+    // the grace period is over and the condition is still true: a NEW alert opens
+    await asOwner(`INSERT INTO app_setting (key, value) VALUES ('alert_grace.full_stale', to_jsonb((now() - interval '1 minute')::text)) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`);
+    services.settings.invalidate();
     expect((await watchdog()).problems).toEqual(['full_stale']);
-    expect((await web.agent.get('/admin/sync')).text).not.toContain('Đã xử lý, báo lại sau');
-    await post('full_stale', 'ack'); // handled again for the next step
+    expect(await openTypes()).toContain('full_stale');
 
     // snooze: silent until the time is over, then it counts again
-    await asOwner(`UPDATE sync_alert SET acked_at = NULL WHERE type = 'full_stale'`);
     expect((await post('full_stale', 'snooze', { days: '7' })).status).toBe(302);
     expect((await watchdog()).problems).toEqual([]);
     await asOwner(`UPDATE sync_alert SET snoozed_until = now() - interval '1 minute' WHERE type = 'full_stale'`);

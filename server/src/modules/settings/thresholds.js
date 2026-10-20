@@ -39,9 +39,9 @@ export const THRESHOLDS = [
   { key: 'anomaly.no_key_pp_increase', group: 'dataalerts', alert: 'no_key_rising', unit: 'points', default: 5, min: 1, max: 100,
     label: 'Tỉ lệ máy chưa có key của chi nhánh tăng quá (điểm %, so với tuần trước)' },
 
-  // Data alerts: a "handled" alert is reported again after this long if its condition remains.
-  { key: 'alerts.ack_reopen_days', group: 'dataalerts', unit: 'days', default: 30, min: 1, max: 365,
-    label: 'Cảnh báo dữ liệu đã xử lý tự báo lại sau (ngày) nếu điều kiện còn' },
+  // Data alerts: after "handled" the alert is closed and the watchdog looks again after this long.
+  { key: 'alerts.fix_grace_hours', group: 'dataalerts', unit: 'hours', default: 24, min: 1, max: 720,
+    label: 'Sau khi bấm "Đã xử lý", theo dõi lại cảnh báo đó sau (giờ)' },
 
   // Computers: when the last AD logon still counts as "recent" (label on the computer page and list).
   { key: 'computer.recent_months', group: 'activity', unit: 'months', default: 3, min: 1, max: 60,

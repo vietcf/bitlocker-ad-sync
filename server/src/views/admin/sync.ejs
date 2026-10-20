@@ -14,8 +14,7 @@
   <div class="status-box <%= workerOff ? 'is-bad' : 'is-ok' %>">
     <div class="status-title">Worker (agent)</div>
     <% if (workerOff) { %><span class="badge badge-bad">● Offline</span> từ <%= h.dateTime(workerOff.opened_at) %>
-      <div class="muted small">Không có heartbeat quá <%= heartbeatMax %> phút: sự cố của worker hoặc đường truyền tới app, chưa nói gì về AD.
-        Mail gửi khi chuyển sang Offline, sau đó tối đa 1 lần mỗi ngày<% if (workerOff.last_notified_at) { %> (gần nhất <%= h.dateTime(workerOff.last_notified_at) %>)<% } %>; worker gửi heartbeat trở lại thì tự về Online, không gửi nữa.</div>
+      <div class="muted small">Không có heartbeat quá <%= heartbeatMax %> phút. Mail nhắc tối đa 1 lần mỗi ngày<% if (workerOff.last_notified_at) { %> (gần nhất <%= h.dateTime(workerOff.last_notified_at) %>)<% } %>.</div>
     <% } else { %><span class="badge badge-good">● Online</span>
       <div class="muted small">Có heartbeat trong <%= heartbeatMax %> phút gần nhất.</div><% } %>
   </div>
@@ -50,7 +49,7 @@
         <%- include('../partials/csrf') %>
         <input type="text" name="note" maxlength="300" placeholder="Ghi chú (tùy chọn)" aria-label="Ghi chú">
         <div class="alert-form-actions">
-          <button type="submit" formaction="/admin/sync/alerts/<%= a.id %>/ack" class="small" title="Đã xử lý nguyên nhân: ngừng gửi mail và không tính vào trạng thái, báo lại nếu hết thời hạn mà điều kiện còn">Đã xử lý</button>
+          <button type="submit" formaction="/admin/sync/alerts/<%= a.id %>/ack" class="small" title="Đã sửa nguyên nhân: đóng cảnh báo ngay, theo dõi lại sau <%= fixGraceHours %> giờ">Đã xử lý</button>
           <span class="alert-form-or">hoặc</span>
           <span class="alert-form-snooze">
             <select name="days" aria-label="Số ngày bỏ qua"><option value="1">1 ngày</option><option value="7" selected>7 ngày</option><option value="30">30 ngày</option></select>
@@ -61,7 +60,7 @@
       <% } %>
     </div>
   <% }) %>
-  <% if (dataAlerts.length) { %><p class="muted small">Đã xử lý / Bỏ qua: im lặng đến hết thời hạn, hết hạn mà vẫn còn thì báo lại.</p><% } %>
+  <% if (dataAlerts.length) { %><p class="muted small"><strong>Đã xử lý</strong>: đóng ngay, theo dõi lại sau <%= fixGraceHours %> giờ. <strong>Bỏ qua</strong>: giữ cảnh báo nhưng im lặng đến hết hạn.</p><% } %>
 </section>
 <% } %>
 

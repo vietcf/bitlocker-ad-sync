@@ -39,6 +39,9 @@ export async function runSyncWatchdog({ pool, alerts, settings }) {
   // Each alert's text is the mail template named like its type (templates/mail-templates.yaml).
   const flag = async (type, severity, vars) => {
     if (!(await settings.alertEnabled(type))) return quiet(type); // switched off by Admin HQ: not watched, an open one is closed quietly
+    // "Handled" by Admin HQ: leave this type alone until the grace period is over, then look again
+    const graceUntil = await settings.get(`alert_grace.${type}`, null);
+    if (graceUntil && new Date(graceUntil) > new Date()) return quiet(type);
     raised.push(type);
     const subject = await alerts.record(type, severity, vars);
     // a data alert marked handled / snoozed by Admin HQ no longer counts as a sync problem

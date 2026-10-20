@@ -66,7 +66,8 @@ export class SyncAdminService {
       return { ...hb, minutesAgo, online: minutesAgo <= heartbeatMax };
     });
     const withRef = runs.map((r) => ({ ...r, run_ref: runRef(r.id, r.started_at) }));
-    return { runs: withRef, heartbeats: workers, heartbeatMax, openAlerts, requested, lastSuccess, duplicates };
+    const fixGraceHours = Number(await this.settings.get('alerts.fix_grace_hours', 24));
+    return { runs: withRef, heartbeats: workers, heartbeatMax, openAlerts, requested, lastSuccess, duplicates, fixGraceHours };
   }
 
   /**
@@ -112,11 +113,13 @@ export class SyncAdminService {
   async ackAlert(scope, id, raw, client = {}) {
     this.#check(scope);
     const { note } = parse(alertAckInput, raw);
-    const days = Number(await this.settings.get('alerts.ack_reopen_days', 30));
-    const a = await this.alerts.acknowledge(id, { by: scope.upn, note, days });
+    const hours = Number(await this.settings.get('alerts.fix_grace_hours', 24));
+    const a = await this.alerts.acknowledge(id, { by: scope.upn, note });
     if (!a) throw badRequest('alert_not_markable', 'Only open alerts computed from data (not system faults) can be marked handled.');
-    await this.audit.log({ ...this.audit.actor(scope, client), action: 'alert_ack', detail: { alertId: Number(a.id), type: a.type, days, note: note ?? null } });
-    return a;
+    // the watchdog leaves this alert type alone for `hours`, then looks again (a new alert opens if it is still true)
+    await this.settings.set(`alert_grace.${a.type}`, new Date(Date.now() + hours * 3_600_000).toISOString());
+    await this.audit.log({ ...this.audit.actor(scope, client), action: 'alert_ack', detail: { alertId: Number(a.id), type: a.type, graceHours: hours, note: note ?? null } });
+    return { ...a, hours };
   }
 
   /** "Skip for N days" on a data alert. */

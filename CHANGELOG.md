@@ -13,6 +13,13 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.20.0] - 2026-10-20
+
+### Đổi
+
+- Cảnh báo dữ liệu: **Đã xử lý** nay khác **Bỏ qua**. Đã xử lý = đã sửa nguyên nhân: **đóng cảnh báo ngay** (ghi người xử lý và ghi chú), watchdog **theo dõi lại sau 24 giờ** (ngưỡng `alerts.fix_grace_hours`, thay `alerts.ack_reopen_days`, chỉnh ở Cảnh báo sync); lúc đó điều kiện còn thì mở cảnh báo mới. Bỏ qua = giữ cảnh báo, im lặng 1/7/30 ngày.
+- Tình trạng sync: rút gọn dòng giải thích ở ô Worker Offline.
+
 ## [2.19.9] - 2026-10-20
 
 ### Sửa
