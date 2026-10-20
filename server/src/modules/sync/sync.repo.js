@@ -129,9 +129,9 @@ export async function findComputerByGuid(db, objectGuid) {
 
 export async function insertComputer(db, c) {
   const { rows } = await db.query(
-    `INSERT INTO computer (object_guid, name, dns_name, distinguished_name, branch_id, os, when_changed, ad_created_at, last_seen_run, first_seen_run)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9) RETURNING id`,
-    [c.objectGuid, c.name, c.dnsName ?? null, c.dn, c.branchId, c.os ?? null, c.whenChanged ?? null, c.whenCreated ?? null, c.runId],
+    `INSERT INTO computer (object_guid, name, dns_name, distinguished_name, branch_id, os, when_changed, ad_created_at, last_seen_run, first_seen_run, last_logon_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9, $10) RETURNING id`,
+    [c.objectGuid, c.name, c.dnsName ?? null, c.dn, c.branchId, c.os ?? null, c.whenChanged ?? null, c.whenCreated ?? null, c.runId, c.lastLogon ?? null],
   );
   return rows[0].id;
 }
@@ -139,9 +139,10 @@ export async function insertComputer(db, c) {
 export async function updateComputer(db, id, c) {
   await db.query(
     `UPDATE computer SET name = $2, dns_name = $3, distinguished_name = $4, branch_id = $5, os = $6,
-            when_changed = $7, ad_created_at = coalesce($8, ad_created_at), last_seen_run = $9, deleted_in_ad_at = NULL
+            when_changed = $7, ad_created_at = coalesce($8, ad_created_at), last_seen_run = $9, deleted_in_ad_at = NULL,
+            last_logon_at = coalesce($10, last_logon_at)
       WHERE id = $1`,
-    [id, c.name, c.dnsName ?? null, c.dn, c.branchId, c.os ?? null, c.whenChanged ?? null, c.whenCreated ?? null, c.runId],
+    [id, c.name, c.dnsName ?? null, c.dn, c.branchId, c.os ?? null, c.whenChanged ?? null, c.whenCreated ?? null, c.runId, c.lastLogon ?? null],
   );
 }
 

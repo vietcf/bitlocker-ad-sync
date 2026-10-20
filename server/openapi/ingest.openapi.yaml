@@ -384,6 +384,7 @@ components:
         usnChanged: { $ref: '#/components/schemas/Usn' }
         whenChanged: { type: [string, 'null'], format: date-time }
         whenCreated: { type: [string, 'null'], format: date-time, description: Used to find new computers without a key. }
+        lastLogon: { type: [string, 'null'], format: date-time, description: 'AD lastLogonTimestamp of the computer (optional; accurate to ~14 days).' }
     ComputersBatch:
       type: object
       required: [runId, items]

@@ -5,7 +5,7 @@ import { branchFilter } from '../../db/scoped.js';
 
 const COMPUTER_COLUMNS = `
   c.id, c.object_guid, c.name, c.dns_name, c.distinguished_name, c.os, c.branch_id, b.code AS branch_code, b.name AS branch_name,
-  c.ad_created_at, c.first_seen_at, c.when_changed, c.deleted_in_ad_at,
+  c.ad_created_at, c.first_seen_at, c.when_changed, c.last_logon_at, c.deleted_in_ad_at,
   c.device_serial, c.owner_email, c.info_updated_at, c.info_updated_by`;
 
 // Search form of a text: lower case, without the separators - _ . and spaces, so "lt0231",
@@ -123,7 +123,8 @@ export async function listKeyMetadata(tx, computerId) {
 /**
  * WHERE conditions on computer `c` for the list filters (shared by the list, its CSV export and
  * the key export). filters: { branchId (id or 'na' = no branch), status: 'all' | 'no_key' | 'has_key', includeDeleted,
- * dateField: 'seen' (first recorded here) | 'ad' (created in AD), from, to: 'YYYY-MM-DD' inclusive, in APP_TZ }
+ * dateField: 'seen' (first recorded here) | 'ad' (created in AD), from, to: 'YYYY-MM-DD' inclusive, in APP_TZ,
+ * activity: aN | iN | unknown (last AD logon, see computerQuery) }
  */
 export function computerFilters(branches, filters, params) {
   const where = [branchFilter('c.branch_id', branches, params)];
@@ -138,6 +139,13 @@ export function computerFilters(branches, filters, params) {
     where.push('NOT EXISTS (SELECT 1 FROM recovery_key k WHERE k.computer_id = c.id)');
   } else if (filters.status === 'has_key') {
     where.push('EXISTS (SELECT 1 FROM recovery_key k WHERE k.computer_id = c.id)');
+  }
+  if (filters.activity === 'unknown') {
+    where.push('c.last_logon_at IS NULL');
+  } else if (filters.activity) {
+    const months = Number(filters.activity.slice(1)); // validated by computerQuery: 1 3 6 9 12 24
+    params.push(months);
+    where.push(`c.last_logon_at ${filters.activity[0] === 'a' ? '>=' : '<'} now() - make_interval(months => $${params.length})`);
   }
   if (filters.from || filters.to) {
     const column = filters.dateField === 'ad' ? 'c.ad_created_at' : 'c.first_seen_at';

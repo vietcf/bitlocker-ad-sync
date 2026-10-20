@@ -17,7 +17,8 @@ public sealed record AdComputer(
     string? OperatingSystem,
     long UsnChanged,
     DateTimeOffset? WhenChanged,
-    DateTimeOffset? WhenCreated);
+    DateTimeOffset? WhenCreated,
+    DateTimeOffset? LastLogon = null); // lastLogonTimestamp: replicated between DCs, accurate to ~14 days
 
 /// <summary>
 /// One msFVE-RecoveryInformation object. <see cref="RecoveryPassword"/> is empty when the object

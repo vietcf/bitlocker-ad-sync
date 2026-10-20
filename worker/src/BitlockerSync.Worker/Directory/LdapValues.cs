@@ -22,6 +22,15 @@ public static class LdapValues
             : null;
     }
 
+    /// <summary>AD large integer date (lastLogonTimestamp: 100 ns ticks since 1601-01-01 UTC). 0 or Int64.MaxValue = no value.</summary>
+    public static DateTimeOffset? ParseFileTime(string? value)
+    {
+        if (!long.TryParse(value?.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var ticks)) return null;
+        if (ticks <= 0 || ticks == long.MaxValue) return null;
+        try { return DateTimeOffset.FromFileTime(ticks).ToUniversalTime(); }
+        catch (ArgumentOutOfRangeException) { return null; }
+    }
+
     /// <summary>"OU=A, OU=B,DC=x" -> "ou=a,ou=b,dc=x": lower case, no spaces around commas or '='.</summary>
     public static string NormalizeDn(string dn) =>
         string.Join(',', dn.Split(',').Select(rdn => string.Join('=', rdn.Split('=').Select(p => p.Trim())).ToLowerInvariant()));

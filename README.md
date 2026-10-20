@@ -1000,6 +1000,8 @@ Mỗi máy và mỗi key có hai mốc: **Tạo trên AD** (`whenCreated`) và *
 
 Bộ lọc danh sách: chi nhánh (kể cả N/A), tình trạng, có tính máy ngoài phạm vi giám sát hay không, và **khoảng ngày** theo *Ghi nhận* (mặc định) hoặc *Tạo trên AD* (tính cả hai đầu, theo `APP_TZ`). Ví dụ: máy mới tuần này = Ghi nhận, từ thứ Hai đến hôm nay.
 
+**Đăng nhập AD gần nhất:** worker đọc thêm thuộc tính `lastLogonTimestamp` của máy (AD đồng bộ giữa các DC nên chỉ cần hỏi một DC; AD chỉ cập nhật khi giá trị cũ hơn khoảng 14 ngày nên lệch tối đa ~14 ngày). Giá trị hiện ở danh sách, trang chi tiết và CSV (`last_logon_utc`), kèm nhãn **Hoạt động gần đây** (trong 3 tháng), **Không hoạt động gần đây** hoặc **Chưa có dữ liệu** (máy chưa từng đăng nhập, hoặc worker chưa báo, ví dụ worker bản cũ). Đó chỉ là "chưa thấy máy đăng nhập domain", không có nghĩa máy đã hỏng hay bị bỏ. Bộ lọc **Hoạt động**: trong 1/3/6/9/12/24 tháng gần nhất, quá 1/3/6/9/12/24 tháng chưa thấy, hoặc chưa có dữ liệu. Cần cập nhật worker (Go và .NET từ 1.2.0 có thuộc tính này) rồi chờ lượt sync full kế tiếp để dữ liệu có đủ.
+
 Hai nút xuất, đều xuất **toàn bộ** danh sách theo bộ lọc (không chỉ trang đang xem) và trong phạm vi chi nhánh của người xuất:
 
 | Nút | File CSV | Ai dùng | Nhật ký |

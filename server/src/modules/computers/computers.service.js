@@ -133,10 +133,10 @@ export class ComputersService {
     });
     return toCsv(
       ['name', 'object_guid', 'dns_name', 'branch', 'distinguished_name', 'os', 'device_serial', 'owner_email',
-        'keys', 'latest_key_utc', 'ad_created_utc', 'first_seen_utc', 'in_scope', 'out_of_scope_since_utc'],
+        'keys', 'latest_key_utc', 'ad_created_utc', 'first_seen_utc', 'last_logon_utc', 'in_scope', 'out_of_scope_since_utc'],
       rows.map((c) => [
         c.name, c.object_guid, c.dns_name, c.branch_code ?? 'N/A', c.distinguished_name, c.os, c.device_serial, c.owner_email,
-        c.key_count, c.latest_key_at, c.ad_created_at, c.first_seen_at, c.deleted_in_ad_at ? 'no' : 'yes', c.deleted_in_ad_at,
+        c.key_count, c.latest_key_at, c.ad_created_at, c.first_seen_at, c.last_logon_at, c.deleted_in_ad_at ? 'no' : 'yes', c.deleted_in_ad_at,
       ]),
     );
   }

@@ -150,6 +150,16 @@ describe('real-life cases', () => {
     expect(new Set(keys.map((k) => k.computer_id)).size).toBe(1);
   });
 
+  it('stores the last AD logon of a computer; a worker that does not send it keeps the stored value', async () => {
+    await runSync({ computers: [{ ...computer(1), lastLogon: '2026-10-01T08:00:00Z' }] });
+    const lastLogon = async () => (await asOwner('SELECT last_logon_at FROM computer'))[0].last_logon_at?.toISOString() ?? null;
+    expect(await lastLogon()).toBe('2026-10-01T08:00:00.000Z');
+    await runSync({ mode: 'delta', computers: [computer(1)] }); // older worker: no lastLogon in the item
+    expect(await lastLogon()).toBe('2026-10-01T08:00:00.000Z');
+    await runSync({ mode: 'delta', computers: [{ ...computer(1), lastLogon: '2026-10-15T08:00:00Z' }] });
+    expect(await lastLogon()).toBe('2026-10-15T08:00:00.000Z');
+  });
+
   it('case 2: a computer deleted and joined again with the same name is a new computer; old keys stay with the old one', async () => {
     await runSync({ computers: [computer(1), ...tenComputers('HN', 10), ...tenComputers('HN', 20), ...tenComputers('HN', 30)], keys: [key(1, 1, 'HN'), ...Array.from({ length: 30 }, (_, i) => key(100 + i, 10 + i, 'HN'))] });
     // Deleted from AD, then re-installed and joined with the same name: a NEW object (new objectGUID), same DN.

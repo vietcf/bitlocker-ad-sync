@@ -17,6 +17,9 @@ export const computerQuery = z.object({
   ),
   status: z.preprocess((v) => (v === '' ? undefined : v), z.enum(['all', 'no_key', 'has_key']).default('all')),
   includeDeleted: checkbox,
+  // Last AD logon of the computer: aN = seen within N months, iN = not seen for more than N months (N: 1 3 6 9 12 24),
+  // unknown = no logon data (never logged on, or the worker has not reported it yet).
+  activity: z.preprocess((v) => (v === '' ? undefined : v), z.string().regex(/^(?:[ai](?:1|3|6|9|12|24)|unknown)$/).optional()),
   // Appeared between from and to (YYYY-MM-DD, inclusive, in APP_TZ), by the date recorded in this
   // system ("seen", default) or the creation date in AD ("ad").
   dateField: z.preprocess((v) => (v === '' ? undefined : v), z.enum(['seen', 'ad']).default('seen')),

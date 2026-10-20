@@ -48,7 +48,7 @@ type LdapConfig struct {
 	SkipCertificateValidation bool
 }
 
-var computerAttributes = []string{"objectGUID", "name", "dNSHostName", "distinguishedName", "operatingSystem", "uSNChanged", "whenChanged", "whenCreated"}
+var computerAttributes = []string{"objectGUID", "name", "dNSHostName", "distinguishedName", "operatingSystem", "uSNChanged", "whenChanged", "whenCreated", "lastLogonTimestamp"}
 var keyAttributes = []string{"msFVE-RecoveryGuid", "msFVE-VolumeGuid", "msFVE-RecoveryPassword", "distinguishedName", "whenCreated", "uSNChanged"}
 
 // LdapFactory creates LdapReaders.
@@ -358,6 +358,7 @@ func toComputer(e *ldap.Entry) *Computer {
 		USNChanged:      usn,
 		WhenChanged:     ParseGeneralizedTime(e.GetAttributeValue("whenChanged")),
 		WhenCreated:     ParseGeneralizedTime(e.GetAttributeValue("whenCreated")),
+		LastLogon:       ParseFileTime(e.GetAttributeValue("lastLogonTimestamp")),
 	}
 }
 

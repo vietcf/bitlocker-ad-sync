@@ -25,6 +25,7 @@
     <input type="hidden" name="status" value="<%= filters.status %>">
     <% if (filters.includeDeleted) { %><input type="hidden" name="includeDeleted" value="on"><% } %>
     <input type="hidden" name="dateField" value="<%= filters.dateField %>">
+    <% if (filters.activity) { %><input type="hidden" name="activity" value="<%= filters.activity %>"><% } %>
     <% if (filters.from) { %><input type="hidden" name="from" value="<%= filters.from %>"><% } %>
     <% if (filters.to) { %><input type="hidden" name="to" value="<%= filters.to %>"><% } %>
     <label>Lý do

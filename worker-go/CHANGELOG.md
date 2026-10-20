@@ -3,6 +3,12 @@
 Định dạng theo [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/), phiên bản theo
 [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [1.2.0] - 2026-10-20
+
+### Thêm
+
+- Đọc `lastLogonTimestamp` của máy và gửi lên server (trường `lastLogon`, cần server 2.7.0 trở lên để hiển thị).
+
 ## [1.1.1] - 2026-10-19
 
 ### Sửa

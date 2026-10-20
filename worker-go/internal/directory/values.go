@@ -4,6 +4,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -75,6 +77,18 @@ func ParseGeneralizedTime(v string) *time.Time {
 		}
 	}
 	return nil
+}
+
+// ParseFileTime reads an AD large-integer date (lastLogonTimestamp): 100 ns ticks since 1601-01-01 UTC.
+// 0 (never) and 9223372036854775807 (no expiry) mean "no value".
+func ParseFileTime(v string) *time.Time {
+	n, err := strconv.ParseInt(strings.TrimSpace(v), 10, 64)
+	if err != nil || n <= 0 || n == math.MaxInt64 {
+		return nil
+	}
+	const epochDiff = 11644473600 // seconds from 1601-01-01 to 1970-01-01
+	t := time.Unix(n/10_000_000-epochDiff, (n%10_000_000)*100).UTC()
+	return &t
 }
 
 // NormalizeDN: "OU=A, OU=B,DC=x" -> "ou=a,ou=b,dc=x": lower case, no spaces around commas or '='.

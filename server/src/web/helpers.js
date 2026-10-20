@@ -58,6 +58,12 @@ export const helpers = {
   anomalyText,
   /** Readable number of a sync run: 20261018-0042 (the day it started + its sequence number). */
   runRef: (run) => runRef(run.id, run.started_at),
+  /** Recent AD logon of a computer: { label, cls } (recent = within 3 months; AD records it with ~14 days of delay). */
+  activity: (d) => {
+    if (!d) return { label: 'Chưa có dữ liệu', cls: 'badge-muted' };
+    const recent = Date.now() - new Date(d).getTime() <= 91 * 86_400_000;
+    return recent ? { label: 'Hoạt động gần đây', cls: 'badge-good' } : { label: 'Không hoạt động gần đây', cls: 'badge-warn' };
+  },
   dateTime: (d) => (d ? dateTimeFmt.format(new Date(d)) : '—'),
   date: (d) => (d ? dateFmt.format(new Date(d)) : '—'),
   role: (r) => ROLE_LABELS[r] ?? r,

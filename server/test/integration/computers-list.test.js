@@ -71,6 +71,31 @@ describe('computer list (no search term)', () => {
     expect(page.text).not.toContain('HN-PC-001<');
   });
 
+  it('filters by the last AD logon (recent / not seen for N months / no data), shows it on the page and in the CSV', async () => {
+    await asOwner(`UPDATE computer SET last_logon_at = now() - interval '10 days' WHERE name IN ('HN-PC-001', 'HN-PC-002');
+                   UPDATE computer SET last_logon_at = now() - interval '5 months' WHERE name = 'HN-PC-003';
+                   UPDATE computer SET last_logon_at = now() - interval '30 months' WHERE name = 'HN-PC-004'`);
+    const { agent } = await apiLogin(app, 'it.hn');
+    const total = async (activity) => (await agent.get('/api/computers').query({ activity })).body.total;
+    expect(await total('a1')).toBe(2);
+    expect(await total('a6')).toBe(3);
+    expect(await total('a24')).toBe(3);
+    expect(await total('i3')).toBe(2); // 5 and 30 months ago; machines without data are not "not seen"
+    expect(await total('i24')).toBe(1);
+    expect(await total('unknown')).toBe(30 - 4); // HN-LT-0001 and the other 25 HN-PC have no data
+    expect((await agent.get('/api/computers').query({ activity: 'a5' })).status).toBe(400);
+
+    const web = await webLogin(app, 'it.hn');
+    const [{ id }] = await asOwner(`SELECT id FROM computer WHERE name = 'HN-PC-003'`);
+    const page = (await web.agent.get(`/computers/${id}`)).text;
+    expect(page).toContain('Đăng nhập AD gần nhất');
+    expect(page).toContain('Không hoạt động gần đây');
+    const csv = (await web.agent.get('/computers/export.csv').query({ activity: 'a1' })).text;
+    expect(csv).toContain('last_logon_utc');
+    expect(csv).toContain('HN-PC-001');
+    expect(csv).not.toContain('HN-PC-003');
+  });
+
   it('shows the AD objectGUID of every computer and finds a computer by it', async () => {
     const { agent } = await apiLogin(app, 'it.hn');
     const list = (await agent.get('/api/computers')).body.rows;
@@ -115,7 +140,7 @@ describe('computer list (no search term)', () => {
     expect(res.headers['content-type']).toMatch(/text\/csv/);
     expect(res.headers['content-disposition']).toMatch(/attachment; filename="?computers-\d{4}-\d{2}-\d{2}\.csv"?/);
     const lines = res.text.replace(/^﻿/, '').trim().split('\r\n');
-    expect(lines[0]).toBe('name,object_guid,dns_name,branch,distinguished_name,os,device_serial,owner_email,keys,latest_key_utc,ad_created_utc,first_seen_utc,in_scope,out_of_scope_since_utc');
+    expect(lines[0]).toBe('name,object_guid,dns_name,branch,distinguished_name,os,device_serial,owner_email,keys,latest_key_utc,ad_created_utc,first_seen_utc,last_logon_utc,in_scope,out_of_scope_since_utc');
     expect(lines).toHaveLength(1 + 29); // HN machines without a key; not HN-LT-0001 (has a key), not HCM
     expect(res.text).not.toContain('HCM-LT-0001');
     expect(res.text).not.toMatch(/\d{6}-\d{6}-\d{6}/); // never a recovery password

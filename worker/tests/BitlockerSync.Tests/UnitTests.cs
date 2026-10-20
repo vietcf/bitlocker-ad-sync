@@ -17,6 +17,21 @@ public class LdapValuesTests
     public void Returns_null_for_unparsable_time() => Assert.Null(LdapValues.ParseGeneralizedTime("yesterday"));
 
     [Fact]
+    public void Parses_ad_file_time_for_last_logon()
+    {
+        var expected = new DateTimeOffset(2026, 10, 1, 8, 0, 0, TimeSpan.Zero);
+        Assert.Equal(expected, LdapValues.ParseFileTime(expected.ToFileTime().ToString()));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("0")]
+    [InlineData("9223372036854775807")]
+    [InlineData("abc")]
+    public void File_time_without_a_value_is_null(string? value) => Assert.Null(LdapValues.ParseFileTime(value));
+
+    [Fact]
     public void Converts_ad_binary_guids_like_the_rest_of_windows()
     {
         // {01234567-89AB-CDEF-0123-456789ABCDEF} is stored as 67 45 23 01 AB 89 EF CD 01 23 45 67 89 AB CD EF.

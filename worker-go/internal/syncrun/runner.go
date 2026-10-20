@@ -369,7 +369,7 @@ func chunk[T any](items []T, size int) [][]T {
 // ComputerItem converts a directory computer to its wire shape.
 func ComputerItem(c directory.Computer) ingest.ComputerItem {
 	return ingest.ComputerItem{ObjectGUID: c.ObjectGUID.String(), Name: c.Name, DNSName: c.DNSName, DN: c.DN,
-		OS: c.OperatingSystem, USNChanged: c.USNChanged, WhenChanged: c.WhenChanged, WhenCreated: c.WhenCreated}
+		OS: c.OperatingSystem, USNChanged: c.USNChanged, WhenChanged: c.WhenChanged, WhenCreated: c.WhenCreated, LastLogon: c.LastLogon}
 }
 
 // KeyItem converts a directory key to its wire shape.

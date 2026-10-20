@@ -18,7 +18,8 @@ public sealed record ComputerItem(
     string? Os,
     long UsnChanged,
     DateTimeOffset? WhenChanged,
-    DateTimeOffset? WhenCreated);
+    DateTimeOffset? WhenCreated,
+    DateTimeOffset? LastLogon = null);
 
 public sealed record ComputersBatch(long RunId, IReadOnlyList<ComputerItem> Items);
 

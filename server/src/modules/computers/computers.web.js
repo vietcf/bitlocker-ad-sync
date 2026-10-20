@@ -35,7 +35,7 @@ export function computersWeb({ computers, keys }) {
       filters,
       preview,
       branchName: branches.find((b) => b.id === filters.branchId)?.code ?? null,
-      query: { branchId: source.branchId, status: source.status, includeDeleted: source.includeDeleted },
+      query: { branchId: source.branchId, status: source.status, includeDeleted: source.includeDeleted, activity: source.activity },
       reasons: await keys.reasons(),
       ticketRequired: await keys.ticketRequired(),
       form: req.method === 'POST' ? req.body : {},

@@ -26,6 +26,7 @@ type Computer struct {
 	USNChanged      int64      `json:"usnChanged"`
 	WhenChanged     *time.Time `json:"whenChanged"`
 	WhenCreated     *time.Time `json:"whenCreated"`
+	LastLogon       *time.Time `json:"lastLogon"` // lastLogonTimestamp: replicated between DCs, accurate to ~14 days
 }
 
 // RecoveryKey is one msFVE-RecoveryInformation object. RecoveryPassword is empty when the object

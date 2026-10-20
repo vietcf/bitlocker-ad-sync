@@ -25,7 +25,7 @@ public sealed class LdapDirectoryReaderFactory(IOptions<LdapOptions> options, IL
 public sealed class LdapDirectoryReader(LdapOptions options, ILogger<LdapDirectoryReader> log) : IDirectoryReader
 {
     private static readonly string[] ComputerAttributes =
-        ["objectGUID", "name", "dNSHostName", "distinguishedName", "operatingSystem", "uSNChanged", "whenChanged", "whenCreated"];
+        ["objectGUID", "name", "dNSHostName", "distinguishedName", "operatingSystem", "uSNChanged", "whenChanged", "whenCreated", "lastLogonTimestamp"];
 
     private static readonly string[] KeyAttributes =
         ["msFVE-RecoveryGuid", "msFVE-VolumeGuid", "msFVE-RecoveryPassword", "distinguishedName", "whenCreated", "uSNChanged"];
@@ -282,7 +282,8 @@ public sealed class LdapDirectoryReader(LdapOptions options, ILogger<LdapDirecto
             GetString(e, "operatingSystem"),
             long.Parse(GetString(e, "uSNChanged") ?? "0"),
             LdapValues.ParseGeneralizedTime(GetString(e, "whenChanged")),
-            LdapValues.ParseGeneralizedTime(GetString(e, "whenCreated")));
+            LdapValues.ParseGeneralizedTime(GetString(e, "whenCreated")),
+            LdapValues.ParseFileTime(GetString(e, "lastLogonTimestamp")));
     }
 
     private IEnumerable<SearchResultEntry> PagedSearch(string searchBase, string filter, string[] attributes, CancellationToken ct)

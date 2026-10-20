@@ -36,6 +36,7 @@ type ComputerItem struct {
 	USNChanged  int64      `json:"usnChanged"`
 	WhenChanged *time.Time `json:"whenChanged"`
 	WhenCreated *time.Time `json:"whenCreated"`
+	LastLogon   *time.Time `json:"lastLogon"`
 }
 
 type ComputersBatch struct {

@@ -13,6 +13,12 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.7.0] - 2026-10-20
+
+### Thêm
+
+- Đăng nhập AD gần nhất của máy (`lastLogonTimestamp`, lệch tối đa ~14 ngày, một DC là đủ): hiện ở trang máy, danh sách Tìm máy và CSV (`last_logon_utc`), kèm nhãn "Hoạt động gần đây" / "Không hoạt động gần đây" / "Chưa có dữ liệu". Bộ lọc **Hoạt động** (trong hoặc quá 1/3/6/9/12/24 tháng, hoặc chưa có dữ liệu), cũng áp dụng cho xuất CSV, xuất kèm key và API (`activity`). Trường ingest `lastLogon` tùy chọn: worker cũ vẫn chạy, giá trị đã lưu không bị xóa. Migration 036 thêm `computer.last_logon_at`.
+
 ## [2.6.1] - 2026-10-20
 
 ### Sửa

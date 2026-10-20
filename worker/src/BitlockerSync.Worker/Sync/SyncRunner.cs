@@ -213,7 +213,7 @@ public sealed class SyncRunner(
     private DateOnly Today() => DateOnly.FromDateTime(time.GetLocalNow().DateTime);
 
     internal static ComputerItem ToItem(AdComputer c) =>
-        new(c.ObjectGuid.ToString(), c.Name, c.DnsName, c.Dn, c.OperatingSystem, c.UsnChanged, c.WhenChanged, c.WhenCreated);
+        new(c.ObjectGuid.ToString(), c.Name, c.DnsName, c.Dn, c.OperatingSystem, c.UsnChanged, c.WhenChanged, c.WhenCreated, c.LastLogon);
 
     internal static KeyItem ToItem(AdRecoveryKey k) =>
         new(k.KeyId.ToString(), k.Dn, k.RecoveryPassword, k.WhenCreated, k.VolumeGuid?.ToString());

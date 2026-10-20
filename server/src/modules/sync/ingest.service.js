@@ -90,6 +90,7 @@ const computersInput = z.object({
         usnChanged: z.coerce.number().int().nonnegative().optional(),
         whenChanged: isoDate.nullish(),
         whenCreated: isoDate.nullish(),
+        lastLogon: isoDate.nullish(), // AD lastLogonTimestamp; older workers do not send it
       }),
     )
     .max(MAX_BATCH),
