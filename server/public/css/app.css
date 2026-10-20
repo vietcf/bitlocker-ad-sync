@@ -354,9 +354,6 @@ label:has(input:disabled) { opacity: .6; }
 button:disabled { cursor: not-allowed; }
 
 /* nut chon nhanh ky bao cao: cai dang chon duoc to noi */
-.quick a { padding: 2px 10px; border-radius: 999px; text-decoration: none; }
-.quick a:hover { background: var(--info-bg); }
-.quick a[aria-current="true"] { background: var(--accent); color: var(--accent-fg); font-weight: 600; }
 
 .app-version { text-align: center; padding: 16px; }
 

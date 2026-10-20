@@ -13,6 +13,12 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.19.6] - 2026-10-20
+
+### Đổi
+
+- Báo cáo: bỏ các nút chọn thời gian nhanh (7 / 30 / 90 ngày, Toàn bộ). Vẫn chọn kỳ bằng hai ô ngày hoặc tích **Toàn bộ thời gian**.
+
 ## [2.19.5] - 2026-10-20
 
 ### Hiệu năng

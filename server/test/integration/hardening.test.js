@@ -105,15 +105,14 @@ describe('key of a computer outside the monitored scope', () => {
 });
 
 describe('report period picker', () => {
-  it('marks the quick period in use', async () => {
+  it('has no quick-period shortcuts, only the date range and the all-time box, applied on change', async () => {
     const { webLogin } = await import('./app.js');
     const web = await webLogin(app, 'admin.hq');
-    const on = (html) => [...html.matchAll(/<a [^>]*aria-current="true"[^>]*>([^<]*)</g)].map((m) => m[1]);
-    expect(on((await web.agent.get('/reports')).text)).toEqual(['30 ngày']);
-    expect(on((await web.agent.get('/reports?period=all')).text)).toEqual(['Toàn bộ']);
-    const day = (n) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(Date.now() - n * 86_400_000));
-    expect(on((await web.agent.get(`/reports?from=${day(6)}&to=${day(0)}`)).text)).toEqual(['7 ngày']);
-    expect(on((await web.agent.get('/reports?from=2026-01-01&to=2026-01-31')).text)).toEqual([]);
-    expect((await web.agent.get('/reports')).text).toContain('data-autosubmit');
+    const html = (await web.agent.get('/reports')).text;
+    expect(html).not.toContain('Nhanh:');
+    expect(html).not.toContain('>7 ngày<');
+    expect(html).toContain('name="period"'); // the "Toàn bộ thời gian" box stays
+    expect(html).toContain('data-autosubmit');
+    expect((await web.agent.get('/reports?period=all')).status).toBe(200);
   });
 });

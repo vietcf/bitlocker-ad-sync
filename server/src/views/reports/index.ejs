@@ -44,11 +44,6 @@
     <%- include('../partials/logon-filter', { filters: { activity: report.activity, noLogon: report.noLogon } }) %>
   </div>
   <div class="filter-actions">
-    <span class="muted small quick">Nhanh:
-      <% [7, 30, 90].forEach((n) => { const on = !report.period.all && report.period.to === h.daysAgo(0) && report.period.from === h.daysAgo(n - 1); %>
-      <a href="/reports<%= h.query(query, { from: h.daysAgo(n - 1), to: undefined, period: undefined }) %>" <%- on ? 'aria-current="true"' : '' %>><%= n %> ngày</a><% }) %>
-      <a href="/reports<%= h.query(query, { period: 'all', from: undefined, to: undefined }) %>" <%- report.period.all ? 'aria-current="true"' : '' %>>Toàn bộ</a>
-    </span>
     <span class="spacer"></span>
     <a href="/reports" class="small" title="Về kỳ mặc định 30 ngày">Xóa lọc</a>
     <button type="submit" class="small" title="Tự áp dụng khi bạn đổi kỳ hoặc chi nhánh">Lọc</button>
