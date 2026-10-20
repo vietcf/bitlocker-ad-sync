@@ -1067,7 +1067,7 @@ App không tự ghi file: mọi log in ra **stdout** dạng JSON, môi trường
 
 ### 6.11. Trang Báo cáo
 
-Cho Trưởng IT, Admin HQ và Auditor, trong phạm vi chi nhánh của người xem. Chọn kỳ (mặc định 30 ngày, tối đa 366, hoặc **Toàn bộ thời gian**), chi nhánh và bộ lọc đăng nhập AD (như Tìm máy, mục 6.4; áp dụng cho số máy và số key, không áp dụng cho lượt hiện key). Gồm: tổng quan, chi tiết từng chi nhánh, hoạt động của máy theo đăng nhập AD, xem key theo chi nhánh, máy chưa có key. Số máy và số key là số **hiện tại**; máy mới, key mới, máy rời phạm vi và lượt hiện key tính **trong kỳ**; "ngoài giờ" chỉ tính khi đã cấu hình giờ làm việc.
+Cho Trưởng IT, Admin HQ và Auditor, trong phạm vi chi nhánh của người xem. Chọn kỳ (mặc định 30 ngày, tối đa 366, hoặc **Toàn bộ thời gian**), chi nhánh và bộ lọc đăng nhập AD (như Tìm máy, mục 6.4; áp dụng cho số máy và số key, không áp dụng cho lượt hiện key). Gồm: tổng quan, chi tiết từng chi nhánh, hoạt động của máy theo đăng nhập AD, xem key theo chi nhánh, máy chưa có key. Số máy và số key là số **hiện tại**; máy mới, key mới, máy rời phạm vi và lượt hiện key tính **trong kỳ**. Máy mới và key mới tính theo **ngày ghi nhận trên hệ thống** (mặc định, lần đầu thấy qua sync; lần cài đầu mọi máy đều tính là mới trong ngày đó) hoặc **ngày tạo trên AD**, chọn ở ô "Máy mới / key mới theo"; máy rời phạm vi (ngày gắn nhãn) và lượt hiện key không đổi; "ngoài giờ" chỉ tính khi đã cấu hình giờ làm việc.
 
 **Xuất Excel** (`.xlsx`, đúng kỳ, chi nhánh và bộ lọc đang chọn): các sheet *Tổng quan*, *Theo chi nhánh*, *Xem key theo CN*, *Người xem key*, *Máy chưa có key*, *Máy rời phạm vi*; một chi nhánh có thêm sheet *Máy đã có key*. File **không bao giờ chứa recovery key**; mỗi lần xuất ghi `export_report`.
 

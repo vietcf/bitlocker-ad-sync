@@ -24,6 +24,8 @@ export const reportQuery = z.object({
   // Last AD logon filter of the computers counted (same as the computer search): activity aN / iN, noLogon exclude / include / only.
   activity: activityParam,
   noLogon: noLogonParam,
+  // What "new" means: first recorded in this system (default) or created in AD.
+  dateField: z.preprocess((v) => (v === '' ? undefined : v), z.enum(['seen', 'ad']).optional()),
 });
 
 const dateIn = (date, tz) => new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(date); // YYYY-MM-DD
@@ -64,7 +66,7 @@ export class ReportsService {
   filters(rawQuery) {
     const q = parse(reportQuery, rawQuery ?? {});
     const today = dateIn(this.now(), this.tz);
-    const logon = { activity: q.activity ?? null, noLogon: q.noLogon ?? null };
+    const logon = { activity: q.activity ?? null, noLogon: q.noLogon ?? null, dateField: q.dateField ?? 'seen' };
     if (q.period === 'all') return { all: true, from: null, to: today, branchId: q.branchId ?? null, ...logon };
     const to = q.to ?? today;
     const from = q.from ?? addDays(to, -29);
@@ -87,19 +89,20 @@ export class ReportsService {
     const branches = f.branchId ? (inScope ? [f.branchId] : []) : all;
     const hours = this.settings ? await this.settings.get('reveal.working_hours', null) : null;
     const logon = { activity: f.activity, noLogon: f.noLogon };
+    const dateField = f.dateField ?? 'seen';
     const months = this.settings ? Number(await this.settings.get('computer.recent_months', 3)) : 3; // "recent" last AD logon
 
     const data = branches.length === 0
       ? { list: [], existing: [], inventory: [], reveals: [], noKey: [], options: [] }
       : await withScope(this.pool, branches, async (tx) => {
-        if (f.all) f.from = (await earliestDay(tx, branches, this.tz)) ?? f.to;
+        if (f.all) f.from = (await earliestDay(tx, branches, this.tz, dateField)) ?? f.to;
         const period = { from: f.from, to: f.to, tz: this.tz };
         const list = await branchList(tx, branches);
         return {
           options: await branchList(tx, all),
           list,
           existing: await existingBranches(tx, branches),
-          inventory: await inventoryByBranch(tx, branches, period, months, logon),
+          inventory: await inventoryByBranch(tx, branches, period, months, logon, dateField),
           reveals: await revealsInPeriod(tx, branches, period),
           noKey: await computersWithoutKey(tx, branches, logon),
           // Computers that have keys, with their key counts: for the Excel file of one branch only.
@@ -210,6 +213,7 @@ export class ReportsService {
       branchId: f.branchId,
       activity: f.activity,
       noLogon: f.noLogon,
+      dateField: f.dateField ?? 'seen',
       branchOptions: data.options,
       workingHours: hours,
       activityMonths: months,
@@ -276,6 +280,7 @@ function workbook(r, scope) {
       [{ v: `Kỳ báo cáo: ${period}`, s: 'muted' }],
       [{ v: `Phạm vi: ${scopeText}`, s: 'muted' }],
       [{ v: `Lọc đăng nhập AD: ${logonText(r)}`, s: 'muted' }],
+      [{ v: `Máy mới / key mới tính theo: ${r.dateField === 'ad' ? 'ngày tạo trên AD' : 'ngày ghi nhận trên hệ thống'}`, s: 'muted' }],
       [{ v: `Người xuất: ${scope.upn} · lúc`, s: 'muted' }, r.generatedAt],
       [],
       [H('Chỉ số'), H('Giá trị'), H('Ghi chú')],

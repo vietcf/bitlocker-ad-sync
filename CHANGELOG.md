@@ -13,6 +13,12 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.19.0] - 2026-10-20
+
+### Thêm
+
+- Báo cáo: ô **"Máy mới / key mới theo"** chọn tính máy mới và key mới trong kỳ theo **ngày ghi nhận trên hệ thống** (mặc định) hoặc **ngày tạo trên AD**. Áp dụng cho trang, mốc "Toàn bộ thời gian" và file Excel (ghi rõ ở sheet Tổng quan). API `/api/reports/summary` nhận `dateField` (`seen` | `ad`).
+
 ## [2.18.3] - 2026-10-20
 
 ### Thêm

@@ -22,12 +22,12 @@ const periodParams = (params, { from, to, tz }) => {
  * First day with data in scope (computer or key first recorded here), 'YYYY-MM-DD' in time zone tz;
  * null when there is none. Start of the "all time" report.
  */
-export async function earliestDay(tx, branches, tz) {
+export async function earliestDay(tx, branches, tz, dateField = 'seen') {
   const params = [];
   const scope = branchFilter('c.branch_id', branches, params);
   params.push(tz);
   const { rows } = await tx.query(
-    `SELECT to_char(least(min(c.first_seen_at), min(k.first_synced_at)) AT TIME ZONE $${params.length},'YYYY-MM-DD') AS day
+    `SELECT to_char(${dateField === 'ad' ? 'least(min(c.ad_created_at), min(k.ad_created_at))' : 'least(min(c.first_seen_at), min(k.first_synced_at))'} AT TIME ZONE $${params.length},'YYYY-MM-DD') AS day
        FROM computer c LEFT JOIN recovery_key k ON k.computer_id = c.id
       WHERE ${scope}`,
     params,
@@ -118,12 +118,15 @@ export async function existingBranches(tx, branches) {
  * Per branch: computers in AD now, with / without a key, keys, and what changed in the period
  * (computers and keys first recorded, computers marked as no longer in AD).
  */
-export async function inventoryByBranch(tx, branches, period, months = 3, logon = null) {
+export async function inventoryByBranch(tx, branches, period, months = 3, logon = null, dateField = 'seen') {
   const params = [];
   const scope = branchFilter('c.branch_id', branches, params);
   const { start, end } = periodParams(params, period);
   params.push(months);
   const recent = `now() - make_interval(months => $${params.length})`;
+  // "new" in the period: first recorded here (default) or created in AD (computer whenCreated / key whenCreated)
+  const newC = dateField === 'ad' ? 'c.ad_created_at' : 'c.first_seen_at';
+  const newK = dateField === 'ad' ? 'k.ad_created_at' : 'k.first_synced_at';
   const extra = logonClause(logon, params);
   const { rows } = await tx.query(
     `SELECT c.branch_id,
@@ -134,13 +137,13 @@ export async function inventoryByBranch(tx, branches, period, months = 3, logon 
             count(*) FILTER (WHERE c.deleted_in_ad_at IS NULL AND c.last_logon_at < ${recent})::int AS inactive,
             count(*) FILTER (WHERE c.deleted_in_ad_at IS NULL AND c.last_logon_at IS NULL)::int AS no_logon,
             coalesce(sum(kc.n) FILTER (WHERE c.deleted_in_ad_at IS NULL), 0)::int AS keys,
-            count(*) FILTER (WHERE c.first_seen_at >= ${start} AND c.first_seen_at < ${end})::int AS new_computers,
+            count(*) FILTER (WHERE ${newC} >= ${start} AND ${newC} < ${end})::int AS new_computers,
             coalesce(sum(kc.new_n), 0)::int AS new_keys,
             count(*) FILTER (WHERE c.deleted_in_ad_at >= ${start} AND c.deleted_in_ad_at < ${end})::int AS left_ad
        FROM computer c
        CROSS JOIN LATERAL (
          SELECT count(*)::int AS n,
-                count(*) FILTER (WHERE k.first_synced_at >= ${start} AND k.first_synced_at < ${end})::int AS new_n
+                count(*) FILTER (WHERE ${newK} >= ${start} AND ${newK} < ${end})::int AS new_n
            FROM recovery_key k WHERE k.computer_id = c.id) kc
       WHERE ${scope}${extra}
       GROUP BY c.branch_id`,

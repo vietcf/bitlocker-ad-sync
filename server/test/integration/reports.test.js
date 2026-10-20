@@ -187,6 +187,23 @@ describe('report', () => {
     expect(Object.values(unzip(xlsx.body)).join('')).toContain('quá 3 tháng chưa thấy, gồm cả máy chưa có dữ liệu');
   });
 
+  it('counts new computers and keys by the day recorded here (default) or by the day created in AD', async () => {
+    // HN-PC-NEW was first recorded 2 days ago; make it created in AD long ago, and one old computer created in AD yesterday
+    await asOwner(`UPDATE computer SET ad_created_at = now() - interval '300 days' WHERE name = 'HN-PC-NEW';
+                   UPDATE computer SET ad_created_at = now() - interval '1 day' WHERE name = 'HCM-LT-0001'`);
+    const { agent } = await apiLogin(app, 'auditor');
+    const seen = (await agent.get('/api/reports/summary')).body;
+    expect(seen.dateField).toBe('seen');
+    expect(seen.totals.newComputers).toBe(1); // HN-PC-NEW (recorded 2 days ago)
+    const ad = (await agent.get('/api/reports/summary').query({ dateField: 'ad' })).body;
+    expect(ad.dateField).toBe('ad');
+    expect(ad.branches.find((b) => b.branch_code === 'HCM').new_computers).toBe(1); // created in AD yesterday
+    expect(ad.branches.find((b) => b.branch_code === 'HN').new_computers).toBe(0); // HN-PC-NEW is old in AD
+    const page = (await (await webLogin(app, 'auditor')).agent.get('/reports').query({ dateField: 'ad' })).text;
+    expect(page).toContain('Máy mới / key mới theo');
+    expect(page).toContain('dateField=ad'); // the Excel link keeps the choice
+  });
+
   it('renders the page with the three parts', async () => {
     const { agent } = await webLogin(app, 'auditor');
     const page = await agent.get('/reports');
