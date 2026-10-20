@@ -830,7 +830,7 @@ paths:
       tags: [Admin - settings]
       summary: Anomaly and watchdog thresholds
       description: |
-        `[{ key, group (run | watchdog), unit (percent | minutes | hours | count | points), label, min, max,
+        `[{ key, group (run | watchdog | activity), unit (percent | minutes | hours | months | count | points), label, min, max,
         default, value, defaultValue }]` in `items`. `value`, `defaultValue`, `min` and `max` are in page units (percent as 0-100);
         `default` is the stored value (percent as a ratio, 0.5 = 50%).
       responses:

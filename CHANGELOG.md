@@ -13,6 +13,12 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.8.0] - 2026-10-20
+
+### Thêm
+
+- Ngưỡng "Hoạt động gần đây" của máy cấu hình được ở Quản trị > Ngưỡng cảnh báo (mục Hoạt động của máy, mặc định 3 tháng, tối đa 60). Tooltip ở trang máy và danh sách hiển thị đúng số tháng đang cấu hình.
+
 ## [2.7.1] - 2026-10-20
 
 ### Sửa

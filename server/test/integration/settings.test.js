@@ -297,6 +297,7 @@ describe('thresholds', () => {
     const list = (await a.get('/api/admin/settings/thresholds')).body.items;
     const ratio = list.find((t) => t.key === 'anomaly.min_computer_ratio');
     expect(ratio).toMatchObject({ unit: 'percent', group: 'run' });
+    expect(list.find((t) => t.key === 'computer.recent_months')).toMatchObject({ unit: 'months', group: 'activity', value: 3 });
     expect(ratio.value).toBe(ratio.defaultValue);
     expect(ratio.value).toBeGreaterThan(1); // shown as a percent, not a ratio
 

@@ -36,6 +36,10 @@ export const THRESHOLDS = [
     label: '... chỉ xét khi số máy mới ít nhất là' },
   { key: 'anomaly.no_key_pp_increase', group: 'watchdog', unit: 'points', default: 5, min: 1, max: 100,
     label: 'Tỉ lệ máy chưa có key của chi nhánh tăng quá (điểm %, so với tuần trước)' },
+
+  // Computers: when the last AD logon still counts as "recent" (label on the computer page and list).
+  { key: 'computer.recent_months', group: 'activity', unit: 'months', default: 3, min: 1, max: 60,
+    label: 'Máy được coi là "Hoạt động gần đây" nếu có đăng nhập AD trong (tháng)' },
 ];
 
 /** Stored value -> value shown in the form. */

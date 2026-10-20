@@ -58,12 +58,15 @@ export const helpers = {
   anomalyText,
   /** Readable number of a sync run: 20261018-0042 (the day it started + its sequence number). */
   runRef: (run) => runRef(run.id, run.started_at),
-  /** Recent AD logon of a computer: { label, cls } (recent = within 3 months; AD records it with ~14 days of delay). */
-  activity: (d) => {
+  /** Recent AD logon of a computer: { label, cls } (recent = within `months`, setting computer.recent_months; AD records it with ~14 days of delay). */
+  activity: (d, months = 3) => {
     if (!d) return { label: 'Chưa có dữ liệu', cls: 'badge-muted' };
-    const recent = Date.now() - new Date(d).getTime() <= 91 * 86_400_000;
+    const recent = Date.now() - new Date(d).getTime() <= months * 30.44 * 86_400_000;
     return recent ? { label: 'Hoạt động gần đây', cls: 'badge-good' } : { label: 'Không hoạt động gần đây', cls: 'badge-warn' };
   },
+  /** Tooltip explaining the last AD logon. */
+  activityTip: (months) =>
+    `Lần máy này đăng nhập (xác thực) vào domain gần nhất, theo thuộc tính lastLogonTimestamp của máy trên AD. AD chỉ cập nhật khi giá trị cũ hơn khoảng 14 ngày nên số liệu có thể lệch tối đa ~14 ngày. Chỉ cho biết "chưa thấy máy đăng nhập domain", không có nghĩa máy đã hỏng hay bị bỏ. "Hoạt động gần đây" = trong ${months} tháng (Quản trị > Ngưỡng cảnh báo). "Chưa có dữ liệu" = máy chưa từng đăng nhập hoặc worker chưa báo giá trị này.`,
   dateTime: (d) => (d ? dateTimeFmt.format(new Date(d)) : '—'),
   date: (d) => (d ? dateFmt.format(new Date(d)) : '—'),
   role: (r) => ROLE_LABELS[r] ?? r,

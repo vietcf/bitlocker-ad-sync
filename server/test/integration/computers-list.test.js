@@ -90,6 +90,13 @@ describe('computer list (no search term)', () => {
     const page = (await web.agent.get(`/computers/${id}`)).text;
     expect(page).toContain('Đăng nhập AD gần nhất');
     expect(page).toContain('Không hoạt động gần đây');
+    expect(page).toContain('trong 3 tháng'); // the default threshold, explained in the tooltip
+    // the threshold is a setting (Quan tri > Nguong canh bao): 5 months ago counts as recent within 6 months
+    await asOwner(`INSERT INTO app_setting (key, value) VALUES ('computer.recent_months', '6')`);
+    services.settings.invalidate();
+    const page6 = (await web.agent.get(`/computers/${id}`)).text;
+    expect(page6).toContain('Hoạt động gần đây');
+    expect(page6).toContain('trong 6 tháng');
     const csv = (await web.agent.get('/computers/export.csv').query({ activity: 'a1' })).text;
     expect(csv).toContain('last_logon_utc');
     expect(csv).toContain('HN-PC-001');

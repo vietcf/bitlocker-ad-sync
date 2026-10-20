@@ -12,6 +12,7 @@ import { syncWeb } from '../modules/sync/sync.web.js';
 import { dashboardWeb } from '../modules/dashboard/dashboard.web.js';
 import { settingsWeb } from '../modules/settings/settings.web.js';
 import { templateLocals, webErrorHandler } from './middleware.js';
+import { helpers } from './helpers.js';
 
 /** Server-rendered pages (EJS). Same services as the API; forms carry a CSRF token. */
 export function createWebRouter({ services, config, sessions }) {
@@ -22,6 +23,8 @@ export function createWebRouter({ services, config, sessions }) {
   // Feature switches (Quan tri > Tinh nang) for templates: show or hide buttons.
   web.use(async (req, res, next) => {
     res.locals.features = await services.settings.features();
+    res.locals.activityMonths = Number(await services.settings.get('computer.recent_months', 3));
+    res.locals.activityTip = helpers.activityTip(res.locals.activityMonths);
     next();
   });
   web.use(verifyCsrf);
