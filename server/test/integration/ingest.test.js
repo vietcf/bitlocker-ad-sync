@@ -366,6 +366,21 @@ describe('heartbeat, manual sync and watchdog', () => {
     expect(sent.some((m) => m.subject.includes('Đã khôi phục'))).toBe(false);
   });
 
+  it('a delta run page shows only what the run saw; only a full run is compared with the whole system', async () => {
+    const full = await runSync({ computers: [computer(1), computer(2), computer(3)], keys: [key(1, 1)] });
+    const delta = await runSync({ mode: 'delta', computers: [computer(2)] });
+    await addUser(pool, 'admin.hq', [{ branchId: null, role: 'admin' }]);
+    const web = await webLogin(app, 'admin.hq');
+    const fullPage = (await web.agent.get(`/admin/sync/runs/${full.runId}`)).text;
+    expect(fullPage).toContain('Số liệu của lượt so với hệ thống');
+    expect(fullPage).toContain('Máy đang có');
+    const deltaPage = (await web.agent.get(`/admin/sync/runs/${delta.runId}`)).text;
+    expect(deltaPage).toContain('Số liệu của lượt này');
+    expect(deltaPage).not.toContain('Máy đang có');
+    expect(deltaPage).not.toContain('Chênh lệch');
+    expect(deltaPage).not.toContain('Key đang có');
+  });
+
   it('Admin HQ can mark a data alert handled or snooze it; system faults cannot be marked', async () => {
     await heartbeat();
     await runSync({ computers: [computer(1)] }); // a full run, then it gets old

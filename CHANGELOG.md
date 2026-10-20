@@ -13,6 +13,12 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.10.1] - 2026-10-20
+
+### Sửa
+
+- Trang chi tiết lượt sync: lượt **delta** không còn so với toàn hệ thống (trước đây hiện "Máy đang có" và chênh lệch âm rất lớn gây hiểu nhầm). Delta chỉ hiện máy thấy, key thấy, key mới thêm, key không đọc được; chỉ lượt full mới so sánh với dữ liệu đang có.
+
 ## [2.10.0] - 2026-10-20
 
 ### Thêm

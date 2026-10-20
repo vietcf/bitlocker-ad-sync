@@ -910,6 +910,8 @@ sudo systemctl daemon-reload && sudo userdel blk-sync
 
 Worker chạy **delta** mỗi 15 phút (chỉ đọc object có `uSNChanged` mới) và **full** mỗi đêm (`FullAt`, mặc định 01:00; thêm một lần khi worker khởi động lần đầu).
 
+Trang chi tiết của một lượt (Quản trị > Sync AD, bấm mã lượt): lượt **delta** chỉ hiện những gì lượt đó thấy (máy thấy, key thấy, key mới thêm, key không đọc được); chỉ lượt **full** mới so với dữ liệu đang có (máy/key đang có, chênh lệch).
+
 | Thay đổi trên AD | Delta | Full |
 | --- | --- | --- |
 | Máy mới, đổi tên, sửa thuộc tính, key mới | Thấy | Thấy |
