@@ -138,14 +138,6 @@ function logonCondition(filters, params) {
   return noLogon === 'include' ? `(${time} OR c.last_logon_at IS NULL)` : time;
 }
 
-/** Computers in the same list (all filters except the last logon) that have no logon data: a hint next to the filter. */
-export async function countWithoutLogon(tx, branches, filters) {
-  const params = [];
-  const where = computerFilters(branches, { ...filters, activity: undefined, noLogon: 'only' }, params);
-  const { rows } = await tx.query(`SELECT count(*)::int AS n FROM computer c WHERE ${where}`, params);
-  return rows[0].n;
-}
-
 /**
  * WHERE conditions on computer `c` for the list filters (shared by the list, its CSV export and
  * the key export). filters: { branchId (id or 'na' = no branch), status: 'all' | 'no_key' | 'has_key', includeDeleted,

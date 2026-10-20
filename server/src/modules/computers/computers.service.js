@@ -7,7 +7,6 @@ import { parse } from '../../http/validate.js';
 import {
   branchOptions,
   getComputer,
-  countWithoutLogon,
   listComputers,
   listKeyMetadata,
   searchByKeyId,
@@ -116,8 +115,7 @@ export class ComputersService {
     const PAGE_SIZE = await pageSize(this.settings, PAGE_SIZES.computers);
     return withScope(this.pool, branches, async (tx) => {
       const r = await listComputers(tx, branches, filters, { limit: PAGE_SIZE, offset: (pageNo - 1) * PAGE_SIZE });
-      const noLogonCount = await countWithoutLogon(tx, branches, filters);
-      return { ...r, noLogonCount, page: pageNo, pageSize: PAGE_SIZE, pages: Math.max(1, Math.ceil(r.total / PAGE_SIZE)), branches: await branchOptions(tx, branches), seesUnmapped: branches === 'all' };
+      return { ...r, page: pageNo, pageSize: PAGE_SIZE, pages: Math.max(1, Math.ceil(r.total / PAGE_SIZE)), branches: await branchOptions(tx, branches), seesUnmapped: branches === 'all' };
     });
   }
 

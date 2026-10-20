@@ -13,6 +13,12 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.11.5] - 2026-10-20
+
+### Sửa
+
+- Tìm máy: bỏ số máy hiện cạnh ô "Chưa có dữ liệu" và rút ngắn nhãn của ô này (trước là "Máy chưa có dữ liệu đăng nhập") để bộ lọc không bị lệch hàng.
+
 ## [2.11.4] - 2026-10-20
 
 ### Sửa

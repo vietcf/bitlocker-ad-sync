@@ -103,13 +103,12 @@
         </optgroup>
       </select>
     </label>
-    <label title="Máy chưa từng đăng nhập hoặc worker chưa báo dữ liệu. Gồm cả: tính thêm các máy này vào kết quả của mốc thời gian (HOẶC). Chỉ máy này: bỏ qua mốc thời gian.">Máy chưa có dữ liệu đăng nhập
+    <label title="Máy chưa từng đăng nhập AD, hoặc worker chưa báo dữ liệu này. Gồm cả: tính thêm các máy này vào kết quả của mốc thời gian (HOẶC). Chỉ máy này: bỏ qua mốc thời gian.">Chưa có dữ liệu
       <select name="noLogon">
         <option value="exclude" <%= noLogon === 'exclude' ? 'selected' : '' %>>Không gồm</option>
         <option value="include" <%= noLogon === 'include' ? 'selected' : '' %>>Gồm cả</option>
         <option value="only" <%= noLogon === 'only' ? 'selected' : '' %>>Chỉ máy này</option>
       </select>
-      <% if (list.noLogonCount) { %><span class="muted small">(<%= h.number(list.noLogonCount) %> máy)</span><% } %>
     </label>
     <fieldset class="date-range">
       <legend>Ngày xuất hiện</legend>
