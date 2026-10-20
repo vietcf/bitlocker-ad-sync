@@ -13,6 +13,12 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.11.3] - 2026-10-20
+
+### Sửa
+
+- Cảnh báo sync: ngưỡng "Cảnh báo dữ liệu đã xử lý tự báo lại sau (ngày)" có khung riêng "Chung cho mọi cảnh báo dữ liệu" ở đầu mục (trước đây nằm lửng sau cảnh báo cuối nên trông như thuộc về cảnh báo đó).
+
 ## [2.11.2] - 2026-10-20
 
 ### Sửa

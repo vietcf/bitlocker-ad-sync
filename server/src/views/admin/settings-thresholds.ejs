@@ -34,6 +34,11 @@
     <fieldset>
       <legend>Cảnh báo dữ liệu (bật/tắt được)</legend>
       <p class="muted small">Tính từ nội dung đã đồng bộ nên còn đúng nhiều ngày sau khi sửa nguyên nhân; không làm dừng sync. Mỗi loại có công tắc bật/tắt và ngưỡng riêng. Tắt thì không bao giờ mở cảnh báo đó (đang mở thì đóng). Nút "Đã xử lý" / "Bỏ qua" ở tab Tình trạng sync chỉ im lặng tạm thời.</p>
+      <div class="alert-config">
+        <div class="alert-config-head"><strong>Chung cho mọi cảnh báo dữ liệu</strong></div>
+        <p class="muted small">Áp dụng cho cả bốn loại bên dưới, không phải riêng loại nào.</p>
+        <%- include('_threshold-rows', { items: list.filter((t) => t.group === 'dataalerts' && !t.alert), values, UNIT }) %>
+      </div>
       <% alerts.forEach((a) => { %>
         <div class="alert-config">
           <div class="alert-config-head">
@@ -53,7 +58,6 @@
           <% } %>
         </div>
       <% }) %>
-      <%- include('_threshold-rows', { items: list.filter((t) => t.group === 'dataalerts' && !t.alert), values, UNIT }) %>
     </fieldset>
 
     <fieldset>
