@@ -13,6 +13,13 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.12.4] - 2026-10-20
+
+### Sửa
+
+- Sao lưu chạy ngay sau khi cài, không phải cấu hình thêm: `docker-compose.prod.yml` có dịch vụ `backups-init` tự cấp quyền ghi cho `./backups` (trước đây phải `sudo chown 1000:1000 backups` tay khi không chạy `install.sh` bằng root); `tools/install.sh` điền `BACKUP_DATABASE_URL` cho cả hai cách Docker; README cách C (không Docker) điền `BACKUP_DATABASE_URL` và coi `pg_dump` 17 là bắt buộc. Đã thử cài mới bằng `install.sh --db docker` rồi bấm Sao lưu ngay: ra đủ hai file (máy/key và database).
+- Bỏ mục 3.8 "Thao tác hay dùng" khỏi README (đã có trong phần cập nhật, mục 3.7).
+
 ## [2.12.3] - 2026-10-20
 
 ### Sửa
