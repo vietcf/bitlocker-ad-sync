@@ -33,8 +33,6 @@
         <% } else { %><span class="badge badge-good">● OK</span><% if (nSilenced) { %><span class="muted small">(<%= nSilenced %> đã xử lý / bỏ qua)</span><% } %><% } %>
         <% if (alertsOff.length) { %><span class="muted small">Đã tắt <%= alertsOff.length %> loại cảnh báo (Đồng bộ AD > Cảnh báo sync).</span><% } %>
       </div>
-      <div class="muted small" style="margin-top:6px">Sự cố hệ thống: worker không đọc được AD, sync quá hạn... (tự hết khi sửa xong). Cảnh báo dữ liệu: tính từ nội dung đã đồng bộ, ví dụ máy mới không có key (không làm dừng sync, cần người vận hành xem và bấm Đã xử lý / Bỏ qua).
-        <% if (problem) { %>Mail gửi khi bắt đầu, sau đó tối đa 1 lần mỗi ngày<% if (problem.last_notified_at) { %> (gần nhất <%= h.dateTime(problem.last_notified_at) %>)<% } %>; hết thì tự về bình thường, không gửi nữa.<% } else { %>Watchdog kiểm tra 5 phút một lần.<% } %></div>
     <% } %>
   </div>
 </div>

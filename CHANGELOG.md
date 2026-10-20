@@ -13,6 +13,13 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.18.2] - 2026-10-20
+
+### Sửa
+
+- Tình trạng sync: bỏ đoạn giải thích dưới hai dòng "Sự cố hệ thống" và "Cảnh báo dữ liệu" (sự cố hệ thống tự hết, cảnh báo dữ liệu cần xử lý, watchdog 5 phút, thông tin mail).
+- Sửa test của trang cấu hình cảnh báo cho khớp việc bỏ khung giải thích ở 2.18.1.
+
 ## [2.18.1] - 2026-10-20
 
 ### Sửa

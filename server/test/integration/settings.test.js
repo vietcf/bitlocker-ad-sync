@@ -351,7 +351,7 @@ describe('thresholds', () => {
     const html = await page.agent.get('/admin/settings/thresholds');
     expect(html.status).toBe(200);
     expect(html.text).toContain('value="65"');
-    expect(html.text).toContain('Cách các ngưỡng kết hợp');
+    expect(html.text).not.toContain('Cách các ngưỡng kết hợp'); // the explanatory note was removed
     // AND pairs share one outlined box: 2 boxes (branch drop, escrow).
     expect(html.text.match(/class="thr-and"/g)).toHaveLength(2);
     expect(html.text).toMatch(/Một chi nhánh giảm quá[\s\S]*?thr-and-sep[\s\S]*?>giảm quá \(số máy\)</);
