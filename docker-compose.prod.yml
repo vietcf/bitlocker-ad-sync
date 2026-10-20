@@ -48,6 +48,17 @@ services:
         condition: service_healthy
         required: false
 
+  # Thu muc ./backups do Docker tao (root) khi chua co: cap quyen cho user cua app (node) truoc khi server chay,
+  # de sao luu ghi duoc ngay ma khong phai chown tay. Chay xong thoat.
+  backups-init:
+    build: ./server
+    image: blk-server:${BLK_VERSION:-latest}
+    user: "0:0"
+    command: ["sh", "-c", "chown node:node /app/backups && chmod 700 /app/backups"]
+    volumes:
+      - ./backups:/app/backups
+    restart: "no"
+
   server:
     build: ./server
     image: blk-server:${BLK_VERSION:-latest}
@@ -71,6 +82,8 @@ services:
       - "8443"
     depends_on:
       migrate:
+        condition: service_completed_successfully
+      backups-init:
         condition: service_completed_successfully
     restart: unless-stopped
     logging: *logging

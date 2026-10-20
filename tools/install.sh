@@ -172,7 +172,7 @@ set_env "$ENV" LOCAL_LOGIN_ENABLED true
 
 # --- 4. Chung chi HTTPS, thu muc sao luu ---
 mkdir -p cert backups; chmod 700 backups
-if [[ $(id -u) -eq 0 ]]; then chown 1000:1000 backups; else say "Luu y: cap quyen ghi cho uid 1000: sudo chown 1000:1000 backups"; fi
+# quyen ghi cho user cua app do dich vu backups-init trong docker-compose.prod.yml dam bao (khong can chown tay)
 if [[ ! -f cert/server.crt || ! -f cert/server.key ]]; then
   say "Chua co cert/server.crt va cert/server.key."
   default_names="$(hostname -f 2>/dev/null || hostname)"

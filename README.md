@@ -193,7 +193,7 @@ Script hỏi IP máy worker, máy chủ AD (có thể để trống), múi giờ
 
 ### 3.4. Cách C: Không Docker (Node.js + systemd + nginx)
 
-**Chuẩn bị:** máy chủ Linux có quyền root; một máy PostgreSQL 17 mà máy chủ này truy cập được; cài **Node.js 24**, **nginx** và `git`. Muốn dùng chức năng sao lưu database thì cài thêm `pg_dump` bản 17 (gói `postgresql-client-17`).
+**Chuẩn bị:** máy chủ Linux có quyền root; một máy PostgreSQL 17 mà máy chủ này truy cập được; cài **Node.js 24**, **nginx** và `git`. Để sao lưu database chạy được, cài thêm `pg_dump` bản 17 (gói `postgresql-client-17`).
 
 **Bước 1. Lấy mã nguồn và cài thư viện**
 
@@ -227,6 +227,7 @@ set_env $E INGEST_TRUST_PROXY 1
 set_env $E COOKIE_SECURE true
 set_env $E APP_TZ Asia/Ho_Chi_Minh
 set_env $E BACKUP_DIR /opt/blk/backups
+set_env $E BACKUP_DATABASE_URL "postgres://blk_owner:MẬT_KHẨU_OWNER@db.corp.local:5432/blk?sslmode=require"   # sao lưu database; nên đổi sang tài khoản chỉ đọc blk_backup (mục 6.8)
 # --- đổi cho đúng môi trường của bạn ---
 set_env $E INGEST_ALLOWED_IPS 10.0.5.21
 set_env $E DATABASE_URL "postgres://app_node:MẬT_KHẨU_APP@db.corp.local:5432/blk"
@@ -427,24 +428,6 @@ Không dùng `down -v`: `-v` xóa cả volume, mất toàn bộ database.
 **Quay về bản cũ (rollback):** image bản cũ vẫn còn trong Docker nếu bạn chưa xóa. Chạy `BLK_VERSION=2.0.1 docker compose -f docker-compose.prod.yml up -d --no-build` (đổi `2.0.1` thành tag cũ). Lưu ý migration của bản mới đã chạy và không tự hoàn tác, nên chỉ quay về nếu bản cũ chạy được với schema mới, hoặc khôi phục database từ bản sao lưu trước khi nâng cấp.
 
 ---
-
-### 3.8. Thao tác hay dùng (Docker, chạy ở thư mục gốc dự án)
-
-Đặt tạm cho gọn: `C="docker compose -f docker-compose.prod.yml --profile db"` (DB ngoài Docker thì bỏ `--profile db`).
-
-| Việc | Lệnh |
-|---|---|
-| Bật tất cả | `$C up -d` |
-| Tắt tất cả (giữ dữ liệu) | `$C down` |
-| Xem trạng thái | `$C ps` |
-| Xem log server | `$C logs -f --tail=100 server` |
-| Khởi động lại server (sau khi sửa `server/.env`) | `$C up -d --force-recreate server` |
-| Cập nhật bản mới | `git fetch --tags && git checkout vX.Y.Z` rồi `BLK_VERSION=X.Y.Z $C up -d --build` |
-| Kiểm tra sức khỏe | `curl -k https://localhost/healthz` |
-
-Trạng thái bình thường: `db`, `server`, `nginx` là `Up (healthy)`; `migrate` là `Exited (0)` (chạy xong tự thoát).
-
-**Không** dùng `down -v`: `-v` xóa cả volume, mất toàn bộ database.
 
 ## 4. Cài sync worker trên Windows
 
@@ -1093,8 +1076,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE blk_owner IN SCHEMA public GRANT SELECT ON SEQ
 ```
 
 Cài bằng `tools/install.sh` thì `BACKUP_DATABASE_URL` đã được điền sẵn (DB trong Docker: tài khoản `blk_backup` có sẵn). Nếu tự cài, thêm vào `server/.env`: `BACKUP_DATABASE_URL=postgres://blk_backup:<mk>@<db-host>:5432/blk?sslmode=require` và `BACKUP_DIR=/app/backups`
-(ngoài Docker cần `pg_dump` 17, hoặc `PG_DUMP_PATH`). Trên Linux cho uid 1000 quyền ghi `./backups`
-(`sudo chown 1000:1000 backups && sudo chmod 700 backups`). Rồi vào trang Sao lưu: đặt mật khẩu, chọn loại, giờ, bật, bấm **Sao lưu ngay** để thử. **Thử khôi phục định kỳ.**
+(ngoài Docker cần `pg_dump` 17, hoặc `PG_DUMP_PATH`). Docker Compose tự cấp quyền ghi cho `./backups` (dịch vụ `backups-init`), không phải chown tay. Rồi vào trang Sao lưu: đặt mật khẩu, chọn loại, giờ, bật, bấm **Sao lưu ngay** để thử. **Thử khôi phục định kỳ.**
 
 **Tra key khi hệ thống không chạy.** Giải nén `bitlocker-keys-*.zip` bằng 7-Zip vào thư mục chỉ mình bạn đọc được, mở `recovery_keys.csv` bằng Excel
 (Data > From Text/CSV, UTF-8), lọc cột `key_id_first8` theo 8 ký tự trên màn hình BitLocker, đọc `recovery_password`. Xong thì **xóa** file giải nén.
