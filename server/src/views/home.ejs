@@ -87,7 +87,7 @@
         <option value="no_key" <%= filters.status === 'no_key' ? 'selected' : '' %>>Chưa có key</option>
       </select>
     </label>
-    <%- include('partials/logon-filter', { filters }) %>
+    <%- include('partials/logon-filter', { filters, newRow: false }) %>
     <fieldset class="date-range">
       <legend>Ngày xuất hiện</legend>
       <select name="dateField" aria-label="Lọc theo ngày">

@@ -13,6 +13,12 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.12.3] - 2026-10-20
+
+### Sửa
+
+- Tìm máy: khung "Đăng nhập AD gần nhất" nằm cùng hàng với Chi nhánh và Tình trạng, các ô chọn thẳng hàng. Báo cáo vẫn để khung ở hàng riêng.
+
 ## [2.12.2] - 2026-10-20
 
 ### Sửa

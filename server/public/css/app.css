@@ -151,6 +151,8 @@ tr.warn-row td { background: var(--warn-bg); }
 /* Hai o loc dang nhap AD: nhan tren o chon nhu cac o khac, khoanh bang net vien mo */
 .filter-fields .logon-range { display: flex; flex-wrap: nowrap; gap: 8px 14px; align-items: flex-end; border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 12px 10px; margin: 0; flex: 0 0 auto; }
 @media (max-width: 760px) { .filter-fields .logon-range { flex-wrap: wrap; } }
+/* Cung hang voi cac o khac: ha khung xuong de o chon thang hang voi o ben canh */
+.filter-fields .logon-range.logon-inline { margin-bottom: -11px; }
 .filter-fields .logon-range > label { display: block; font-weight: 600; font-size: 13px; margin: 0; flex: 0 0 230px; }
 .filter-fields .logon-range > label.logon-nodata { flex-basis: 170px; }
 .logon-range select { width: 100%; }
