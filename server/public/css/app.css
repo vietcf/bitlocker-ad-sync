@@ -369,3 +369,6 @@ button:disabled { cursor: not-allowed; }
 .switch-text { display: inline-block; min-width: 2.2em; font-weight: 600; }
 .switch-text::before { content: 'Tắt'; color: var(--muted); }
 .switch input:checked ~ .switch-text::before { content: 'Bật'; color: var(--good); }
+
+/* Chu co giai thich khi re chuot: gach chan cham + con tro dau hoi (thay icon) */
+.has-tip { border-bottom: 1px dotted var(--muted); cursor: help; }

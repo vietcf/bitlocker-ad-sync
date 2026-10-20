@@ -13,6 +13,12 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.11.4] - 2026-10-20
+
+### Sửa
+
+- Bỏ biểu tượng ⓘ cạnh "Đăng nhập AD gần nhất"; chữ giải thích khi rê chuột nay có gạch chân chấm và con trỏ dấu hỏi.
+
 ## [2.11.3] - 2026-10-20
 
 ### Sửa

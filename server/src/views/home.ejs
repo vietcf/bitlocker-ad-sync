@@ -134,7 +134,7 @@
     <p class="muted">Không có máy nào khớp bộ lọc.</p>
   <% } else { %>
   <table>
-    <thead><tr><th>Máy</th><th>Chi nhánh</th><th>Hệ điều hành</th><th class="num">Số key</th><th>Key mới nhất</th><th>Tạo trên AD</th><th>Ghi nhận</th><th title="<%= activityTip %>">Đăng nhập AD gần nhất</th><th>Tình trạng</th></tr></thead>
+    <thead><tr><th>Máy</th><th>Chi nhánh</th><th>Hệ điều hành</th><th class="num">Số key</th><th>Key mới nhất</th><th>Tạo trên AD</th><th>Ghi nhận</th><th title="<%= activityTip %>"><span class="has-tip">Đăng nhập AD gần nhất</span></th><th>Tình trạng</th></tr></thead>
     <tbody>
     <% list.rows.forEach((c) => { %>
       <tr>
