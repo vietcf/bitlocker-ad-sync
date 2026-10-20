@@ -17,7 +17,7 @@
       </optgroup>
     </select>
   </label>
-  <label class="logon-nodata" title="Máy chưa có dữ liệu đăng nhập trên AD: thuộc tính lastLogonTimestamp của máy trên AD đang trống (máy chưa từng đăng nhập domain, hoặc chưa đủ ~14 ngày để AD ghi lần đầu), hoặc worker bản cũ chưa báo giá trị này. Không gồm: bỏ các máy này khỏi kết quả. Gồm cả: tính thêm các máy này vào kết quả của mốc thời gian (HOẶC). Chỉ máy này: chỉ liệt kê các máy này, bỏ qua mốc thời gian.">Máy chưa có dữ liệu
+  <label class="logon-nodata" title="Máy mà AD chưa ghi lần đăng nhập nào: chưa từng đăng nhập domain, hoặc worker chưa báo dữ liệu này.">Máy chưa có dữ liệu
     <select name="noLogon">
       <option value="exclude" <%= noLogon === 'exclude' ? 'selected' : '' %>>Không gồm</option>
       <option value="include" <%= noLogon === 'include' ? 'selected' : '' %>>Gồm cả</option>

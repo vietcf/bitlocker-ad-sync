@@ -13,6 +13,12 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.13.2] - 2026-10-20
+
+### Sửa
+
+- Bộ lọc đăng nhập AD: gợi ý khi rê chuột vào "Máy chưa có dữ liệu" chỉ giải thích đó là máy nào (bỏ phần diễn giải từng lựa chọn).
+
 ## [2.13.1] - 2026-10-20
 
 ### Sửa
