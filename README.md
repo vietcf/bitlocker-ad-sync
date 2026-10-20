@@ -418,6 +418,16 @@ Build sẵn image trên một máy có internet, đóng thành một file, chép
 
 5. Kiểm tra: `docker compose -f docker-compose.prod.yml --profile db ps` (`db`, `server`, `nginx` là `Up (healthy)`, `migrate` là `Exited (0)`) và log server hiện đúng phiên bản (`docker compose -f docker-compose.prod.yml logs --tail=20 server`). Migration tự chạy khi `migrate` chạy.
 
+6. **Cập nhật worker** (làm sau server): máy build chạy `cd worker-go && make package VERSION=X.Y.Z`, chép `worker-go/dist/blk-sync-X.Y.Z-linux-amd64.tar.gz` sang máy worker, rồi:
+
+   ```bash
+   mkdir /tmp/blk-sync && tar -C /tmp/blk-sync -xzf /tmp/blk-sync-X.Y.Z-linux-amd64.tar.gz
+   cd /tmp/blk-sync && sudo ./install.sh --update
+   ```
+
+   Worker .NET trên Windows: mục 4.7. Chi tiết: mục 4B.9.
+7. Nếu bản mới có thêm dữ liệu lấy từ AD (ví dụ đăng nhập AD gần nhất từ server 2.7.0 và worker 1.2.0): vào **Quản trị > Sync AD**, bấm **Sync full** (hoặc chờ 01:00) để điền đủ dữ liệu cho mọi máy.
+
 Không dùng `down -v`: `-v` xóa cả volume, mất toàn bộ database.
 
 **Quay về bản cũ (rollback):** image bản cũ vẫn còn trong Docker nếu bạn chưa xóa. Chạy `BLK_VERSION=2.0.1 docker compose -f docker-compose.prod.yml up -d --no-build` (đổi `2.0.1` thành tag cũ). Lưu ý migration của bản mới đã chạy và không tự hoàn tác, nên chỉ quay về nếu bản cũ chạy được với schema mới, hoặc khôi phục database từ bản sao lưu trước khi nâng cấp.
@@ -727,10 +737,10 @@ Trên máy build (Linux, kể cả CentOS 7.6 đã cài Go; hoặc Windows):
 ```bash
 cd worker-go
 go test ./...
-make package VERSION=1.1.1
+make package VERSION=1.2.0
 ```
 
-Kết quả: `worker-go/dist/blk-sync-1.1.1-linux-amd64.tar.gz`. Gói gồm:
+Kết quả: `worker-go/dist/blk-sync-1.2.0-linux-amd64.tar.gz`. Gói gồm:
 - binary `blk-sync` (build tĩnh);
 - `install.sh`, `blk-sync.service` (systemd mới) và `blk-sync-legacy.service` (systemd cũ như CentOS 7);
 - `config.example.json`, `README.md`.
@@ -740,9 +750,9 @@ Máy chủ đích là ARM thì dùng `make linux-arm64`. Không có `make` (Wind
 ### 4B.5. Cài lên máy chủ
 
 ```bash
-scp worker-go/dist/blk-sync-1.1.1-linux-amd64.tar.gz admin@sync01:/tmp/
+scp worker-go/dist/blk-sync-1.2.0-linux-amd64.tar.gz admin@sync01:/tmp/
 ssh admin@sync01
-mkdir /tmp/blk-sync && tar -C /tmp/blk-sync -xzf /tmp/blk-sync-1.1.1-linux-amd64.tar.gz
+mkdir /tmp/blk-sync && tar -C /tmp/blk-sync -xzf /tmp/blk-sync-1.2.0-linux-amd64.tar.gz
 cd /tmp/blk-sync && sudo ./install.sh
 ```
 
@@ -840,7 +850,7 @@ sẽ tranh nhau mở lượt sync (409 `run_in_progress`; lượt của worker �
 
 ### 4B.9. Cập nhật và gỡ cài đặt
 
-Cập nhật: build gói mới (`make package VERSION=1.1.1`), chép lên máy chủ, giải nén, rồi:
+Cập nhật: build gói mới (`make package VERSION=1.2.0`), chép lên máy chủ, giải nén, rồi:
 
 ```bash
 sudo ./install.sh --update
