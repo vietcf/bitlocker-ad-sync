@@ -13,6 +13,12 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.11.1] - 2026-10-20
+
+### Sửa
+
+- Cảnh báo sync: công tắc Bật/Tắt của từng cảnh báo dữ liệu nay là **nút gạt** ở bên phải tiêu đề cảnh báo (trước là ô chọn khó nhìn), hiện rõ "Bật" (xanh) / "Tắt" (xám).
+
 ## [2.11.0] - 2026-10-20
 
 ### Đổi

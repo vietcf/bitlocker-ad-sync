@@ -37,11 +37,15 @@
       <% alerts.forEach((a) => { %>
         <div class="alert-config">
           <div class="alert-config-head">
-            <label for="<%= a.key %>"><strong><%= a.label %></strong></label>
-            <select id="<%= a.key %>" name="<%= a.key %>" aria-label="Bật hoặc tắt: <%= a.label %>">
-              <option value="on" <%= (values[a.key] ?? a.enabled) !== false && (values[a.key] ?? a.enabled) !== 'off' ? 'selected' : '' %>>Bật</option>
-              <option value="off" <%= (values[a.key] ?? a.enabled) === false || values[a.key] === 'off' ? 'selected' : '' %>>Tắt</option>
-            </select>
+            <strong><%= a.label %></strong>
+            <%# Cong tac: o an "off" di truoc de form luon gui gia tri (checkbox bo chon thi khong gui gi) %>
+            <% const v = Array.isArray(values[a.key]) ? values[a.key].at(-1) : values[a.key]; const on = (v ?? a.enabled) !== false && v !== 'off'; %>
+            <input type="hidden" name="<%= a.key %>" value="off">
+            <label class="switch" for="<%= a.key %>">
+              <input id="<%= a.key %>" type="checkbox" role="switch" name="<%= a.key %>" value="on" <%= on ? 'checked' : '' %> aria-label="Bật hoặc tắt: <%= a.label %>">
+              <span class="switch-track" aria-hidden="true"></span>
+              <span class="switch-text" aria-hidden="true"></span>
+            </label>
           </div>
           <p class="muted small"><%= a.help %></p>
           <% const own = list.filter((t) => t.alert === a.type); if (own.length) { %>

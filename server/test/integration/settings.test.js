@@ -306,6 +306,15 @@ describe('data alert switches (Canh bao sync)', () => {
     const page = (await (await webLogin(app, 'admin.hq')).agent.get('/admin/settings/thresholds')).text;
     expect(page).toContain('Cảnh báo dữ liệu (bật/tắt được)');
     expect(page).toContain('name="alert.full_stale"');
+    expect(page).toContain('role="switch"');
+
+    // the page form: a hidden "off" then the checkbox "on" when checked; only "off" when the switch is unchecked
+    const web = await webLogin(app, 'admin.hq');
+    const send = (body) => web.agent.post('/admin/settings/thresholds').type('form').send(`_csrf=${encodeURIComponent(web.csrf)}&${body}`);
+    expect((await send('alert.full_stale=off&alert.full_stale=on&alert.escrow_broken=off')).status).toBe(302);
+    const after = (await a.get('/api/admin/settings/thresholds')).body.alerts;
+    expect(after.find((x) => x.type === 'full_stale').enabled).toBe(true);
+    expect(after.find((x) => x.type === 'escrow_broken').enabled).toBe(false);
   });
 });
 

@@ -356,3 +356,15 @@ button:disabled { cursor: not-allowed; }
 .alert-form-or { color: var(--muted); font-size: 13px; }
 .alert-form-snooze { display: inline-flex; align-items: center; gap: 8px; }
 .inline-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+/* Cong tac bat/tat (canh bao du lieu): thanh truot + chu Bat / Tat o ben phai tieu de */
+.switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+.switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.switch-track { position: relative; width: 42px; height: 24px; border-radius: 12px; background: var(--muted); transition: background .15s; flex: none; }
+.switch-track::after { content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform .15s; }
+.switch input:checked + .switch-track { background: var(--good); }
+.switch input:checked + .switch-track::after { transform: translateX(18px); }
+.switch input:focus-visible + .switch-track { outline: 2px solid var(--info); outline-offset: 2px; }
+.switch-text { min-width: 2.2em; font-weight: 600; }
+.switch-text::before { content: 'Tắt'; color: var(--muted); }
+.switch input:checked ~ .switch-text::before { content: 'Bật'; color: var(--good); }

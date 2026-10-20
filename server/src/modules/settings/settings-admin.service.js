@@ -336,7 +336,8 @@ export class SettingsAdminService {
       changes[t.key] = fromForm(t, n);
     }
     for (const a of ALERT_SWITCHES) {
-      const v = raw?.[`alert.${a.type}`];
+      let v = raw?.[`alert.${a.type}`];
+      if (Array.isArray(v)) v = v.at(-1); // form: hidden "off" then the checked checkbox "on"
       if (v === undefined || v === '') continue;
       if (v === true || v === 'on' || v === 'true' || v === '1') changes[`alert.${a.type}`] = true;
       else if (v === false || v === 'off' || v === 'false' || v === '0') changes[`alert.${a.type}`] = false;
