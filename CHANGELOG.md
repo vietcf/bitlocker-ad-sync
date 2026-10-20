@@ -13,6 +13,12 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.19.9] - 2026-10-20
+
+### Sửa
+
+- Tình trạng sync: đoạn giải thích Đã xử lý / Bỏ qua chỉ hiện khi có cảnh báo dữ liệu đang chờ xử lý, và rút còn một câu (trước đây luôn hiện dài ở cuối danh sách cảnh báo).
+
 ## [2.19.8] - 2026-10-20
 
 ### Sửa

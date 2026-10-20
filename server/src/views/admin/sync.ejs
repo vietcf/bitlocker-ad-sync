@@ -61,7 +61,7 @@
       <% } %>
     </div>
   <% }) %>
-  <p class="muted small"><strong>Đã xử lý</strong> (cảnh báo tính từ dữ liệu: máy mới không có key, tỉ lệ không key tăng, full sync quá hạn, chứng chỉ DC sắp hết hạn): ngừng gửi mail và không tính vào trạng thái trong thời hạn cấu hình (mặc định 30 ngày, Ngưỡng cảnh báo); hết hạn mà điều kiện còn thì báo lại, điều kiện hết thì cảnh báo tự đóng. <strong>Bỏ qua</strong> im lặng trong 1/7/30 ngày theo cùng cách. Muốn tắt hẳn một loại cảnh báo dữ liệu: Đồng bộ AD > Cảnh báo sync. Sự cố hệ thống (worker, đọc AD, lượt sync, canary, USN) tự hết khi sửa xong nên không cần xác nhận. Mọi thao tác ghi vào nhật ký truy cập.</p>
+  <% if (dataAlerts.length) { %><p class="muted small">Đã xử lý / Bỏ qua: im lặng đến hết thời hạn, hết hạn mà vẫn còn thì báo lại.</p><% } %>
 </section>
 <% } %>
 
