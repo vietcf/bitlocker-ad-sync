@@ -46,14 +46,15 @@
         </select>
       </label>
       <% } %>
-      <%- include('../partials/logon-filter', { filters: { activity: report.activity, noLogon: report.noLogon }, bare: true }) %>
+      <%# Hai o dang nhap AD di cung nhau: khong bao gio tach xuong hai hang %>
+      <div class="logon-pair"><%- include('../partials/logon-filter', { filters: { activity: report.activity, noLogon: report.noLogon }, bare: true }) %></div>
       <p class="muted small hint">Áp dụng cho số máy và số key.</p>
     </fieldset>
   </div>
   <div class="filter-actions">
     <span class="spacer"></span>
-    <noscript><button type="submit" class="small">Lọc</button></noscript>
     <a href="/reports" class="small" title="Về kỳ mặc định 30 ngày">Xóa lọc</a>
+    <button type="submit" class="small" title="Tự áp dụng khi bạn đổi kỳ hoặc chi nhánh">Lọc</button>
   </div>
 </form>
 

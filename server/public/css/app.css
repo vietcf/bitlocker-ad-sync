@@ -165,6 +165,11 @@ tr.warn-row td { background: var(--warn-bg); }
 .filter-group label.check { display: inline-flex; align-items: center; gap: 6px; flex: none; min-width: 0; font-weight: 400; font-size: 14px; white-space: nowrap; margin-left: 4px; }
 .filter-group input[type="checkbox"] { width: 16px; height: 16px; min-width: 0; padding: 0; margin: 0; flex: none; accent-color: var(--accent); }
 .filter-group .hint { flex: 1 1 100%; margin: 0; }
+/* Hai o dang nhap AD la mot cap: o tren mot hang, khong tach roi (chi xuong dong khi man hinh hep) */
+.filter-group .logon-pair { display: flex; flex-wrap: nowrap; gap: 8px 14px; align-items: flex-end; flex: 0 0 auto; }
+.filter-group .logon-pair > label { flex: 0 0 220px; min-width: 0; }
+.filter-group .logon-pair > label.logon-nodata { flex-basis: 170px; }
+@media (max-width: 760px) { .filter-group .logon-pair { flex-wrap: wrap; } }
 /* Hai o loc dang nhap AD: nhan tren o chon nhu cac o khac, khoanh bang net vien mo */
 .filter-fields .logon-range { display: flex; flex-wrap: nowrap; gap: 8px 14px; align-items: flex-end; border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 12px 10px; margin: 0; flex: 0 0 auto; }
 @media (max-width: 760px) { .filter-fields .logon-range { flex-wrap: wrap; } }
