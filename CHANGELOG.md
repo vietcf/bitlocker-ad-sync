@@ -13,6 +13,16 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.9.0] - 2026-10-20
+
+### Thêm
+
+- Quản trị > Tính năng: công tắc **tắt từng loại cảnh báo dữ liệu** (`escrow_broken`, `no_key_rising`, `full_stale`, `dc_cert_expiring`). Loại đã tắt không mở, đang mở thì đóng; ô trạng thái ghi số loại đã tắt. Sự cố hệ thống không tắt được.
+
+### Đổi
+
+- **Đã xử lý** ở cảnh báo dữ liệu nay có thời hạn (ngưỡng `alerts.ack_reopen_days`, mặc định 30 ngày, Quản trị > Ngưỡng cảnh báo): hết hạn mà điều kiện còn thì báo lại, tránh im lặng mãi khi tình hình xấu đi. Migration 037 tính hạn cho các cảnh báo đã xử lý trước đó.
+
 ## [2.8.0] - 2026-10-20
 
 ### Thêm

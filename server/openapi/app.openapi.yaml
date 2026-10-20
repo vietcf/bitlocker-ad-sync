@@ -1053,6 +1053,10 @@ components:
         feature.computer_export: { type: boolean }
         feature.reveal_alerts: { type: boolean, description: Alert on reveals outside working hours. }
         reveal.ticket_required: { type: boolean }
+        alert.escrow_broken: { type: boolean, description: Data alert on new computers without a key. }
+        alert.no_key_rising: { type: boolean, description: Data alert when the share of computers without a key rises. }
+        alert.full_stale: { type: boolean, description: Data alert when no full run succeeded for too long. }
+        alert.dc_cert_expiring: { type: boolean, description: Data alert on a DC certificate close to expiry. }
         export.keys: { type: string, enum: ['off', admin, all], description: Who may export keys with passwords. }
         ui.page_size.computers: { type: integer, minimum: 5, maximum: 200, default: 25, description: Rows per page of the computer search and list. }
         ui.page_size.audit: { type: integer, minimum: 5, maximum: 200, default: 50, description: Rows per page of the access log. }

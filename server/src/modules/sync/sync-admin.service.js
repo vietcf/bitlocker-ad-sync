@@ -106,9 +106,10 @@ export class SyncAdminService {
   async ackAlert(scope, id, raw, client = {}) {
     this.#check(scope);
     const { note } = parse(alertAckInput, raw);
-    const a = await this.alerts.acknowledge(id, { by: scope.upn, note });
+    const days = Number(await this.settings.get('alerts.ack_reopen_days', 30));
+    const a = await this.alerts.acknowledge(id, { by: scope.upn, note, days });
     if (!a) throw badRequest('Only open alerts computed from data (not system faults) can be marked handled.');
-    await this.audit.log({ ...this.audit.actor(scope, client), action: 'alert_ack', detail: { alertId: Number(a.id), type: a.type, note: note ?? null } });
+    await this.audit.log({ ...this.audit.actor(scope, client), action: 'alert_ack', detail: { alertId: Number(a.id), type: a.type, days, note: note ?? null } });
     return a;
   }
 

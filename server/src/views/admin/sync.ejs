@@ -31,6 +31,7 @@
       <div class="status-row"><span class="status-label">Cảnh báo dữ liệu</span>
         <% if (dataAlerts.length) { %><span class="badge badge-warn">● Có cảnh báo nhẹ</span><span class="muted small"><%= dataAlerts.map((x) => x.detail.subject).join('; ') %></span>
         <% } else { %><span class="badge badge-good">● OK</span><% if (nSilenced) { %><span class="muted small">(<%= nSilenced %> đã xử lý / bỏ qua)</span><% } %><% } %>
+        <% const nOff = ['escrow_broken', 'no_key_rising', 'full_stale', 'dc_cert_expiring'].filter((t) => features['alert.' + t] === false).length; if (nOff) { %><span class="muted small">Đã tắt <%= nOff %> loại cảnh báo dữ liệu (Quản trị > Tính năng).</span><% } %>
       </div>
       <div class="muted small" style="margin-top:6px">Sự cố hệ thống: worker không đọc được AD, sync quá hạn... (tự hết khi sửa xong). Cảnh báo dữ liệu: tính từ nội dung đã đồng bộ, ví dụ máy mới không có key (không làm dừng sync, cần người vận hành xem và bấm Đã xử lý / Bỏ qua).
         <% if (problem) { %>Mail gửi khi bắt đầu, sau đó tối đa 1 lần mỗi ngày<% if (problem.last_notified_at) { %> (gần nhất <%= h.dateTime(problem.last_notified_at) %>)<% } %>; hết thì tự về bình thường, không gửi nữa.<% } else { %>Watchdog kiểm tra 5 phút một lần.<% } %></div>
@@ -43,9 +44,9 @@
   <% openAlerts.filter((a) => !SUMMARY.includes(a.type)).forEach((a) => { const data = ['escrow_broken', 'no_key_rising', 'full_stale', 'dc_cert_expiring'].includes(a.type); %>
     <div class="notice notice-<%= a.silenced ? 'info' : (a.severity === 'high' ? 'error' : 'warn') %>">
       <strong><%= a.detail.subject %></strong> <span class="muted">· từ <%= h.dateTime(a.opened_at) %></span>
-      <% if (a.silenced) { %><span class="badge badge-muted"><%= a.snoozed_until && new Date(a.snoozed_until) > new Date() ? 'Bỏ qua đến ' + h.dateTime(a.snoozed_until) : 'Đã xử lý' %></span><% } %>
+      <% if (a.silenced) { %><span class="badge badge-muted"><%= a.acked_at ? 'Đã xử lý, báo lại sau ' : 'Bỏ qua đến ' %><%= h.dateTime(a.snoozed_until) %></span><% } %>
       <div class="pre"><%= a.detail.text %></div>
-      <% if (data && a.acked_by && a.silenced) { %><div class="muted small">Đã <%= a.snoozed_until ? 'bỏ qua' : 'xử lý' %> bởi <%= a.acked_by %><% if (a.acked_at) { %> lúc <%= h.dateTime(a.acked_at) %><% } %><% if (a.ack_note) { %>: <%= a.ack_note %><% } %></div><% } %>
+      <% if (data && a.acked_by && a.silenced) { %><div class="muted small">Đã <%= a.acked_at ? 'xử lý' : 'bỏ qua' %> bởi <%= a.acked_by %><% if (a.acked_at) { %> lúc <%= h.dateTime(a.acked_at) %><% } %><% if (a.ack_note) { %>: <%= a.ack_note %><% } %></div><% } %>
       <% if (data && !a.silenced) { %>
       <form method="post" class="inline-actions" style="margin-top:.5rem">
         <%- include('../partials/csrf') %>
@@ -57,7 +58,7 @@
       <% } %>
     </div>
   <% }) %>
-  <p class="muted small"><strong>Đã xử lý</strong> (cảnh báo tính từ dữ liệu: máy mới không có key, tỉ lệ không key tăng, full sync quá hạn, chứng chỉ DC sắp hết hạn): ngừng gửi mail và không tính vào trạng thái "Có sự cố"; cảnh báo vẫn tự đóng khi điều kiện hết và báo lại nếu tái phát. <strong>Bỏ qua</strong> im lặng trong 1/7/30 ngày, hết hạn mà điều kiện còn thì báo lại. Sự cố hệ thống (worker, đọc AD, lượt sync, canary, USN) tự hết khi sửa xong nên không cần xác nhận. Mọi thao tác ghi vào nhật ký truy cập.</p>
+  <p class="muted small"><strong>Đã xử lý</strong> (cảnh báo tính từ dữ liệu: máy mới không có key, tỉ lệ không key tăng, full sync quá hạn, chứng chỉ DC sắp hết hạn): ngừng gửi mail và không tính vào trạng thái trong thời hạn cấu hình (mặc định 30 ngày, Ngưỡng cảnh báo); hết hạn mà điều kiện còn thì báo lại, điều kiện hết thì cảnh báo tự đóng. <strong>Bỏ qua</strong> im lặng trong 1/7/30 ngày theo cùng cách. Muốn tắt hẳn một loại cảnh báo dữ liệu: Quản trị > Tính năng. Sự cố hệ thống (worker, đọc AD, lượt sync, canary, USN) tự hết khi sửa xong nên không cần xác nhận. Mọi thao tác ghi vào nhật ký truy cập.</p>
 </section>
 <% } %>
 

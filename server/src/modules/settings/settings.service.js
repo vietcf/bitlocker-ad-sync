@@ -10,6 +10,11 @@ export const FEATURES = [
   { key: 'feature.computer_export', default: true }, // CSV export of the computer list (no keys)
   { key: 'feature.reveal_alerts', default: true }, // alert on reveals outside working hours
   { key: 'reveal.ticket_required', default: false }, // a ticket number is required to reveal a key
+  // Data alerts of the watchdog (system faults cannot be switched off): a switched-off alert is never opened
+  { key: 'alert.escrow_broken', default: true },
+  { key: 'alert.no_key_rising', default: true },
+  { key: 'alert.full_stale', default: true },
+  { key: 'alert.dc_cert_expiring', default: true },
 ];
 const FEATURE_DEFAULTS = Object.fromEntries(FEATURES.map((f) => [f.key, f.default]));
 

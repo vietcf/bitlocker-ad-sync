@@ -388,6 +388,13 @@ describe('heartbeat, manual sync and watchdog', () => {
     expect(page).toContain('Sự cố hệ thống');
     expect(page).toContain('Cảnh báo dữ liệu');
     expect((await asOwner(`SELECT detail FROM access_log WHERE action = 'alert_ack'`))[0].detail.type).toBe('full_stale');
+    // "handled" is not forever: it lasts alerts.ack_reopen_days (default 30), then the alert counts again
+    const [{ days }] = await asOwner(`SELECT round(extract(epoch FROM snoozed_until - now()) / 86400)::int AS days FROM sync_alert WHERE type = 'full_stale'`);
+    expect(days).toBe(30);
+    await asOwner(`UPDATE sync_alert SET snoozed_until = now() - interval '1 minute' WHERE type = 'full_stale'`);
+    expect((await watchdog()).problems).toEqual(['full_stale']);
+    expect((await web.agent.get('/admin/sync')).text).not.toContain('Đã xử lý, báo lại sau');
+    await post('full_stale', 'ack'); // handled again for the next step
 
     // snooze: silent until the time is over, then it counts again
     await asOwner(`UPDATE sync_alert SET acked_at = NULL WHERE type = 'full_stale'`);
@@ -395,6 +402,15 @@ describe('heartbeat, manual sync and watchdog', () => {
     expect((await watchdog()).problems).toEqual([]);
     await asOwner(`UPDATE sync_alert SET snoozed_until = now() - interval '1 minute' WHERE type = 'full_stale'`);
     expect((await watchdog()).problems).toEqual(['full_stale']);
+
+    // Admin HQ can switch a data alert off: it is closed and never opened again
+    await asOwner(`INSERT INTO app_setting (key, value) VALUES ('alert.full_stale', 'false')`);
+    services.settings.invalidate();
+    expect((await watchdog()).problems).toEqual([]);
+    expect(await openTypes()).not.toContain('full_stale');
+    await asOwner(`DELETE FROM app_setting WHERE key = 'alert.full_stale'`);
+    services.settings.invalidate();
+    expect((await watchdog()).problems).toEqual(['full_stale']); // back on: it is reported again
 
     // a system fault clears itself: it can be neither marked handled nor snoozed
     await heartbeat({ ldapOk: false, lastErrorCode: 'ldap_bind_failed' });

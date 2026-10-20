@@ -1,4 +1,5 @@
 import { withAllBranches } from '../db/scoped.js';
+import { DATA_ALERT_TYPES } from '../modules/alerts/alerts.service.js';
 import { loadThresholds } from '../modules/sync/anomaly.js';
 import {
   abortStaleRuns,
@@ -44,7 +45,11 @@ export async function runSyncWatchdog({ pool, alerts, settings }) {
     if (type !== 'worker_silent' && !(await alerts.isSilenced(type))) problems.push({ type, subject, severity });
   };
   const quiet = (type) => alerts.clear(type, {}, { announce: false });
-  const check = async (type, isBad, severity, vars) => (isBad ? flag(type, severity, vars) : quiet(type));
+  // A data alert Admin HQ switched off (Quan tri > Tinh nang) is never opened; an open one is closed quietly.
+  const check = async (type, isBad, severity, vars) => {
+    const off = DATA_ALERT_TYPES.includes(type) && !(await settings.feature(`alert.${type}`));
+    return isBad && !off ? flag(type, severity, vars) : quiet(type);
+  };
 
   const [heartbeats, last, lastFull, aborted, recent, trend] = await withAllBranches(pool, async (tx) => [
     await listHeartbeats(tx),

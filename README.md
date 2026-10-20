@@ -941,7 +941,7 @@ Watchdog chạy mỗi 5 phút và tách **hai loại sự cố**, mỗi loại m
 - Mỗi loại: gửi khi bắt đầu, nhắc lại tối đa 1 lần mỗi ngày, hết sự cố thì không gửi gì nữa.
 - Xem ở **Quản trị > Đồng bộ AD > Tình trạng sync** (hai ô Worker và Đồng bộ AD, bên dưới là cảnh báo đang mở), Tổng quan của Admin HQ và báo cáo email hằng ngày.
 
-**Ô "Đồng bộ AD" gồm 2 phần:** **Sự cố hệ thống** (đo trực tiếp: không đọc được AD, sync quá hạn, lượt sync treo, canary, USN; tự hết khi sửa xong) và **Cảnh báo dữ liệu** (tính từ nội dung đã đồng bộ: máy mới không có key, tỉ lệ không key tăng, full sync quá hạn, chứng chỉ DC sắp hết hạn; hiện "Có cảnh báo nhẹ" và không làm dừng sync). Vì cảnh báo dữ liệu còn đúng nhiều ngày sau khi bạn đã sửa nguyên nhân, mỗi cảnh báo loại này có nút **Đã xử lý** (kèm ghi chú: ngừng gửi mail, không tính vào trạng thái, tự đóng khi điều kiện hết, báo lại nếu tái phát) và **Bỏ qua 1/7/30 ngày** (hết hạn mà điều kiện còn thì báo lại). Sự cố hệ thống tự hết khi sửa xong nên không có nút nào. Chỉ Admin HQ bấm được; mọi thao tác ghi vào nhật ký truy cập (`alert_ack`, `alert_snooze`).
+**Ô "Đồng bộ AD" gồm 2 phần:** **Sự cố hệ thống** (đo trực tiếp: không đọc được AD, sync quá hạn, lượt sync treo, canary, USN; tự hết khi sửa xong) và **Cảnh báo dữ liệu** (tính từ nội dung đã đồng bộ: máy mới không có key, tỉ lệ không key tăng, full sync quá hạn, chứng chỉ DC sắp hết hạn; hiện "Có cảnh báo nhẹ" và không làm dừng sync). Vì cảnh báo dữ liệu còn đúng nhiều ngày sau khi bạn đã sửa nguyên nhân, mỗi cảnh báo loại này có nút **Đã xử lý** (kèm ghi chú: ngừng gửi mail và không tính vào trạng thái trong **30 ngày** theo mặc định, chỉnh ở Ngưỡng cảnh báo; hết hạn mà điều kiện còn thì báo lại, điều kiện hết thì cảnh báo tự đóng) và **Bỏ qua 1/7/30 ngày** (cùng cách). Muốn **tắt hẳn** một loại cảnh báo dữ liệu: **Quản trị > Tính năng** (4 công tắc "Cảnh báo dữ liệu: ..."); loại đã tắt không bao giờ mở, đang mở thì đóng, và ô trạng thái ghi "Đã tắt N loại". Sự cố hệ thống không tắt được. Sự cố hệ thống tự hết khi sửa xong nên không có nút nào. Chỉ Admin HQ bấm được; mọi thao tác ghi vào nhật ký truy cập (`alert_ack`, `alert_snooze`).
 
 **Email cảnh báo chia 4 nhóm**, mỗi nhóm bật/tắt và chọn người nhận riêng ở **Quản trị > Thông báo** (Admin HQ và/hoặc địa chỉ thêm; `NOTIFY_TO` luôn nhận nhóm đang bật). Tắt nhóm thì không gửi mail nhóm đó (cảnh báo vẫn hiện trong app):
 
@@ -965,6 +965,7 @@ Ngưỡng của watchdog (**Quản trị > Ngưỡng cảnh báo**):
 | Giá trị canary cũ quá | 90 phút |
 | Máy mới (2–7 ngày) chưa có key quá | 50%, chỉ xét khi có từ 5 máy mới |
 | Tỉ lệ máy chưa có key của chi nhánh tăng quá (so với tuần trước) | 5 điểm % |
+| Cảnh báo dữ liệu đã xử lý tự báo lại sau nếu điều kiện còn | 30 ngày |
 | Máy được coi là "Hoạt động gần đây" nếu có đăng nhập AD trong (chỉ là nhãn, không tạo cảnh báo) | 3 tháng |
 
 **Trang Tổng quan:** dòng "Dữ liệu cập nhật lần cuối" (chuyển thành cảnh báo khi quá ngưỡng sync), biểu đồ số máy và số key 30 ngày, lượt hiện key mỗi ngày 14 ngày (Trưởng IT, Admin HQ, Auditor), và khung **Theo chi nhánh**: mỗi chi nhánh một thanh, **xanh** là % máy đã có key, **đỏ** là % chưa có (bấm phần đỏ để mở danh sách máy chưa có key). Mặc định 10 chi nhánh nhiều máy nhất, bấm **Xem tất cả** để hiện đủ. Báo cáo theo kỳ ở mục 6.11.

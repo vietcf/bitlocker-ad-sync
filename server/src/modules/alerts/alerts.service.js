@@ -11,7 +11,8 @@ export const REMIND_HOURS = 4;
  * mark them handled or snooze them. The other alerts (worker, AD, sync) are measured live and clear themselves.
  */
 export const DATA_ALERT_TYPES = ['escrow_broken', 'no_key_rising', 'full_stale', 'dc_cert_expiring'];
-const SILENCED = '(type = ANY($1::text[]) AND (acked_at IS NOT NULL OR snoozed_until > now()))';
+// "Handled" and "skip N days" both set snoozed_until: silent until then, reported again if the condition remains.
+const SILENCED = '(type = ANY($1::text[]) AND snoozed_until > now())';
 
 /** 'YYYY-MM-DD' of a date in the app's time zone. */
 const dayOf = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: process.env.APP_TZ ?? 'Asia/Ho_Chi_Minh' }).format(d);
@@ -112,12 +113,12 @@ export class AlertsService {
     return rows.length > 0;
   }
 
-  /** "Handled": a data alert goes quiet until it clears. Live system faults clear themselves and cannot be marked. */
-  async acknowledge(id, { by, note }) {
+  /** "Handled": a data alert goes quiet for `days` (or until it clears). Live system faults clear themselves and cannot be marked. */
+  async acknowledge(id, { by, note, days }) {
     const { rows } = await this.pool.query(
-      `UPDATE sync_alert SET acked_at = now(), acked_by = $2, ack_note = $3, snoozed_until = NULL
-        WHERE id = $1 AND resolved_at IS NULL AND type = ANY($4::text[]) RETURNING id, type`,
-      [id, by, note || null, DATA_ALERT_TYPES],
+      `UPDATE sync_alert SET acked_at = now(), acked_by = $2, ack_note = $3, snoozed_until = now() + make_interval(days => $5)
+        WHERE id = $1 AND resolved_at IS NULL AND type = ANY($4::text[]) RETURNING id, type, snoozed_until`,
+      [id, by, note || null, DATA_ALERT_TYPES, days],
     );
     return rows[0] ?? null;
   }

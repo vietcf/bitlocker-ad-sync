@@ -1,9 +1,10 @@
 <%- include('../partials/head') %>
 <%- include('_tabs') %>
-<% const UNIT = { percent: '%', minutes: 'phút', hours: 'giờ', months: 'tháng', count: '', points: 'điểm %' }; %>
+<% const UNIT = { percent: '%', minutes: 'phút', hours: 'giờ', months: 'tháng', days: 'ngày', count: '', points: 'điểm %' }; %>
 <% const GROUPS = [
   ['run', 'Kiểm tra khi lượt sync kết thúc', 'Vượt ngưỡng thì lượt sync bị giữ lại (cách ly) và chờ Admin HQ chấp nhận hoặc bác bỏ ở tab Sync AD. Các ngưỡng này chỉ xét lượt full (lượt delta chỉ đọc phần thay đổi); riêng key đọc được mà không có mật khẩu thì lượt nào cũng giữ lại.'],
   ['watchdog', 'Watchdog', 'Hai loại sự cố riêng: không có heartbeat thì Worker Offline (một mail); worker vẫn chạy mà vượt ngưỡng khác (không đọc được AD, lâu không sync, canary, USN...) thì Đồng bộ AD có sự cố (một mail). Mỗi loại nhắc lại tối đa 1 lần mỗi ngày; hết thì tự về bình thường, không gửi gì nữa.'],
+  ['dataalerts', 'Cảnh báo dữ liệu', 'Nút "Đã xử lý" ở Quản trị > Sync AD im lặng cảnh báo đến hết thời hạn này; hết hạn mà điều kiện còn thì báo lại. Muốn tắt hẳn một loại: Quản trị > Tính năng.'],
   ['activity', 'Hoạt động của máy', 'Nhãn "Hoạt động gần đây" / "Không hoạt động gần đây" ở trang máy và danh sách Tìm máy, theo lần đăng nhập AD gần nhất của máy (lastLogonTimestamp, lệch tối đa ~14 ngày). Không tạo cảnh báo. Bộ lọc ở Tìm máy có các mốc riêng (1/3/6/9/12/24 tháng).'],
 ]; %>
 <section class="card">
