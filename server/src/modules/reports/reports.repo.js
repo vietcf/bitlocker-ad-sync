@@ -36,7 +36,7 @@ export async function computersWithKey(tx, branches) {
   const params = [];
   const scope = branchFilter('c.branch_id', branches, params);
   const { rows } = await tx.query(
-    `SELECT c.id, c.name, c.os, c.distinguished_name, c.device_serial, c.owner_email, c.ad_created_at, c.first_seen_at,
+    `SELECT c.id, c.name, c.os, c.distinguished_name, c.device_serial, c.owner_email, c.ad_created_at, c.first_seen_at, c.last_logon_at,
             c.branch_id, b.code AS branch_code, b.name AS branch_name,
             k.keys, k.latest_key_at
        FROM computer c
@@ -76,7 +76,7 @@ export async function computersWithoutKey(tx, branches) {
   const params = [];
   const scope = branchFilter('c.branch_id', branches, params);
   const { rows } = await tx.query(
-    `SELECT c.id, c.name, c.os, c.distinguished_name, c.device_serial, c.owner_email, c.ad_created_at, c.first_seen_at,
+    `SELECT c.id, c.name, c.os, c.distinguished_name, c.device_serial, c.owner_email, c.ad_created_at, c.first_seen_at, c.last_logon_at,
             c.branch_id, b.code AS branch_code, b.name AS branch_name
        FROM computer c
        LEFT JOIN branch b ON b.id = c.branch_id
@@ -108,15 +108,20 @@ export async function existingBranches(tx, branches) {
  * Per branch: computers in AD now, with / without a key, keys, and what changed in the period
  * (computers and keys first recorded, computers marked as no longer in AD).
  */
-export async function inventoryByBranch(tx, branches, period) {
+export async function inventoryByBranch(tx, branches, period, months = 3) {
   const params = [];
   const scope = branchFilter('c.branch_id', branches, params);
   const { start, end } = periodParams(params, period);
+  params.push(months);
+  const recent = `now() - make_interval(months => $${params.length})`;
   const { rows } = await tx.query(
     `SELECT c.branch_id,
             count(*) FILTER (WHERE c.deleted_in_ad_at IS NULL)::int AS computers,
             count(*) FILTER (WHERE c.deleted_in_ad_at IS NULL AND kc.n > 0)::int AS with_key,
             count(*) FILTER (WHERE c.deleted_in_ad_at IS NULL AND kc.n = 0)::int AS no_key,
+            count(*) FILTER (WHERE c.deleted_in_ad_at IS NULL AND c.last_logon_at >= ${recent})::int AS active,
+            count(*) FILTER (WHERE c.deleted_in_ad_at IS NULL AND c.last_logon_at < ${recent})::int AS inactive,
+            count(*) FILTER (WHERE c.deleted_in_ad_at IS NULL AND c.last_logon_at IS NULL)::int AS no_logon,
             coalesce(sum(kc.n) FILTER (WHERE c.deleted_in_ad_at IS NULL), 0)::int AS keys,
             count(*) FILTER (WHERE c.first_seen_at >= ${start} AND c.first_seen_at < ${end})::int AS new_computers,
             coalesce(sum(kc.new_n), 0)::int AS new_keys,

@@ -80,10 +80,20 @@ describe('computer list (no search term)', () => {
     expect(await total('a1')).toBe(2);
     expect(await total('a6')).toBe(3);
     expect(await total('a24')).toBe(3);
-    expect(await total('i3')).toBe(2); // 5 and 30 months ago; machines without data are not "not seen"
+    expect(await total('i3')).toBe(2); // 5 and 30 months ago; machines without data are excluded by default
     expect(await total('i24')).toBe(1);
-    expect(await total('unknown')).toBe(30 - 4); // HN-LT-0001 and the other 25 HN-PC have no data
-    expect((await agent.get('/api/computers').query({ activity: 'a5' })).status).toBe(400);
+    expect(await total('unknown')).toBe(30 - 4); // old form of noLogon=only: HN-LT-0001 and the other 25 HN-PC have no data
+    // combine the time condition with the machines that have no data
+    const both = async (activity, noLogon) => (await agent.get('/api/computers').query({ activity, noLogon })).body.total;
+    expect(await both('i24', 'include')).toBe(1 + 26); // not seen for 24 months OR no data
+    expect(await both('a1', 'include')).toBe(2 + 26);
+    expect(await both('a1', 'exclude')).toBe(2);
+    expect(await both('i3', 'only')).toBe(26); // "only" ignores the time condition
+    expect(await both(undefined, 'only')).toBe(26);
+    expect(await both(undefined, 'exclude')).toBe(4); // everything that has data
+    expect(await total(undefined)).toBe(30); // default: no filter
+    expect((await agent.get('/api/computers').query({ activity: 'a99' })).status).toBe(400);
+    expect((await agent.get('/api/computers').query({ noLogon: 'maybe' })).status).toBe(400);
 
     const web = await webLogin(app, 'it.hn');
     const [{ id }] = await asOwner(`SELECT id FROM computer WHERE name = 'HN-PC-003'`);

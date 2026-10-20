@@ -87,17 +87,29 @@
         <option value="no_key" <%= filters.status === 'no_key' ? 'selected' : '' %>>Chưa có key</option>
       </select>
     </label>
-    <label title="Theo lần đăng nhập domain gần nhất của máy trên AD (lastLogonTimestamp, lệch tối đa ~14 ngày)">Hoạt động
+    <%
+      const act = filters.activity === 'unknown' ? '' : (filters.activity ?? '');
+      const noLogon = filters.activity === 'unknown' ? 'only' : (filters.noLogon ?? (act ? 'exclude' : 'include'));
+      const months = [...new Set([1, 3, 6, 9, 12, 24, Number(act.slice(1)) || 1, activityMonths])].sort((x, y) => x - y);
+    %>
+    <label title="Theo lần đăng nhập domain gần nhất của máy trên AD (lastLogonTimestamp, lệch tối đa ~14 ngày)">Đăng nhập AD
       <select name="activity">
         <option value="">Tất cả</option>
         <optgroup label="Hoạt động gần đây">
-          <% [1, 3, 6, 9, 12, 24].forEach((n) => { %><option value="a<%= n %>" <%= filters.activity === 'a' + n ? 'selected' : '' %>>Trong <%= n %> tháng gần nhất</option><% }) %>
+          <% months.forEach((n) => { %><option value="a<%= n %>" <%= act === 'a' + n ? 'selected' : '' %>>Trong <%= n %> tháng gần nhất</option><% }) %>
         </optgroup>
         <optgroup label="Không hoạt động gần đây">
-          <% [1, 3, 6, 9, 12, 24].forEach((n) => { %><option value="i<%= n %>" <%= filters.activity === 'i' + n ? 'selected' : '' %>>Quá <%= n %> tháng chưa thấy</option><% }) %>
+          <% months.forEach((n) => { %><option value="i<%= n %>" <%= act === 'i' + n ? 'selected' : '' %>>Quá <%= n %> tháng chưa thấy</option><% }) %>
         </optgroup>
-        <option value="unknown" <%= filters.activity === 'unknown' ? 'selected' : '' %>>Chưa có dữ liệu đăng nhập</option>
       </select>
+    </label>
+    <label title="Máy chưa từng đăng nhập hoặc worker chưa báo dữ liệu. Gồm cả: tính thêm các máy này vào kết quả của mốc thời gian (HOẶC). Chỉ máy này: bỏ qua mốc thời gian.">Máy chưa có dữ liệu đăng nhập
+      <select name="noLogon">
+        <option value="exclude" <%= noLogon === 'exclude' ? 'selected' : '' %>>Không gồm</option>
+        <option value="include" <%= noLogon === 'include' ? 'selected' : '' %>>Gồm cả</option>
+        <option value="only" <%= noLogon === 'only' ? 'selected' : '' %>>Chỉ máy này</option>
+      </select>
+      <% if (list.noLogonCount) { %><span class="muted small">(<%= h.number(list.noLogonCount) %> máy)</span><% } %>
     </label>
     <fieldset class="date-range">
       <legend>Ngày xuất hiện</legend>

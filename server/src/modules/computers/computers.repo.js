@@ -121,6 +121,32 @@ export async function listKeyMetadata(tx, computerId) {
 }
 
 /**
+ * Last AD logon condition: a time condition (aN seen within N months, iN not seen for more than N months) and what to do
+ * with computers without logon data (noLogon: exclude | include = OR with the time condition | only). Returns SQL or null.
+ */
+function logonCondition(filters, params) {
+  let { activity, noLogon } = filters;
+  if (activity === 'unknown') {
+    activity = undefined;
+    noLogon = 'only';
+  }
+  if (noLogon === 'only') return 'c.last_logon_at IS NULL';
+  noLogon ??= activity ? 'exclude' : 'include';
+  if (!activity) return noLogon === 'exclude' ? 'c.last_logon_at IS NOT NULL' : null;
+  params.push(Number(activity.slice(1)));
+  const time = `c.last_logon_at ${activity[0] === 'a' ? '>=' : '<'} now() - make_interval(months => $${params.length})`;
+  return noLogon === 'include' ? `(${time} OR c.last_logon_at IS NULL)` : time;
+}
+
+/** Computers in the same list (all filters except the last logon) that have no logon data: a hint next to the filter. */
+export async function countWithoutLogon(tx, branches, filters) {
+  const params = [];
+  const where = computerFilters(branches, { ...filters, activity: undefined, noLogon: 'only' }, params);
+  const { rows } = await tx.query(`SELECT count(*)::int AS n FROM computer c WHERE ${where}`, params);
+  return rows[0].n;
+}
+
+/**
  * WHERE conditions on computer `c` for the list filters (shared by the list, its CSV export and
  * the key export). filters: { branchId (id or 'na' = no branch), status: 'all' | 'no_key' | 'has_key', includeDeleted,
  * dateField: 'seen' (first recorded here) | 'ad' (created in AD), from, to: 'YYYY-MM-DD' inclusive, in APP_TZ,
@@ -140,13 +166,8 @@ export function computerFilters(branches, filters, params) {
   } else if (filters.status === 'has_key') {
     where.push('EXISTS (SELECT 1 FROM recovery_key k WHERE k.computer_id = c.id)');
   }
-  if (filters.activity === 'unknown') {
-    where.push('c.last_logon_at IS NULL');
-  } else if (filters.activity) {
-    const months = Number(filters.activity.slice(1)); // validated by computerQuery: 1 3 6 9 12 24
-    params.push(months);
-    where.push(`c.last_logon_at ${filters.activity[0] === 'a' ? '>=' : '<'} now() - make_interval(months => $${params.length})`);
-  }
+  const logon = logonCondition(filters, params);
+  if (logon) where.push(logon);
   if (filters.from || filters.to) {
     const column = filters.dateField === 'ad' ? 'c.ad_created_at' : 'c.first_seen_at';
     params.push(process.env.APP_TZ ?? 'Asia/Ho_Chi_Minh');

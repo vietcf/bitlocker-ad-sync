@@ -21,7 +21,8 @@ beforeEach(async () => {
   await addUser(pool, 'admin.hq', [{ branchId: null, role: 'admin' }]);
 });
 
-const branchRows = (html) => [...html.matchAll(/<td><strong>([A-Z0-9/]+)<\/strong>/g)].map((m) => m[1]);
+// only the "Chi tiet theo chi nhanh" table (the activity table below repeats the branches)
+const branchRows = (html) => [...html.split('Hoạt động của máy')[0].matchAll(/<td><strong>([A-Z0-9/]+)<\/strong>/g)].map((m) => m[1]);
 
 describe('page size helpers', () => {
   it('give the default, keep a stored value inside its limits, and cut a list into pages', async () => {

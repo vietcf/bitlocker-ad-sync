@@ -13,6 +13,13 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.10.0] - 2026-10-20
+
+### Thêm
+
+- Tìm máy: bộ lọc đăng nhập AD nay gồm hai ô kết hợp được, mốc thời gian và "Máy chưa có dữ liệu đăng nhập" (Không gồm / Gồm cả = HOẶC / Chỉ máy này), kèm số máy chưa có dữ liệu. Tham số `noLogon` (API, CSV, xuất kèm key); `activity=unknown` cũ vẫn dùng được; `activity` nhận N từ 1 đến 60.
+- Báo cáo: mục "Hoạt động của máy" theo chi nhánh (hoạt động gần đây / không hoạt động gần đây / chưa có dữ liệu, % hoạt động) với link sang Tìm máy; Excel có thêm các cột đó và cột "Đăng nhập AD gần nhất" ở các sheet danh sách máy.
+
 ## [2.9.0] - 2026-10-20
 
 ### Thêm

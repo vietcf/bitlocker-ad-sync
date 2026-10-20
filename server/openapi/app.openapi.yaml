@@ -234,7 +234,8 @@ paths:
         - { name: status, in: query, schema: { type: string, enum: [all, no_key, has_key], default: all } }
         - { name: includeDeleted, in: query, schema: { type: string, enum: ['on', 'true', '1'] }, description: 'Also list computers no longer in AD.' }
         - { name: dateField, in: query, schema: { type: string, enum: [seen, ad], default: seen }, description: 'Which date from/to apply to: seen = first recorded in this system, ad = created in AD.' }
-        - { name: activity, in: query, schema: { type: string, pattern: '^([ai](1|3|6|9|12|24)|unknown)$' }, description: 'Last AD logon of the computer (lastLogonTimestamp, accurate to ~14 days): aN = seen within the last N months, iN = not seen for more than N months (N = 1, 3, 6, 9, 12, 24), unknown = no logon data yet.' }
+        - { name: activity, in: query, schema: { type: string, pattern: '^([ai]([1-9]|[1-5][0-9]|60)|unknown)$' }, description: 'Last AD logon of the computer (lastLogonTimestamp, accurate to ~14 days): aN = seen within the last N months, iN = not seen for more than N months (N = 1, 3, 6, 9, 12, 24), unknown = no logon data yet.' }
+        - { name: noLogon, in: query, schema: { type: string, enum: [exclude, include, only] }, description: 'What to do with computers that have no logon data: exclude (default with a time condition), include (OR with the time condition; default without one) or only (ignore the time condition).' }
         - { name: from, in: query, schema: { type: string, format: date }, description: 'Appeared on or after this day (YYYY-MM-DD, APP_TZ).' }
         - { name: to, in: query, schema: { type: string, format: date }, description: 'Appeared on or before this day (YYYY-MM-DD, APP_TZ).' }
         - { name: format, in: query, schema: { type: string, enum: [csv] } }
@@ -403,7 +404,8 @@ paths:
                     status: { type: string, enum: [all, no_key, has_key] }
                     includeDeleted: { type: boolean }
                     dateField: { type: string, enum: [seen, ad] }
-                    activity: { type: string, pattern: '^([ai](1|3|6|9|12|24)|unknown)$' }
+                    activity: { type: string, pattern: '^([ai]([1-9]|[1-5][0-9]|60)|unknown)$' }
+                    noLogon: { type: string, enum: [exclude, include, only] }
                     from: { type: string, format: date }
                     to: { type: string, format: date }
       responses:

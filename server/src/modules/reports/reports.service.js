@@ -81,6 +81,7 @@ export class ReportsService {
     const inScope = all === 'all' || (f.branchId && all.includes(f.branchId));
     const branches = f.branchId ? (inScope ? [f.branchId] : []) : all;
     const hours = this.settings ? await this.settings.get('reveal.working_hours', null) : null;
+    const months = this.settings ? Number(await this.settings.get('computer.recent_months', 3)) : 3; // "recent" last AD logon
 
     const data = branches.length === 0
       ? { list: [], existing: [], inventory: [], reveals: [], noKey: [], options: [] }
@@ -92,7 +93,7 @@ export class ReportsService {
           options: await branchList(tx, all),
           list,
           existing: await existingBranches(tx, branches),
-          inventory: await inventoryByBranch(tx, branches, period),
+          inventory: await inventoryByBranch(tx, branches, period, months),
           reveals: await revealsInPeriod(tx, branches, period),
           noKey: await computersWithoutKey(tx, branches),
           // Computers that have keys, with their key counts: for the Excel file of one branch only.
@@ -106,7 +107,7 @@ export class ReportsService {
     // One row per active branch in scope, plus N/A when computers or reveals have no branch.
     const fresh = (id, code = null, name = null) => ({
       branch_id: id, branch_code: code, branch_name: name,
-      computers: 0, with_key: 0, no_key: 0, keys: 0, new_computers: 0, new_keys: 0, left_ad: 0,
+      computers: 0, with_key: 0, no_key: 0, active: 0, inactive: 0, no_logon: 0, keys: 0, new_computers: 0, new_keys: 0, left_ad: 0,
       reveals: 0, exported: 0, out_of_hours: hours ? 0 : null, users: new Set(), devices: new Set(), reasons: {},
     });
     const rows = new Map(data.list.map((b) => [b.id, fresh(b.id, b.code, b.name)]));
@@ -165,6 +166,9 @@ export class ReportsService {
       computers: sum('computers'),
       withKey: sum('with_key'),
       noKey: sum('no_key'),
+      active: sum('active'),
+      inactive: sum('inactive'),
+      noLogon: sum('no_logon'),
       keys: sum('keys'),
       newComputers: sum('new_computers'),
       newKeys: sum('new_keys'),
@@ -200,6 +204,7 @@ export class ReportsService {
       branchId: f.branchId,
       branchOptions: data.options,
       workingHours: hours,
+      activityMonths: months,
       generatedAt: this.now(),
       totals,
       branches: byBranch,
@@ -258,6 +263,9 @@ function workbook(r, scope) {
       ['Máy đã có key', t.withKey],
       ['Máy chưa có key', t.noKey, r.noKeyDetail ? 'Danh sách ở sheet "Máy chưa có key"' : 'Theo chi nhánh ở sheet "Máy chưa có key"; chọn một chi nhánh để xuất danh sách máy'],
       ['Tỉ lệ máy có key', P(t.coverage)],
+      [`Máy hoạt động gần đây (đăng nhập AD trong ${r.activityMonths} tháng)`, t.active, 'Theo lastLogonTimestamp, lệch tối đa ~14 ngày'],
+      ['Máy không hoạt động gần đây', t.inactive, `Đăng nhập AD gần nhất cũ hơn ${r.activityMonths} tháng`],
+      ['Máy chưa có dữ liệu đăng nhập', t.noLogon, 'Chưa từng đăng nhập, hoặc worker chưa báo'],
       ['Số key', t.keys, 'Key của các máy còn trong phạm vi giám sát'],
       [`Máy mới ghi nhận trong kỳ`, t.newComputers],
       [`Key mới ghi nhận trong kỳ`, t.newKeys],
@@ -272,13 +280,13 @@ function workbook(r, scope) {
 
   const branchSheet = {
     name: 'Theo chi nhánh',
-    widths: [12, 30, 12, 12, 14, 12, 12, 12, 12, 12, 14],
+    widths: [12, 30, 12, 12, 14, 12, 12, 12, 12, 12, 14, 16, 16, 16],
     freeze: 1,
     filterRow: 1,
     rows: [
-      [H('Chi nhánh'), H('Tên'), H('Máy'), H('Có key'), H('Chưa có key'), H('% có key'), H('Số key'), H('Máy mới'), H('Key mới'), H('Rời phạm vi'), H('Lượt hiện key')],
-      ...r.branches.map((b) => [code(b), b.branch_name ?? 'Máy chưa thuộc chi nhánh nào', b.computers, b.with_key, b.no_key, P(b.coverage), b.keys, b.new_computers, b.new_keys, b.left_ad, b.reveals]),
-      [T('Tổng'), T(''), TI(t.computers), TI(t.withKey), TI(t.noKey), { v: t.coverage, s: 'pct' }, TI(t.keys), TI(t.newComputers), TI(t.newKeys), TI(t.leftAd), TI(t.reveals)],
+      [H('Chi nhánh'), H('Tên'), H('Máy'), H('Có key'), H('Chưa có key'), H('% có key'), H('Số key'), H('Máy mới'), H('Key mới'), H('Rời phạm vi'), H('Lượt hiện key'), H(`Hoạt động gần đây (${r.activityMonths} tháng)`), H('Không hoạt động gần đây'), H('Chưa có dữ liệu đăng nhập')],
+      ...r.branches.map((b) => [code(b), b.branch_name ?? 'Máy chưa thuộc chi nhánh nào', b.computers, b.with_key, b.no_key, P(b.coverage), b.keys, b.new_computers, b.new_keys, b.left_ad, b.reveals, b.active, b.inactive, b.no_logon]),
+      [T('Tổng'), T(''), TI(t.computers), TI(t.withKey), TI(t.noKey), { v: t.coverage, s: 'pct' }, TI(t.keys), TI(t.newComputers), TI(t.newKeys), TI(t.leftAd), TI(t.reveals), TI(t.active), TI(t.inactive), TI(t.noLogon)],
     ],
   };
 
@@ -308,28 +316,30 @@ function workbook(r, scope) {
 
   const noKeySheet = {
     name: 'Máy chưa có key',
-    widths: [12, 24, 28, 18, 30, 16, 16, 14, 60],
+    widths: [12, 24, 28, 18, 30, 16, 16, 14, 18, 60],
     freeze: 1,
     filterRow: 1,
     rows: [
-      [H('Chi nhánh'), H('Máy'), H('Hệ điều hành'), H('Serial'), H('Email người dùng'), H('Tạo trên AD'), H('Ghi nhận'), H('Số ngày chưa có key'), H('DN')],
+      [H('Chi nhánh'), H('Máy'), H('Hệ điều hành'), H('Serial'), H('Email người dùng'), H('Tạo trên AD'), H('Ghi nhận'), H('Số ngày chưa có key'), H('Đăng nhập AD gần nhất'), H('DN')],
       ...r.noKey.map((c) => [c.branch_code ?? 'N/A', c.name, c.os, c.device_serial, c.owner_email,
-        c.ad_created_at ? { v: new Date(c.ad_created_at), s: 'date' } : null, { v: new Date(c.first_seen_at), s: 'date' }, c.days_without_key, c.distinguished_name]),
+        c.ad_created_at ? { v: new Date(c.ad_created_at), s: 'date' } : null, { v: new Date(c.first_seen_at), s: 'date' }, c.days_without_key,
+        c.last_logon_at ? { v: new Date(c.last_logon_at), s: 'date' } : null, c.distinguished_name]),
     ],
   };
 
   // Mot chi nhanh: cac may da co key va so key cua tung may (dat truoc sheet may chua co key)
   const withKeySheet = r.withKey ? {
     name: 'Máy đã có key',
-    widths: [12, 24, 28, 18, 30, 10, 18, 16, 16, 60],
+    widths: [12, 24, 28, 18, 30, 10, 18, 16, 16, 18, 60],
     freeze: 1,
     filterRow: 1,
     rows: [
-      [H('Chi nhánh'), H('Máy'), H('Hệ điều hành'), H('Serial'), H('Email người dùng'), H('Số key'), H('Key mới nhất (tạo trên AD)'), H('Tạo trên AD'), H('Ghi nhận'), H('DN')],
+      [H('Chi nhánh'), H('Máy'), H('Hệ điều hành'), H('Serial'), H('Email người dùng'), H('Số key'), H('Key mới nhất (tạo trên AD)'), H('Tạo trên AD'), H('Ghi nhận'), H('Đăng nhập AD gần nhất'), H('DN')],
       ...r.withKey.map((c) => [c.branch_code ?? 'N/A', c.name, c.os, c.device_serial, c.owner_email, c.keys,
         c.latest_key_at ? { v: new Date(c.latest_key_at), s: 'date' } : null,
-        c.ad_created_at ? { v: new Date(c.ad_created_at), s: 'date' } : null, { v: new Date(c.first_seen_at), s: 'date' }, c.distinguished_name]),
-      [T('Tổng'), TI(r.withKey.length), T(''), T(''), T(''), TI(r.withKey.reduce((n, c) => n + c.keys, 0)), T(''), T(''), T(''), T('')],
+        c.ad_created_at ? { v: new Date(c.ad_created_at), s: 'date' } : null, { v: new Date(c.first_seen_at), s: 'date' },
+        c.last_logon_at ? { v: new Date(c.last_logon_at), s: 'date' } : null, c.distinguished_name]),
+      [T('Tổng'), TI(r.withKey.length), T(''), T(''), T(''), TI(r.withKey.reduce((n, c) => n + c.keys, 0)), T(''), T(''), T(''), T(''), T('')],
     ],
   } : null;
 

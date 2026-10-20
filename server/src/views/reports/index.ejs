@@ -100,6 +100,38 @@
 </section>
 
 <section class="card">
+  <h2>Hoạt động của máy (đăng nhập AD gần nhất)</h2>
+  <div class="table-scroll">
+  <table class="dense report">
+    <thead>
+      <tr><th>Chi nhánh</th><th class="num">Máy</th><th class="num" title="Có đăng nhập AD trong <%= report.activityMonths %> tháng gần nhất (đổi ở Quản trị > Ngưỡng cảnh báo)">Hoạt động gần đây</th>
+        <th class="num" title="Đăng nhập AD gần nhất cũ hơn <%= report.activityMonths %> tháng">Không hoạt động gần đây</th>
+        <th class="num" title="Máy chưa từng đăng nhập, hoặc worker chưa báo dữ liệu này">Chưa có dữ liệu</th><th class="num">% hoạt động</th></tr>
+    </thead>
+    <tbody>
+    <% const bid = (b) => b.branch_id ?? 'na'; %>
+    <% branchPage.rows.forEach((b) => { %>
+      <tr>
+        <td><strong><%= label(b) %></strong><% if (b.branch_name) { %> <span class="muted">· <%= b.branch_name %></span><% } %></td>
+        <td class="num"><%= h.number(b.computers) %></td>
+        <td class="num"><% if (b.active) { %><a href="/?branchId=<%= bid(b) %>&activity=a<%= report.activityMonths %>&noLogon=exclude"><%= h.number(b.active) %></a><% } else { %>0<% } %></td>
+        <td class="num"><% if (b.inactive) { %><a href="/?branchId=<%= bid(b) %>&activity=i<%= report.activityMonths %>&noLogon=exclude"><%= h.number(b.inactive) %></a><% } else { %>0<% } %></td>
+        <td class="num"><% if (b.no_logon) { %><a href="/?branchId=<%= bid(b) %>&noLogon=only"><%= h.number(b.no_logon) %></a><% } else { %>0<% } %></td>
+        <td class="num"><%= b.computers - b.no_logon > 0 ? Math.round((b.active / (b.computers - b.no_logon)) * 1000) / 10 + '%' : '—' %></td>
+      </tr>
+    <% }) %>
+    <% if (!report.branches.length) { %><tr><td colspan="6" class="muted">Không có dữ liệu trong phạm vi của bạn.</td></tr><% } %>
+    </tbody>
+    <% if (report.branches.length > 1) { %>
+    <tfoot><tr><th>Tổng</th><th class="num"><%= h.number(t.computers) %></th><th class="num"><%= h.number(t.active) %></th><th class="num"><%= h.number(t.inactive) %></th>
+      <th class="num"><%= h.number(t.noLogon) %></th><th class="num"><%= t.computers - t.noLogon > 0 ? Math.round((t.active / (t.computers - t.noLogon)) * 1000) / 10 + '%' : '—' %></th></tr></tfoot>
+    <% } %>
+  </table>
+  </div>
+  <p class="muted small">Theo lần đăng nhập domain gần nhất của máy (lastLogonTimestamp, lệch tối đa ~14 ngày). "Hoạt động gần đây" là có đăng nhập trong <%= report.activityMonths %> tháng; chỉ là chưa thấy máy đăng nhập, không có nghĩa máy đã hỏng hay bị bỏ. % hoạt động tính trên các máy đã có dữ liệu (không tính "Chưa có dữ liệu"). Bấm số để mở danh sách máy ở trang Tìm máy; file Excel có thêm các cột này và cột đăng nhập gần nhất của từng máy.</p>
+</section>
+
+<section class="card">
   <h2>Xem key theo chi nhánh</h2>
   <div class="table-scroll">
   <table class="dense report">

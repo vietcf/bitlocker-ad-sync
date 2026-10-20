@@ -145,6 +145,20 @@ describe('report', () => {
     expect(log[0].detail).toMatchObject({ branchId: null });
   });
 
+  it('counts computers by last AD logon per branch, with links to the list filters', async () => {
+    await asOwner(`UPDATE computer SET last_logon_at = now() - interval '10 days' WHERE name = 'HN-LT-0001';
+                   UPDATE computer SET last_logon_at = now() - interval '8 months' WHERE name = 'HCM-LT-0001'`); // HN-PC-NEW: no data
+    const { agent } = await apiLogin(app, 'auditor');
+    const res = await agent.get('/api/reports/summary');
+    expect(res.body.totals).toMatchObject({ active: 1, inactive: 1, noLogon: 1 });
+    expect(res.body.branches.find((b) => b.branch_code === 'HN')).toMatchObject({ active: 1, inactive: 0, no_logon: 1 });
+    expect(res.body.activityMonths).toBe(3);
+    const page = (await (await webLogin(app, 'auditor')).agent.get('/reports')).text;
+    expect(page).toContain('Hoạt động của máy');
+    expect(page).toContain('activity=a3&noLogon=exclude');
+    expect(page).toContain('noLogon=only');
+  });
+
   it('renders the page with the three parts', async () => {
     const { agent } = await webLogin(app, 'auditor');
     const page = await agent.get('/reports');
