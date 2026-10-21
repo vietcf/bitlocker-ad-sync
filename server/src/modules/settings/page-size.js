@@ -7,6 +7,7 @@ export const PAGE_SIZES = {
   computers: { key: 'ui.page_size.computers', default: 25, label: 'Tìm máy và danh sách máy' },
   audit: { key: 'ui.page_size.audit', default: 50, label: 'Nhật ký truy cập' },
   mail: { key: 'ui.page_size.mail', default: 50, label: 'Log email' },
+  sync: { key: 'ui.page_size.sync', default: 50, label: 'Các lượt sync (Quản trị > Sync AD)' },
   report: { key: 'ui.page_size.report', default: 20, label: 'Báo cáo: chi tiết theo chi nhánh' },
 };
 

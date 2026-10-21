@@ -13,6 +13,12 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.21.1] - 2026-10-21
+
+### Đổi
+
+- Quản trị > Tính năng > **Hiển thị: số dòng mỗi trang** có thêm **Các lượt sync** (mặc định 50, từ 5 đến 200). Áp dụng cho bảng lượt sync và `GET /api/admin/sync-runs`.
+
 ## [2.21.0] - 2026-10-21
 
 ### Đổi

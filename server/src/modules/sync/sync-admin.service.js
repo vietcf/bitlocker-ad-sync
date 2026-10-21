@@ -28,10 +28,10 @@ import {
   setSyncRequest,
 } from './sync.repo.js';
 import { syncRunFields } from '../audit/event-log.js';
+import { PAGE_SIZES, pageSize } from '../settings/page-size.js';
 import { runRef } from './run-ref.js';
 import { mailKeyDuplicates, notInAdEvents } from './ingest.service.js';
 
-const RUNS_PAGE_SIZE = 50;
 const ackInput =z.object({ decision: z.enum(['accept', 'reject']) });
 const duplicateInput = z.object({ action: z.enum(['assign', 'share']) });
 const alertAckInput = z.object({ note: z.string().trim().max(300).optional() });
@@ -55,7 +55,7 @@ export class SyncAdminService {
 
   async status(scope, { page = 1 } = {}) {
     this.#check(scope);
-    const size = RUNS_PAGE_SIZE;
+    const size = await pageSize(this.settings, PAGE_SIZES.sync);
     const total = await countRuns(this.pool);
     const pages = Math.max(1, Math.ceil(total / size));
     const current = Math.min(Math.max(1, Math.trunc(Number(page)) || 1), pages);

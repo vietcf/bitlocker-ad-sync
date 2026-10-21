@@ -697,7 +697,7 @@ paths:
     get:
       operationId: getAdminSyncRuns
       tags: [Admin - sync]
-      summary: Sync runs, newest first (50 per page)
+      summary: Sync runs, newest first (page size from the setting ui.page_size.sync, default 50)
       parameters:
         - { name: page, in: query, required: false, schema: { type: integer, minimum: 1, default: 1 } }
       responses:
@@ -1065,4 +1065,5 @@ components:
         ui.page_size.computers: { type: integer, minimum: 5, maximum: 200, default: 25, description: Rows per page of the computer search and list. }
         ui.page_size.audit: { type: integer, minimum: 5, maximum: 200, default: 50, description: Rows per page of the access log. }
         ui.page_size.mail: { type: integer, minimum: 5, maximum: 200, default: 50, description: Rows per page of the mail log. }
+        ui.page_size.sync: { type: integer, minimum: 5, maximum: 200, default: 50, description: Rows per page of the sync run list. }
         ui.page_size.report: { type: integer, minimum: 5, maximum: 200, default: 20, description: Branches per page of "Chi tiết theo chi nhánh" in the report. }
