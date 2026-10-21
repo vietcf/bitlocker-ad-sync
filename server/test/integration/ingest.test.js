@@ -574,8 +574,13 @@ describe('same Key ID under another computer (unjoin / rejoin, cloned image)', (
     const res = await web.agent.post(`/admin/sync/key-duplicates/${id}/review`).type('form').send({ _csrf: web.csrf, action: 'assign' });
     expect(res.status).toBe(302);
     expect((await ownerOf(1)).object_guid).toBe(guid(2));
-    expect(await asOwner('SELECT resolution FROM key_duplicate')).toEqual([{ resolution: 'moved' }]);
+    expect(await asOwner('SELECT resolution FROM key_duplicate ORDER BY resolution')).toEqual([{ resolution: 'moved' }, { resolution: 'reviewed' }]);
     expect(await asOwner('SELECT reason FROM key_owner_change')).toEqual([{ reason: 'review_newer' }]);
+    // the key still sits under both computers in AD: the next full run must not raise it again
+    await runSync({ computers: withNewer(), keys: [keyOf(1, 1), keyOf(1, 2)] });
+    expect(await asOwner('SELECT id FROM key_duplicate WHERE resolved_at IS NULL')).toEqual([]);
+    expect((await ownerOf(1)).object_guid).toBe(guid(2));
+    expect(duplicateMails()).toHaveLength(1);
     expect((await asOwner(`SELECT detail FROM access_log WHERE action = 'key_duplicate_review'`))[0].detail.result).toBe('moved');
   });
 

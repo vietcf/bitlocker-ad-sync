@@ -19,6 +19,7 @@ import {
   recomputeKeyStatuses,
   getOpenDuplicate,
   moveKey,
+  closeDuplicateAsReviewed,
   reviewDuplicate,
   settleKeyDuplicates,
   peekSyncRequest,
@@ -95,6 +96,8 @@ export class SyncAdminService {
           throw badRequest('duplicate_not_newer', 'The computer holding the key is already the newer one: nothing to move.', times);
         }
         await moveKey(tx, { keyId: d.key_id, fromId: d.owner_id, toId: d.other_id, runId: null, reason: 'review_newer' });
+        // may cu van con key trong AD: ghi cap cu da dong de lan quet sau khong bao lai
+        await closeDuplicateAsReviewed(tx, { keyId: d.key_id, computerId: d.owner_id, samePassword: d.same_password, by: scope.upn });
       } else {
         await reviewDuplicate(tx, id, scope.upn, 'shared');
       }

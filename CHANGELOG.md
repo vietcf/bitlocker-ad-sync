@@ -13,6 +13,12 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.20.1] - 2026-10-21
+
+### Sửa
+
+- Key ID trùng: sau khi bấm **Gán cho máy mới hơn**, lần full scan sau **không báo lại** cặp đó nữa (trước đây máy cũ vẫn còn key trong AD nên bị ghi thành cặp trùng mới và gửi mail lần nữa). **Dùng chung 2 máy** vốn đã không báo lại.
+
 ## [2.20.0] - 2026-10-20
 
 ### Đổi

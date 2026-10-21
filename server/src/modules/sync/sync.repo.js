@@ -421,6 +421,20 @@ export async function recordKeyDuplicate(db, { keyId, computerId, samePassword, 
 }
 
 /**
+ * Admin HQ gave the key to the newer computer: the old holder still has the key in AD, so the pair is
+ * recorded already closed ('reviewed'); later full runs keep it closed instead of raising it again.
+ */
+export async function closeDuplicateAsReviewed(db, { keyId, computerId, samePassword, by }) {
+  await db.query(
+    `INSERT INTO key_duplicate (key_id, computer_id, same_password, notified_at, resolved_at, resolution, resolved_by)
+     VALUES ($1, $2, $3, now(), now(), 'reviewed', $4)
+     ON CONFLICT (key_id, computer_id) DO UPDATE SET
+       notified_at = COALESCE(key_duplicate.notified_at, now()), resolved_at = now(), resolution = 'reviewed', resolved_by = $4`,
+    [keyId, computerId, samePassword, by],
+  );
+}
+
+/**
  * After a full run has flagged the computers that left AD: open duplicates whose key owner left AD
  * move the key to the other computer (same password only); duplicates whose other computer left AD
  * are closed as 'gone'. Returns { moved: [{ key_id, from_id, to_id }], gone }.
