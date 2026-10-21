@@ -90,13 +90,23 @@ export async function abortStaleRuns(db, hours) {
   return rows.map((r) => r.id);
 }
 
-export async function listRuns(db, limit = 30) {
+export async function countRuns(db) {
+  const { rows } = await db.query('SELECT count(*)::int AS n FROM sync_run');
+  return rows[0].n;
+}
+
+export async function lastSuccessRun(db) {
+  const { rows } = await db.query(`SELECT id, finished_at FROM sync_run WHERE status = 'success' ORDER BY id DESC LIMIT 1`);
+  return rows[0] ?? null;
+}
+
+export async function listRuns(db, limit = 30, offset = 0) {
   const { rows } = await db.query(
     `SELECT id, started_at, finished_at, mode, dc_name, since_usn, highest_usn, computers_seen, keys_seen,
             keys_added, keys_empty_pwd, errors, error_code, status, anomalies, pending, ack_by, ack_decision, ack_at, marked_not_in_ad,
             (SELECT count(*)::int FROM computer c WHERE c.first_seen_run = sync_run.id) AS computers_added
-       FROM sync_run ORDER BY id DESC LIMIT $1`,
-    [limit],
+       FROM sync_run ORDER BY id DESC LIMIT $1 OFFSET $2`,
+    [limit, offset],
   );
   return rows;
 }

@@ -168,5 +168,6 @@
     <% if (!runs.length) { %><tr><td colspan="9" class="muted">Chưa có lượt sync nào.</td></tr><% } %>
     </tbody>
   </table>
+  <%- include('../partials/pager', { page: runsPage.page, pages: runsPage.pages, query, total: runsPage.total, pageSize: runsPage.pageSize, unit: 'lượt' }) %>
 </section>
 <%- include('../partials/foot') %>

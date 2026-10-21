@@ -45,7 +45,10 @@ export function adminApi({ admin, syncAdmin, settingsAdmin }) {
 
   // Sync
   r.get('/sync', async (req, res) => res.json(await syncAdmin.status(req.scope)));
-  r.get('/sync-runs', async (req, res) => res.json({ items: (await syncAdmin.status(req.scope)).runs }));
+  r.get('/sync-runs', async (req, res) => {
+    const s = await syncAdmin.status(req.scope, { page: req.query.page });
+    res.json({ items: s.runs, ...s.runsPage });
+  });
   r.post('/sync-runs', async (req, res) => res.status(202).json(await syncAdmin.requestSync(req.scope, req.body, clientInfo(req))));
   r.get('/sync-runs/:id', async (req, res) => res.json(await syncAdmin.runPreview(req.scope, parse(id, req.params.id))));
   r.post('/sync-runs/:id/ack', async (req, res) =>

@@ -697,9 +697,11 @@ paths:
     get:
       operationId: getAdminSyncRuns
       tags: [Admin - sync]
-      summary: The last 30 sync runs
+      summary: Sync runs, newest first (50 per page)
+      parameters:
+        - { name: page, in: query, required: false, schema: { type: integer, minimum: 1, default: 1 } }
       responses:
-        '200': { description: '`{ items }`', content: { application/json: { schema: { type: object, additionalProperties: true } } } }
+        '200': { description: '`{ items, page, pages, total, pageSize }`', content: { application/json: { schema: { type: object, additionalProperties: true } } } }
     post:
       operationId: postAdminSyncRuns
       tags: [Admin - sync]

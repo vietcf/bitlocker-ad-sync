@@ -103,4 +103,20 @@ describe('sync trace in the app log', () => {
     expect(sync().find((l) => l.msg === 'computer not seen by the full run: flagged out of the monitored scope')).toMatchObject({ runId: r, name: 'PC-2' });
     expect(sync().find((l) => l.msg === 'quarantined sync run decided')).toMatchObject({ runId: r, decision: 'accept', by: 'admin.hq', markedNotInAd: 1 });
   });
+
+  it('the run list is paged (50 per page) and "last success" does not depend on the page', async () => {
+    await asOwner(`INSERT INTO sync_run (mode, dc_name, status, started_at, finished_at)
+      SELECT 'delta', 'DC01', CASE WHEN g = 1 THEN 'success' ELSE 'failed' END, now() - make_interval(mins => 200 - g), now() - make_interval(mins => 200 - g)
+        FROM generate_series(1, 120) g`);
+    await addUser(pool, 'admin.hq', [{ branchId: null, role: 'admin' }]);
+    const { agent } = await apiLogin(app, 'admin.hq');
+    const p1 = (await agent.get('/api/admin/sync-runs')).body;
+    expect(p1).toMatchObject({ page: 1, pages: 3, total: 120, pageSize: 50 });
+    expect(p1.items).toHaveLength(50);
+    const p3 = (await agent.get('/api/admin/sync-runs?page=3')).body;
+    expect(p3.items).toHaveLength(20);
+    expect((await agent.get('/api/admin/sync-runs?page=99')).body.page).toBe(3); // out of range: last page
+    const web = await agent.get('/api/admin/sync');
+    expect(web.body.lastSuccess).not.toBeNull(); // the only success is on the last page
+  });
 });

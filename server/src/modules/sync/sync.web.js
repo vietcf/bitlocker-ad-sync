@@ -25,7 +25,7 @@ export function syncWeb({ syncAdmin }) {
   };
 
   r.get('/', async (req, res) => {
-    res.render('admin/sync', { title: 'Tình trạng sync', ...(await syncAdmin.status(req.scope)) });
+    res.render('admin/sync', { title: 'Tình trạng sync', ...(await syncAdmin.status(req.scope, { page: req.query.page })), query: {} });
   });
 
   r.post('/request', async (req, res) => {

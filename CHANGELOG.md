@@ -13,6 +13,12 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.21.0] - 2026-10-21
+
+### Đổi
+
+- Quản trị > Sync AD: **Các lượt sync gần đây** có phân trang (50 lượt/trang), xem được toàn bộ lịch sử còn lưu thay vì chỉ 30 lượt mới nhất. `GET /api/admin/sync-runs` nhận `?page=` và trả thêm `page, pages, total, pageSize`. "Lần sync thành công gần nhất" không phụ thuộc trang đang xem.
+
 ## [2.20.1] - 2026-10-21
 
 ### Sửa

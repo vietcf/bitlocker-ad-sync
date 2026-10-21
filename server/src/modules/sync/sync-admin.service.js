@@ -15,6 +15,8 @@ import {
   listHeartbeats,
   listOpenDuplicates,
   listRuns,
+  countRuns,
+  lastSuccessRun,
   markNotSeenAsDeleted,
   recomputeKeyStatuses,
   getOpenDuplicate,
@@ -29,7 +31,8 @@ import { syncRunFields } from '../audit/event-log.js';
 import { runRef } from './run-ref.js';
 import { mailKeyDuplicates, notInAdEvents } from './ingest.service.js';
 
-const ackInput = z.object({ decision: z.enum(['accept', 'reject']) });
+const RUNS_PAGE_SIZE = 50;
+const ackInput =z.object({ decision: z.enum(['accept', 'reject']) });
 const duplicateInput = z.object({ action: z.enum(['assign', 'share']) });
 const alertAckInput = z.object({ note: z.string().trim().max(300).optional() });
 const alertSnoozeInput = alertAckInput.extend({ days: z.coerce.number().int().refine((d) => [1, 7, 30].includes(d)) });
@@ -50,16 +53,20 @@ export class SyncAdminService {
     if (!can(scope, 'admin')) throw forbidden();
   }
 
-  async status(scope) {
+  async status(scope, { page = 1 } = {}) {
     this.#check(scope);
-    const [runs, heartbeats, openAlerts, requested, duplicates] = await Promise.all([
-      withAllBranches(this.pool, (tx) => listRuns(tx, 30)), // computers table has RLS: count needs the all-branch scope
+    const size = RUNS_PAGE_SIZE;
+    const total = await countRuns(this.pool);
+    const pages = Math.max(1, Math.ceil(total / size));
+    const current = Math.min(Math.max(1, Math.trunc(Number(page)) || 1), pages);
+    const [runs, heartbeats, openAlerts, requested, duplicates, lastSuccess] = await Promise.all([
+      withAllBranches(this.pool, (tx) => listRuns(tx, size, (current - 1) * size)), // computers table has RLS: count needs the all-branch scope
       listHeartbeats(this.pool),
       this.alerts.listOpen(),
       peekSyncRequest(this.pool),
       withAllBranches(this.pool, (tx) => listOpenDuplicates(tx)),
+      lastSuccessRun(this.pool), // khong phu thuoc trang dang xem
     ]);
-    const lastSuccess = runs.find((r) => r.status === 'success') ?? null;
     // Online: a heartbeat within the watchdog limit (Quan tri > Nguong canh bao), the same rule as the watchdog.
     const heartbeatMax = Number(await this.settings.get('watchdog.heartbeat_max_minutes', 15));
     const workers = heartbeats.map((hb) => {
@@ -68,7 +75,7 @@ export class SyncAdminService {
     });
     const withRef = runs.map((r) => ({ ...r, run_ref: runRef(r.id, r.started_at) }));
     const fixGraceHours = Number(await this.settings.get('alerts.fix_grace_hours', 24));
-    return { runs: withRef, heartbeats: workers, heartbeatMax, openAlerts, requested, lastSuccess, duplicates, fixGraceHours };
+    return { runs: withRef, runsPage: { page: current, pages, total, pageSize: size }, heartbeats: workers, heartbeatMax, openAlerts, requested, lastSuccess, duplicates, fixGraceHours };
   }
 
   /**
