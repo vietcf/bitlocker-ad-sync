@@ -48,11 +48,24 @@ describe('daily report', () => {
     expect(d.sync).toMatchObject({ workerOnline: true, adState: 'ok', workers: [], quarantined: 0, duplicates: 0 });
   });
 
+  it('does not count computers whose last AD logon is older than the recent months; no data counts', async () => {
+    await asOwner(`UPDATE computer SET last_logon_at = now() - interval '1 day' WHERE name = 'HN-PC-NEW';
+      UPDATE computer SET last_logon_at = now() - interval '400 days' WHERE name = 'SRV-0001';`); // HN-LT-0001 has no data, HCM-LT-0001 left
+    services.settings.invalidate();
+    const d = await report().build('yesterday');
+    expect(d.series[9].computers).toBe(2); // 3 minus the old SRV-0001 (was +new -left: HN-LT, HN-PC-NEW, SRV)
+    expect(d.changes.new_computers).toBe(1); // recent logon
+    await asOwner(`UPDATE computer SET last_logon_at = now() - interval '400 days' WHERE name = 'HN-PC-NEW'`);
+    const d2 = await report().build('yesterday');
+    expect(d2.changes.new_computers).toBe(0);
+    expect(d2.series[9].computers).toBe(1);
+  });
+
   it('renders text and HTML: sync status, charts, escaped names, never a password', async () => {
     const r = report();
     const m = r.render(await r.build('yesterday'));
     expect(m.subject).toMatch(/^Báo cáo BitLocker \d\d\/\d\d\/\d{4}: worker Online, AD bình thường, máy 0, key \+1$/);
-    expect(m.text).toContain('MÁY: 3 (0): 1 mới ghi nhận, 1 không còn trong phạm vi giám sát');
+    expect(m.text).toContain('MÁY (không tính máy đã quá 3 tháng không đăng nhập AD): 3 (0): 1 mới ghi nhận, 1 không còn trong phạm vi giám sát');
     expect(m.text).toContain('Chưa có worker nào gửi heartbeat');
     expect(m.html).toContain('Số máy, 10 ngày gần nhất');
     expect(m.html).toContain('&lt;b&gt;Ha Noi&lt;/b&gt;');

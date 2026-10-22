@@ -49,9 +49,15 @@ export async function inventoryByBranch(tx, branches) {
  * One pass: computers and keys are bucketed by local day once, then each day's figure is a running sum over those
  * few hundred buckets (MATERIALIZED: otherwise the planner inlines the buckets and recomputes them per day; the old form scanned both tables once per day: 30 scans, seconds on 50k computers).
  */
-export async function inventoryPerDay(tx, branches, days, tz) {
+export async function inventoryPerDay(tx, branches, days, tz, { recentMonths = null } = {}) {
   const params = [days, tz];
   const scope = branchFilter('c.branch_id', branches, params);
+  // bo may lau khong dang nhap AD (bao cao hang ngay); may chua co du lieu dang nhap van tinh; mac dinh dem tat ca
+  let compScope = scope;
+  if (recentMonths) {
+    params.push(recentMonths);
+    compScope = `${scope} AND (c.last_logon_at IS NULL OR c.last_logon_at >= now() - make_interval(months => $${params.length}))`;
+  }
   const { rows } = await tx.query(
     `WITH d AS (
        SELECT g::date AS day
@@ -60,11 +66,11 @@ export async function inventoryPerDay(tx, branches, days, tz) {
      comp AS MATERIALIZED (
        SELECT day, sum(added)::int AS added, sum(left_n)::int AS left_n FROM (
          SELECT (c.first_seen_at AT TIME ZONE $2)::date AS day, count(*) AS added, 0 AS left_n
-           FROM computer c WHERE ${scope} AND c.first_seen_at IS NOT NULL GROUP BY 1
+           FROM computer c WHERE ${compScope} AND c.first_seen_at IS NOT NULL GROUP BY 1
          UNION ALL
          -- a computer marked as left before its first_seen_at (old data) is never counted: take the later of the two days
          SELECT greatest((c.first_seen_at AT TIME ZONE $2)::date, (c.deleted_in_ad_at AT TIME ZONE $2)::date), 0, count(*)
-           FROM computer c WHERE ${scope} AND c.first_seen_at IS NOT NULL AND c.deleted_in_ad_at IS NOT NULL GROUP BY 1
+           FROM computer c WHERE ${compScope} AND c.first_seen_at IS NOT NULL AND c.deleted_in_ad_at IS NOT NULL GROUP BY 1
        ) u GROUP BY day
      ),
      key_days AS MATERIALIZED (

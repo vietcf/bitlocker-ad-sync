@@ -111,11 +111,13 @@ export class DailyReportService {
                 CASE WHEN $3 THEN now() ELSE (($1::date) + 1)::timestamp AT TIME ZONE $2 END AS end`,
         [day, this.tz, period === 'today'],
       );
-      const range = [bounds.start, bounds.end];
+      const months = Number(await this.settings.get('computer.recent_months', 3)); // bo may lau khong dang nhap AD (qua N thang); may chua co du lieu van tinh
+      const range = [bounds.start, bounds.end, months];
+      const recent = '(c.last_logon_at IS NULL OR c.last_logon_at >= now() - make_interval(months => $3))';
       const { rows: [changes] } = await tx.query(
         `SELECT
-           (SELECT count(*)::int FROM computer WHERE first_seen_at >= $1 AND first_seen_at < $2) AS new_computers,
-           (SELECT count(*)::int FROM computer WHERE deleted_in_ad_at >= $1 AND deleted_in_ad_at < $2) AS left_computers,
+           (SELECT count(*)::int FROM computer c WHERE c.first_seen_at >= $1 AND c.first_seen_at < $2 AND ${recent}) AS new_computers,
+           (SELECT count(*)::int FROM computer c WHERE c.deleted_in_ad_at >= $1 AND c.deleted_in_ad_at < $2 AND ${recent}) AS left_computers,
            (SELECT count(*)::int FROM recovery_key WHERE first_synced_at >= $1 AND first_synced_at < $2) AS new_keys,
            (SELECT count(*)::int FROM recovery_key k JOIN computer c ON c.id = k.computer_id
              WHERE c.deleted_in_ad_at >= $1 AND c.deleted_in_ad_at < $2) AS keys_of_left,
@@ -125,8 +127,8 @@ export class DailyReportService {
       const { rows: byBranch } = await tx.query(
         `SELECT b.code, b.name, x.new_computers, x.left_computers, x.new_keys FROM (
            SELECT c.branch_id,
-                  count(*) FILTER (WHERE c.first_seen_at >= $1 AND c.first_seen_at < $2)::int AS new_computers,
-                  count(*) FILTER (WHERE c.deleted_in_ad_at >= $1 AND c.deleted_in_ad_at < $2)::int AS left_computers,
+                  count(*) FILTER (WHERE c.first_seen_at >= $1 AND c.first_seen_at < $2 AND ${recent})::int AS new_computers,
+                  count(*) FILTER (WHERE c.deleted_in_ad_at >= $1 AND c.deleted_in_ad_at < $2 AND ${recent})::int AS left_computers,
                   coalesce(sum((SELECT count(*) FROM recovery_key k
                                  WHERE k.computer_id = c.id AND k.first_synced_at >= $1 AND k.first_synced_at < $2)), 0)::int AS new_keys
              FROM computer c GROUP BY c.branch_id) x
@@ -138,7 +140,7 @@ export class DailyReportService {
       );
       const { rows: runs } = await tx.query(
         `SELECT status, count(*)::int AS n FROM sync_run WHERE started_at >= $1 AND started_at < $2 GROUP BY status`,
-        range,
+        range.slice(0, 2),
       );
       const { rows: alerts } = await tx.query(
         `SELECT type, severity, opened_at, detail->>'subject' AS subject FROM sync_alert
@@ -150,7 +152,7 @@ export class DailyReportService {
       const { rows: [dup] } = await tx.query('SELECT count(*)::int AS n FROM key_duplicate WHERE resolved_at IS NULL');
 
       // End-of-day totals: 12 days ending today, so each shown day has the day before it.
-      const inv = await inventoryPerDay(tx, 'all', CHART_DAYS + 2, this.tz);
+      const inv = await inventoryPerDay(tx, 'all', CHART_DAYS + 2, this.tz, { recentMonths: months });
       const end = period === 'today' ? inv.length - 1 : inv.length - 2;
       const series = inv.slice(end - CHART_DAYS + 1, end + 1).map((r, i) => {
         const prev = inv[end - CHART_DAYS + i];
@@ -171,6 +173,7 @@ export class DailyReportService {
       const problem = alerts.find((a) => a.type === 'sync_problem') ?? null;
       return {
         period,
+        recentMonths: months,
         day,
         start: bounds.start,
         end: bounds.end,
@@ -231,7 +234,7 @@ export class DailyReportService {
       ...d.sync.alerts.map((a) => `- Cảnh báo: ${a.subject}`),
       d.sync.duplicates ? `- ${num(d.sync.duplicates)} Key ID trùng giữa nhiều máy chưa xem xét` : null,
       '',
-      `MÁY: ${num(last?.computers)} (${signed(last?.dComputers ?? 0)}): ${num(c.new_computers)} mới ghi nhận, ${num(c.left_computers)} không còn trong phạm vi giám sát`,
+      `MÁY (không tính máy đã quá ${d.recentMonths} tháng không đăng nhập AD): ${num(last?.computers)} (${signed(last?.dComputers ?? 0)}): ${num(c.new_computers)} mới ghi nhận, ${num(c.left_computers)} không còn trong phạm vi giám sát`,
       `KEY: ${num(last?.keys)} (${signed(last?.dKeys ?? 0)}): ${num(c.new_keys)} mới ghi nhận${c.keys_of_left ? `, ${num(c.keys_of_left)} key thuộc máy vừa rời phạm vi giám sát (vẫn lưu)` : ''}${c.keys_moved ? `, ${num(c.keys_moved)} key chuyển sang máy mới (join lại AD)` : ''}`,
       '',
       ...(d.byBranch.length ? ['THEO CHI NHÁNH (có thay đổi):', ...d.byBranch.map((b) => `- ${b.code ?? 'N/A'}: máy +${b.new_computers} / −${b.left_computers}, key +${b.new_keys}`), ''] : []),
@@ -272,7 +275,7 @@ export class DailyReportService {
       const deltas = d.series.map((s) => `<td align="center" style="${font}font-size:11px;color:${s[dKey] < 0 ? '#b42318' : s[dKey] > 0 ? '#1b7a43' : '#62646c'};">${esc(signed(s[dKey]))}</td>`).join('');
       return `
         <h3 style="${font}font-size:15px;margin:22px 0 2px;color:#1c1d21;">${esc(title)}</h3>
-        <div style="${font}font-size:12px;${muted}margin-bottom:8px;">Số cuối mỗi ngày; trục bắt đầu từ ${esc(num(lo))} để thấy rõ thay đổi nhỏ. Dòng dưới: tăng/giảm so với ngày trước.</div>
+        <div style="${font}font-size:12px;${muted}margin-bottom:8px;">Số cuối mỗi ngày${key === 'computers' ? ` (không tính máy quá ${d.recentMonths} tháng không đăng nhập AD)` : ''}; trục bắt đầu từ ${esc(num(lo))} để thấy rõ thay đổi nhỏ. Dòng dưới: tăng/giảm so với ngày trước.</div>
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
           <tr>${cols}</tr><tr>${labels}</tr><tr>${deltas}</tr>
         </table>`;
@@ -308,7 +311,7 @@ export class DailyReportService {
 
   <h3 style="font-size:15px;margin:22px 0 8px;color:#1c1d21;">Thay đổi trong kỳ</h3>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-    ${stat('Máy trên hệ thống', num(last?.computers), signed(last?.dComputers ?? 0), `${esc(num(c.new_computers))} mới ghi nhận · ${esc(num(c.left_computers))} không còn trong phạm vi giám sát`)}
+    ${stat('Máy hoạt động gần đây', num(last?.computers), signed(last?.dComputers ?? 0), `${esc(num(c.new_computers))} mới ghi nhận · ${esc(num(c.left_computers))} không còn trong phạm vi giám sát`)}
     ${stat('Recovery key', num(last?.keys), signed(last?.dKeys ?? 0), `${esc(num(c.new_keys))} mới ghi nhận${c.keys_of_left ? ` · ${esc(num(c.keys_of_left))} thuộc máy rời phạm vi giám sát (vẫn lưu)` : ''}${c.keys_moved ? ` · ${esc(num(c.keys_moved))} chuyển máy` : ''}`)}
   </tr></table>
   ${d.byBranch.length ? `

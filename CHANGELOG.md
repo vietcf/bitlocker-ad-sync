@@ -13,6 +13,12 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.21.2] - 2026-10-22
+
+### Đổi
+
+- Báo cáo hằng ngày: số máy (tổng, biểu đồ 10 ngày, máy mới, máy rời phạm vi, theo chi nhánh) chỉ tính máy **hoạt động gần đây**: có đăng nhập AD trong `computer.recent_months` tháng (cùng ngưỡng với nhãn "Hoạt động gần đây"). Máy chưa có dữ liệu đăng nhập vẫn tính. Số key không đổi.
+
 ## [2.21.1] - 2026-10-21
 
 ### Đổi
