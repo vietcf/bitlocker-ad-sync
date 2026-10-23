@@ -1,5 +1,5 @@
 #!/bin/bash
-# Runs once, when the Docker volume is first created.
+# Runs once, when the data directory (./data/postgres) is first created.
 # blk_owner: owns the schema, runs migrations. Not a superuser, so RLS is not bypassed by accident.
 # app_node:  the only runtime account (Node.js). Never owns tables, so RLS always applies to it.
 # blk_backup: read-only account for pg_dump (backup). BYPASSRLS so the dump has every row; SELECT only.

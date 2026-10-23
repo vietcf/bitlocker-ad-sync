@@ -38,7 +38,7 @@ services:
       - "127.0.0.1:${DB_PORT:-5432}:5432"
     volumes:
       - ./server/db/init:/docker-entrypoint-initdb.d:ro
-      - blk-pg:/var/lib/postgresql/data
+      - ./data/postgres:/var/lib/postgresql/data   # thu muc, khong dung volume: xoa sach = xoa thu muc data/
     logging: *logging
     healthcheck:
       test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "postgres", "-d", "blk_test"]
@@ -150,6 +150,3 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
-
-volumes:
-  blk-pg:

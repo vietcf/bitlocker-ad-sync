@@ -85,7 +85,8 @@ Không cần tạo file `.env`: mọi giá trị dev đã có sẵn trong `docke
 docker compose exec server node src/db/seed-dev.js   # dữ liệu giả: 3 chi nhánh, ~20 máy
 docker compose run --rm migrate                      # áp dụng migration mới
 docker compose logs -f server                        # xem log
-docker compose down -v                               # xóa sạch, kể cả database
+docker compose down                                  # dừng (database nằm ở thư mục data/, còn nguyên)
+# xóa sạch database: docker compose down rồi xóa thư mục data/
 ```
 
 Chỉ khi cần thử LDAP thật hoặc đổi cấu hình khác: `cp server/.env.example server/.env`, sửa, rồi `docker compose up -d --force-recreate server`.
@@ -110,7 +111,7 @@ Chọn **một** trong ba cách, rồi làm lần lượt từng bước của c
 | Cách | App chạy bằng | Database | Dùng khi |
 | --- | --- | --- | --- |
 | **A** | Docker Compose | PostgreSQL 17 **ngoài** (máy riêng) | Khuyên dùng cho production |
-| **B** | Docker Compose | PostgreSQL **trong Docker** cùng máy | Máy nhỏ, thử nghiệm, đã có cách sao lưu volume |
+| **B** | Docker Compose | PostgreSQL **trong Docker** cùng máy | Máy nhỏ, thử nghiệm, đã có cách sao lưu thư mục `data/` |
 | **C** | Node.js + systemd (không Docker) | PostgreSQL 17 ngoài | Không dùng được Docker |
 
 Cổng cần mở: **443** cho người dùng, **8443** chỉ cho IP máy worker. Cần một tên miền nội bộ trỏ về máy chủ (ví dụ `blk.corp.local`).
@@ -165,7 +166,7 @@ Rồi cài worker (mục 4 hoặc 4B) và cấu hình trong ứng dụng (mục 
 
 ### 3.3. Cách B: Docker Compose + PostgreSQL trong Docker
 
-**Chuẩn bị:** máy chủ Linux đã cài Docker (có `docker compose`) và `git`. Không cần PostgreSQL riêng: Compose tự dựng một container PostgreSQL 17 và lưu dữ liệu trong volume `blk-pg`.
+**Chuẩn bị:** máy chủ Linux đã cài Docker (có `docker compose`) và `git`. Không cần PostgreSQL riêng: Compose tự dựng một container PostgreSQL 17 và lưu dữ liệu ở thư mục `data/postgres` ngay trong thư mục cài (không dùng volume).
 
 **Bước 1. Lấy mã nguồn**
 
@@ -329,7 +330,7 @@ nginx dùng **một chứng chỉ** cho cả web (cổng 443) và ingest API (c�
 
 ### 3.6. Cập nhật phiên bản
 
-**Đổi tên hoặc chuyển thư mục cài:** giữ nguyên file `.env` (có dòng `COMPOSE_PROJECT_NAME`, do `install.sh` ghi). Thiếu dòng này, Docker coi thư mục mới là project mới và tạo database **trống**; volume cũ vẫn còn (`docker volume ls`, tên `<thư-mục-cũ>_blk-pg`), đặt `COMPOSE_PROJECT_NAME=<thư-mục-cũ>` để dùng lại.
+**Đổi tên hoặc chuyển thư mục cài:** giữ nguyên file `.env` (có dòng `COMPOSE_PROJECT_NAME`, do `install.sh` ghi). Database nằm ở `data/postgres` trong thư mục cài, nên chuyển cả thư mục (kể cả `data/`) là mang theo dữ liệu; dòng này giữ tên project Compose để container không bị đổi tên.
 
 Sao lưu database trước (trong ứng dụng: Quản trị > Sao lưu). Dùng Docker Compose thì **migration tự chạy**: bản mới được dựng, tạo bảng mới xong mới khởi động; migration lỗi thì server không lên và bản cũ giữ nguyên. Migration chỉ thêm, không sửa file cũ. Làm trong thư mục dự án:
 
@@ -396,7 +397,7 @@ Build sẵn image trên một máy có internet, đóng thành một file, chép
 
 6. Kiểm tra: script tự in `OK` khi `healthz` trả `"dbOk": true`; hoặc `curl -k https://localhost/healthz`.
 
-**Cập nhật lên bản mới** (máy chủ không có internet). Giải nén **đè vào chính thư mục đang chạy**, đừng tạo thư mục mới: Docker Compose đặt tên project và volume database theo tên thư mục, đổi thư mục là DB mới trống và cổng bị trùng với container cũ.
+**Cập nhật lên bản mới** (máy chủ không có internet). Giải nén **đè vào chính thư mục đang chạy**, đừng tạo thư mục mới: database nằm ở `data/postgres` trong thư mục đang chạy, thư mục mới sẽ có DB trống và cổng bị trùng với container cũ.
 
 1. Trên máy có internet: lấy tag mới (`git fetch --tags && git checkout vX.Y.Z`), chạy `bash tools/build-offline.sh` (thêm `--no-db` nếu DB ngoài Docker), chép `blk-offline-X.Y.Z.tar.gz` sang máy chủ. Build lại gói cho mỗi bản, vì gói mang cả image và `install.sh` mới.
 2. Trên máy chủ: **sao lưu database trước** (Quản trị > Sao lưu > chạy ngay).
@@ -426,7 +427,7 @@ Build sẵn image trên một máy có internet, đóng thành một file, chép
    Worker .NET trên Windows: mục 4.7. Chi tiết: mục 4B.9.
 7. Nếu bản mới có thêm dữ liệu lấy từ AD (ví dụ đăng nhập AD gần nhất từ server 2.7.0 và worker 1.2.0): vào **Quản trị > Sync AD**, bấm **Sync full** (hoặc chờ 01:00) để điền đủ dữ liệu cho mọi máy.
 
-Không dùng `down -v`: `-v` xóa cả volume, mất toàn bộ database.
+Không xóa thư mục `data/`: đó là toàn bộ database.
 
 **Quay về bản cũ (rollback):** image bản cũ vẫn còn trong Docker nếu bạn chưa xóa. Chạy `BLK_VERSION=2.0.1 docker compose -f docker-compose.prod.yml up -d --no-build` (đổi `2.0.1` thành tag cũ). Lưu ý migration của bản mới đã chạy và không tự hoàn tác, nên chỉ quay về nếu bản cũ chạy được với schema mới, hoặc khôi phục database từ bản sao lưu trước khi nâng cấp.
 

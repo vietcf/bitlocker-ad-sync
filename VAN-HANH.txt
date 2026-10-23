@@ -25,5 +25,5 @@ Notes:
 - Database outside Docker: remove "--profile db" from the commands above.
 - Normal state: db, server, nginx are "Up (healthy)";
   migrate is "Exited (0)" (it runs once and exits, this is not an error).
-- NEVER use "down -v": -v also deletes the volumes, so the whole database is lost.
+- NEVER delete the "data/" folder: it is the whole database (data/postgres). Back it up with Admin > Backup.
 - Take a backup before updating (Admin > Backup).

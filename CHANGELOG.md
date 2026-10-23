@@ -13,6 +13,16 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.23.0] - 2026-10-23
+
+### Đổi
+
+- Database PostgreSQL lưu ở **thư mục `data/postgres`** ngay trong thư mục cài (dev và production), không còn dùng Docker volume `blk-pg`. Production bật nhãn SELinux (`:z`). Xóa sạch DB dev: `docker compose down` rồi xóa thư mục `data/`; `down -v` không còn xóa database.
+
+### Khi nâng cấp
+
+- Máy đã chạy bản cũ (DB trong volume `<thư-mục>_blk-pg`): **trước khi nâng cấp** chép dữ liệu sang thư mục mới, nếu không DB sẽ trống. Dừng container (`docker compose down`), rồi: `mkdir -p data/postgres && docker run --rm -v <thư-mục>_blk-pg:/from:ro -v "$PWD/data/postgres:/to" postgres:17.6 sh -c "cp -a /from/. /to/"`, rồi `docker compose up -d`. Volume cũ giữ nguyên làm bản dự phòng. Production chưa cài thì bỏ qua.
+
 ## [2.22.2] - 2026-10-23
 
 ### Đổi

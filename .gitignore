@@ -23,6 +23,9 @@ cert/*.crt
 cert/*.key
 cert/*.srl
 
+# Database PostgreSQL (docker-compose mount ./data/postgres)
+data/
+
 # Backup files (encrypted, but they hold every recovery key)
 backups/
 
