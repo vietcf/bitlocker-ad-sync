@@ -296,39 +296,19 @@ Phải trả HTTP 200 và có `"dbOk": true`. Rồi mở `https://<tên máy ch�
 
 ### 3.5. Chứng chỉ HTTPS thật
 
-nginx dùng **một chứng chỉ** cho cả web (cổng 443) và ingest API (cổng 8443), gồm hai file: `server.crt` (PEM, **kèm chuỗi CA trung gian** nếu có) và `server.key`. Làm lần lượt:
+nginx dùng một chứng chỉ cho cả web (443) và ingest (8443). Thay hai file trong `cert/`:
 
-1. Tạo bản ghi DNS cho tên truy cập, rồi tạo khóa và yêu cầu chứng chỉ (CSR) **trên máy chủ app** (khóa không rời máy):
+- `server.crt`: chứng chỉ (PEM). Có CA trung gian thì ghép: `cat cert.crt intermediate.crt > server.crt`.
+- `server.key`: khóa riêng, đúng cặp với chứng chỉ.
 
-   ```bash
-   openssl req -new -newkey rsa:3072 -nodes -keyout server.key -out server.csr \
-     -subj "/CN=blk.corp.local" -addext "subjectAltName=DNS:blk.corp.local"
-   ```
+Rồi nạp lại nginx (không gián đoạn):
 
-2. Gửi `server.csr` cho CA (AD CS template *Web Server*, hoặc CA công cộng). Nhận về chứng chỉ; nếu có chứng chỉ trung gian riêng thì ghép: `cat blk.corp.local.crt intermediate.crt > server.crt`.
-3. Chép `server.crt`, `server.key` vào thư mục `cert/` (cách C: `/etc/nginx/cert/`), đặt quyền `chmod 644 server.crt && chmod 600 server.key`, rồi nạp lại nginx không gián đoạn:
+```bash
+docker compose -f docker-compose.prod.yml exec nginx nginx -s reload   # cách A, B
+sudo systemctl reload nginx                                            # cách C (file ở /etc/nginx/cert/)
+```
 
-   ```bash
-   docker compose -f docker-compose.prod.yml exec nginx nginx -t && docker compose -f docker-compose.prod.yml exec nginx nginx -s reload   # cách A, B
-   sudo nginx -t && sudo systemctl reload nginx                                                                                              # cách C
-   ```
-
-4. Kiểm tra từ máy khác, cả hai cổng phải in `Verify return code: 0 (ok)`:
-
-   ```bash
-   openssl s_client -connect blk.corp.local:443 -servername blk.corp.local </dev/null | grep "Verify return"
-   openssl s_client -connect blk.corp.local:8443 -servername blk.corp.local </dev/null | grep "Verify return"
-   ```
-
-5. Worker: đặt `Ingest.BaseUrl` = `https://blk.corp.local:8443/api/ingest` (đúng tên trong chứng chỉ, không dùng IP). Máy worker đã tin CA của công ty (thường là CA của AD CS) thì để trống `CaFile`; chưa tin thì đặt `CaFile` là file CA.
-6. **Gia hạn:** lặp lại từ bước 1 trước ngày hết hạn (xem ngày: `openssl x509 -in server.crt -noout -enddate`); chỉ cần nạp lại nginx, không khởi động lại app hay worker.
-
-| Lỗi | Nguyên nhân / cách xử lý |
-| --- | --- |
-| `nginx -t`: `key values mismatch` | `server.key` không khớp chứng chỉ: dùng đúng khóa đã tạo CSR |
-| Trình duyệt báo sai tên | Tên truy cập không có trong SAN: xin cấp lại |
-| Worker `x509: unknown authority` / .NET `RemoteCertificateChainErrors` | Máy worker không tin CA: đặt `Ingest.CaFile` |
-| `s_client`: `unable to get local issuer certificate` | `server.crt` thiếu chứng chỉ trung gian: ghép lại cho đủ chuỗi |
+Worker: `Ingest.BaseUrl` dùng đúng tên trong chứng chỉ (không dùng IP); máy worker chưa tin CA thì đặt `Ingest.CaFile`. Gia hạn: thay lại hai file và nạp lại nginx. Lỗi `key values mismatch` là khóa không khớp chứng chỉ.
 
 ### 3.6. Cập nhật phiên bản
 
