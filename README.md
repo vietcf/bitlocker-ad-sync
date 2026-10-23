@@ -36,11 +36,9 @@ Mục lục:
                               └─ 8443 -> server:8443  /api/ingest (chỉ worker)
 ```
 
-- **Worker** chỉ đọc AD và gửi lên; mọi quyết định (chi nhánh, key còn hiệu lực, lượt sync bất thường) nằm ở server.
-- **Máy** nhận diện bằng `objectGUID`, nên đổi tên hay chuyển OU vẫn là một máy. **Key** nhận diện bằng Key ID.
-- **Không xóa gì.** Máy rời phạm vi giám sát chỉ bị gắn nhãn, key vẫn giữ.
-- **Phân quyền** nằm trong app, đăng nhập bằng tài khoản AD hoặc local.
-- **Ngôn ngữ:** giao diện và email tiếng Việt; API và log tiếng Anh (client dựa vào mã lỗi `error`).
+- **Worker:** đọc dữ liệu từ AD qua LDAP, gửi lên server qua API.
+- **Server:** người dùng vào qua web; mọi xử lý và hoạt động đều do server thực hiện.
+- **Dữ liệu:** không xóa, chỉ thêm vào.
 
 ---
 
