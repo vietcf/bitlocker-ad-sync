@@ -149,7 +149,12 @@ Script hỏi vài thông tin (máy chủ PostgreSQL, mật khẩu `app_node` và
 
 **Bước 4. Kiểm tra.** Script in `OK` khi chạy được. Mở `https://<tên máy chủ>/`, đăng nhập `admin` / `admin`, đổi mật khẩu ngay.
 
-**Bước 5. Làm tiếp.** Lưu `SECRET_KEY` và `INGEST_API_KEY` vào kho mật khẩu (`grep -E '^(SECRET_KEY|INGEST_API_KEY)=' server/.env`; `INGEST_API_KEY` dán vào cấu hình worker). Rồi cài worker (mục 4 hoặc 4B) và cấu hình trong ứng dụng (mục 5).
+**Bước 5. Làm tiếp.** Các khóa đã được tự sinh sẵn trong `server/.env`.
+
+- Lấy `INGEST_API_KEY` để dán vào cấu hình worker: `grep ^INGEST_API_KEY= server/.env`.
+- Cất một bản sao `SECRET_KEY` vào kho mật khẩu (`grep ^SECRET_KEY= server/.env`), mất thì phải nhập lại mật khẩu mail, sao lưu, 2 bước.
+
+Rồi cài worker (mục 4 hoặc 4B) và cấu hình trong ứng dụng (mục 5).
 
 **Tùy chọn** (đầy đủ: `bash tools/install.sh --help`):
 - Chứng chỉ thật: đặt `server.crt`, `server.key` vào `cert/` trước khi chạy (mục 3.5).
@@ -178,7 +183,12 @@ Script hỏi IP máy worker, máy chủ AD (có thể để trống), múi giờ
 
 **Bước 3. Kiểm tra.** Script in `OK` khi chạy được. Mở `https://<tên máy chủ>/`, đăng nhập `admin` / `admin`, đổi mật khẩu ngay.
 
-**Bước 4. Làm tiếp.** Lưu `SECRET_KEY` (`grep ^SECRET_KEY= server/.env`) và `server/db.env` vào kho mật khẩu; `INGEST_API_KEY` dán vào cấu hình worker. Rồi cài worker (mục 4 hoặc 4B) và cấu hình trong ứng dụng (mục 5).
+**Bước 4. Làm tiếp.** Các khóa đã được tự sinh sẵn trong `server/.env`.
+
+- Lấy `INGEST_API_KEY` để dán vào cấu hình worker: `grep ^INGEST_API_KEY= server/.env`.
+- Cất một bản sao `SECRET_KEY` (`grep ^SECRET_KEY= server/.env`) và `server/db.env` vào kho mật khẩu.
+
+Rồi cài worker (mục 4 hoặc 4B) và cấu hình trong ứng dụng (mục 5).
 
 **Tùy chọn** (đầy đủ: `bash tools/install.sh --help`): chứng chỉ thật (`server.crt`, `server.key` vào `cert/` trước khi chạy, mục 3.5); chứng chỉ tự ký (nhập đúng tên truy cập, worker tin `cert/ca.crt` qua `Ingest.CaFile`); cổng khác (`--https-port 8444 --ingest-port 9443 --http-port 8080`); không cần gõ (`bash tools/install.sh --db docker --worker-ips 10.0.5.21 --yes --up`).
 

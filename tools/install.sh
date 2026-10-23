@@ -223,7 +223,7 @@ if [[ "$DB_MODE" == docker ]] && get_env "$ENV" DATABASE_URL | grep -q '@127\.0\
 
 say ""; say "Cau hinh ($ENV, mat khau da che):"
 grep -E '^(DATABASE_URL|MIGRATION_DATABASE_URL|BACKUP_DATABASE_URL|DB_SSL|INGEST_ALLOWED_IPS|APP_TZ|LDAP_SERVERS|LDAP_DOMAIN|LDAP_BASE_DN|LDAP_PROTOCOL|LOCAL_LOGIN_ENABLED)=' "$ENV" | mask | sed 's/^/  /'
-say "  (SESSION_SECRET, SECRET_KEY, INGEST_API_KEY: da co; CAT MOT BAN SECRET_KEY o kho mat khau)"
+say "  (Cac khoa da tu sinh. INGEST_API_KEY: dan vao cau hinh worker. SECRET_KEY: cat mot ban sao o kho mat khau)"
 
 final_info() {
   say ""
