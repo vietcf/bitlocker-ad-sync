@@ -828,227 +828,165 @@ sudo systemctl daemon-reload && sudo userdel blk-sync
 
 ### 6.0. Delta và full sync
 
-**Phạm vi giám sát** là các OU trong `Ldap.SearchBases` của worker. Máy **"Không còn trong phạm vi giám sát"** là máy mà lượt full không còn thấy: **bị xóa khỏi AD** hoặc **bị chuyển ra ngoài `SearchBases`** (hệ thống không phân biệt được hai trường hợp). Dữ liệu và key của máy luôn được giữ; máy xuất hiện lại thì tự trở lại bình thường.
+**Phạm vi giám sát** là các OU trong `Ldap.SearchBases` của worker. Máy **"Không còn trong phạm vi giám sát"** là máy lượt full không còn thấy (bị xóa khỏi AD hoặc chuyển ra ngoài `SearchBases`). Dữ liệu và key luôn được giữ; máy xuất hiện lại thì tự bình thường.
 
-Worker chạy **delta** mỗi 15 phút (chỉ đọc object có `uSNChanged` mới) và **full** mỗi đêm (`FullAt`, mặc định 01:00; thêm một lần khi worker khởi động lần đầu).
-
-Bảng **Các lượt sync gần đây** (Quản trị > Sync AD, phân trang, số dòng chỉnh ở Quản trị > Tính năng > Hiển thị) có cột **Máy** (`+` máy mới thêm vào hệ thống, `−` máy bị gắn "không còn trong phạm vi giám sát", chỉ lượt full phát hiện) và **Key** (`+` key mới; key không bao giờ bị xóa). Trang chi tiết của một lượt (bấm mã lượt): máy / key lượt đó thấy, máy / key hiện tại, key không đọc được mật khẩu, và bên dưới là danh sách máy và key mới; chỉ lượt **full** mới so với dữ liệu trước đó (chênh lệch).
+Worker chạy **delta** mỗi 15 phút (chỉ object thay đổi) và **full** mỗi đêm (`FullAt`, mặc định 01:00).
 
 | Thay đổi trên AD | Delta | Full |
 | --- | --- | --- |
-| Máy mới, đổi tên, sửa thuộc tính, key mới | Thấy | Thấy |
-| Máy chuyển OU nhưng **vẫn trong `SearchBases`** | Thấy (đổi chi nhánh, ghi `computer_moved`) | Thấy |
-| Máy bị **xóa** khỏi AD, hoặc chuyển **ra ngoài** `SearchBases` | **Không thấy** | Thấy: gắn nhãn "Không còn trong phạm vi giám sát" |
+| Máy mới, đổi tên, chuyển OU trong phạm vi, key mới | Thấy | Thấy |
+| Máy bị xóa, hoặc chuyển ra ngoài `SearchBases` | Không thấy | Thấy (gắn nhãn "Không còn trong phạm vi giám sát") |
 
-Nên máy bị xóa hoặc chuyển ra khỏi phạm vi chỉ cập nhật **sau lượt full ban đêm** (tối đa khoảng một ngày; full chỉ chạy ban đêm để không tải AD giờ làm việc). Cần ngay thì Admin HQ bấm **Full** ở Quản trị > Đồng bộ AD > Tình trạng sync (worker làm ở heartbeat kế tiếp, tối đa 5 phút).
+Cần cập nhật ngay thì Admin HQ bấm **Full** ở Quản trị > Đồng bộ AD > Tình trạng sync (worker làm ở heartbeat kế tiếp, tối đa 5 phút). Bảng **Các lượt sync gần đây** (phân trang; số dòng chỉnh ở Quản trị > Tính năng > Hiển thị) có cột **Máy** (`+` mới, `−` rời phạm vi) và **Key** (`+` mới). Bấm mã lượt để xem chi tiết.
 
 ### 6.1. Lượt sync bị giữ lại (cách ly)
 
-Có lượt sync báo thành công nhưng số liệu bất thường. Server giữ lại thay đổi của lượt đó, cảnh báo và chờ Admin HQ quyết định. Ngưỡng chỉnh ở **Quản trị > Đồng bộ AD > Cảnh báo sync** (mặc định):
+Lượt báo thành công nhưng số liệu bất thường thì server giữ thay đổi, cảnh báo và chờ Admin HQ quyết định. Mặc định giữ khi: lượt full thấy ít hơn 95% máy / key so với DB; một chi nhánh giảm hơn 20% **và** hơn 10 máy; lượt full không thấy quá 5% máy; đọc được key nhưng mật khẩu rỗng (từ 1 key). Ngưỡng và công tắc Bật/Tắt từng kiểm tra ở **Quản trị > Đồng bộ AD > Cảnh báo sync**.
 
-| Trường hợp | Ngưỡng |
-| --- | --- |
-| Lượt full thấy ít máy / ít key hơn hẳn so với DB | dưới 95% |
-| Một chi nhánh giảm mạnh so với mức thường | giảm hơn 20% **và** hơn 10 máy |
-| Lượt full không thấy nhiều máy (sẽ bị gắn nhãn ngoài phạm vi) | quá 5% |
-| Đọc được key nhưng mật khẩu rỗng (tài khoản sync mất quyền) | từ 1 key |
-
-Chỉ cần một ngưỡng vượt là bị giữ; riêng các cặp đánh dấu **VÀ** phải vượt cả hai. Mỗi kiểm tra có công tắc **Bật/Tắt** riêng. Kiểm tra "mật khẩu rỗng" chạy cả lượt delta; tắt nó thì key vẫn được lưu nhưng không có mật khẩu và không có cảnh báo nào.
-
-Xử lý ở Quản trị > Đồng bộ AD > Tình trạng sync: bấm **Xem chi tiết và quyết định** để xem lý do, số liệu so với hệ thống theo chi nhánh, danh sách máy **sẽ bị gắn nhãn** nếu chấp nhận, và máy/key mới lượt đó đã lưu. Rồi chọn:
-
-- **Chấp nhận** khi thay đổi là thật (vừa xóa hàng loạt máy cũ): gắn nhãn và lưu mốc USN.
-- **Bác bỏ** khi dữ liệu sai (DC lỗi, mất quyền): không áp dụng gì, lượt full sau đọc lại từ đầu.
-
-Key mới trong lượt bị giữ vẫn được lưu ngay (key không bao giờ bị ghi đè hay xóa).
+Xử lý ở Tình trạng sync: bấm **Xem chi tiết và quyết định**, rồi **Chấp nhận** (thay đổi là thật, ví dụ vừa xóa hàng loạt máy cũ) hoặc **Bác bỏ** (dữ liệu sai: DC lỗi, mất quyền; lượt full sau đọc lại từ đầu). Key mới trong lượt bị giữ vẫn được lưu.
 
 ### 6.2. Cảnh báo
 
-Watchdog chạy mỗi 5 phút, hai trạng thái, mỗi loại **một** mail khi bắt đầu, nhắc tối đa 1 lần mỗi ngày, hết sự cố thì không gửi nữa:
+Watchdog chạy mỗi 5 phút, mỗi loại **một** mail khi bắt đầu, nhắc tối đa 1 lần mỗi ngày, hết sự cố thì thôi:
 
-- **Worker Offline:** không có heartbeat quá ngưỡng (worker chết, máy tắt, mất mạng, sai API key / IP / chứng chỉ). Khi Offline, trạng thái AD là "chưa xác định".
-- **Đồng bộ AD có sự cố:** worker vẫn chạy nhưng AD hoặc sync có vấn đề. Gồm **sự cố hệ thống** (đo trực tiếp, tự hết khi sửa xong: không đọc được AD, sync quá hạn, lượt sync treo, canary, USN) và **cảnh báo dữ liệu** (tính từ dữ liệu: máy mới không có key, tỉ lệ không key tăng, full sync quá hạn, chứng chỉ DC sắp hết hạn).
+- **Worker Offline:** không có heartbeat quá ngưỡng (worker chết, tắt máy, mất mạng, sai API key / IP / chứng chỉ).
+- **Đồng bộ AD có sự cố:** worker chạy nhưng AD hoặc sync có vấn đề. Gồm *sự cố hệ thống* (tự hết khi sửa xong) và *cảnh báo dữ liệu* (máy mới không có key, tỉ lệ không key tăng, full sync quá hạn, chứng chỉ DC sắp hết hạn).
 
-Cảnh báo dữ liệu còn đúng nhiều ngày sau khi sửa nguyên nhân, nên có **Đã xử lý** (đã sửa nguyên nhân: đóng cảnh báo ngay, watchdog theo dõi lại sau 24 giờ, đổi được ở Cảnh báo sync; còn đúng thì mở cảnh báo mới) và **Bỏ qua 1/7/30 ngày** (giữ cảnh báo nhưng im lặng đến hết hạn). Mọi loại cảnh báo (sự cố hệ thống và cảnh báo dữ liệu) và các kiểm tra khi lượt full kết thúc đều có công tắc **Bật/Tắt** cạnh ngưỡng của nó ở **Quản trị > Đồng bộ AD > Cảnh báo sync**. Tắt thì không theo dõi loại đó: nếu sự cố xảy ra thật sẽ không có cảnh báo nào.
+Cảnh báo dữ liệu có hai nút: **Đã xử lý** (đã sửa nguyên nhân: đóng ngay, theo dõi lại sau 24 giờ, còn đúng thì mở cảnh báo mới) và **Bỏ qua 1/7/30 ngày** (giữ cảnh báo nhưng im lặng). Mỗi loại cảnh báo và mỗi kiểm tra có công tắc **Bật/Tắt** ở Cảnh báo sync; tắt thì sự cố thật cũng không báo.
 
-Mail cảnh báo chia 4 nhóm, bật/tắt và chọn người nhận ở Quản trị > Thông báo (`NOTIFY_TO` luôn nhận nhóm đang bật; tắt nhóm thì vẫn hiện trong app): **Agent ngừng hoạt động**; **Kết nối AD và đồng bộ có vấn đề** (kể cả sync lỗi, lượt bị giữ lại, Key ID trùng); **Xem key ngoài giờ và bảo mật dữ liệu**; **Sao lưu lỗi**.
-
-Ngưỡng mặc định: heartbeat 15 phút; lượt sync thành công 60 phút; lượt full 26 giờ; lượt "đang chạy" 2 giờ thì hủy; USN không đổi 6 giờ; canary 90 phút; máy mới (2–7 ngày) chưa có key 50% (từ 5 máy); tỉ lệ không key của chi nhánh tăng 5 điểm %; cảnh báo đã xử lý báo lại sau 30 ngày; "hoạt động gần đây" 3 tháng.
+Mail cảnh báo chia 4 nhóm, bật/tắt và chọn người nhận ở Quản trị > Thông báo: Agent ngừng hoạt động; Kết nối AD và đồng bộ có vấn đề; Xem key ngoài giờ và bảo mật dữ liệu; Sao lưu lỗi.
 
 ### 6.3. Gửi mail
 
-- Mọi email ghi vào bảng `mail_outbox` trước; job `mail-outbox` chạy mỗi phút để gửi. Lỗi tạm thời thử lại sau 1, 5, 15, 60, 240 phút rồi đánh dấu thất bại để Admin HQ gửi lại (Quản trị > Log email). Mail server chưa cấu hình: mail nằm ở **Chờ gửi** và tự gửi khi bật.
-- Mật khẩu SMTP mã hóa AES-256-GCM bằng khóa suy ra từ `SECRET_KEY`, không hiện lại (đổi `SECRET_KEY` thì nhập lại). Tắt mail server trong Quản trị thì app dùng `SMTP_URL` trong `.env` (nếu có).
-- **Máy mới / key mới:** sau mỗi lượt sync, mỗi người nhận **một** email gom các máy/key mới trong phạm vi của họ (không gửi cho lượt full đầu tiên). Recovery password **không bao giờ gửi qua email**.
-- Chỉ người dùng đang hoạt động và có email mới nhận. Không ai có email thì mail lưu với trạng thái **Không gửi (thiếu email)** kèm nội dung.
+- Mail ghi vào bảng `mail_outbox` rồi job gửi mỗi phút. Lỗi tạm thời thử lại sau 1, 5, 15, 60, 240 phút rồi đánh dấu thất bại để Admin HQ gửi lại (Quản trị > Log email). Chưa cấu hình mail server thì mail nằm ở **Chờ gửi**.
+- Mật khẩu SMTP mã hóa bằng khóa suy ra từ `SECRET_KEY`, không hiện lại. Tắt mail server trong Quản trị thì dùng `SMTP_URL` trong `.env` (nếu có).
+- **Máy mới / key mới:** sau mỗi lượt sync, mỗi người nhận một email gom trong phạm vi của họ (trừ lượt full đầu tiên). Recovery password **không bao giờ gửi qua email**.
+- Chỉ người dùng đang hoạt động và có email mới nhận.
 
 ### 6.4. Tìm máy, đăng nhập AD và xuất dữ liệu
 
-Mỗi máy và key có hai mốc: **Tạo trên AD** (`whenCreated`) và **Ghi nhận** (lần đầu hệ thống thấy qua sync).
+**Đăng nhập AD gần nhất:** worker đọc `lastLogonTimestamp` (AD cập nhật chậm, lệch tối đa ~14 ngày). Nhãn **Hoạt động gần đây** (mặc định trong 3 tháng, đổi ở Cảnh báo sync), **Không hoạt động gần đây** hoặc **Chưa có dữ liệu**; chỉ có nghĩa "chưa thấy đăng nhập", không phải máy hỏng. Bộ lọc gồm mốc (trong / quá 1, 3, 6, 9, 12, 24 tháng) và ô **Máy chưa có dữ liệu** (Không gồm / Gồm cả / Chỉ máy này). Cần worker từ 1.2.0 và một lượt full.
 
-**Đăng nhập AD gần nhất:** worker đọc `lastLogonTimestamp` của máy (một DC là đủ; AD chỉ cập nhật khi giá trị cũ hơn ~14 ngày nên lệch tối đa ~14 ngày). Nhãn **Hoạt động gần đây** (mặc định trong 3 tháng, đổi ở Cảnh báo sync), **Không hoạt động gần đây** hoặc **Chưa có dữ liệu** (chưa từng đăng nhập hoặc worker chưa báo). Chỉ là "chưa thấy máy đăng nhập", không có nghĩa máy hỏng. Bộ lọc kết hợp hai ô: mốc (trong / quá 1, 3, 6, 9, 12, 24 tháng) và **Máy chưa có dữ liệu** (Không gồm / Gồm cả = HOẶC / Chỉ máy này). Cần worker từ 1.2.0 và một lượt full để có dữ liệu.
+Hai nút xuất, đều xuất toàn bộ danh sách theo bộ lọc và phạm vi chi nhánh của người xuất:
 
-Hai nút xuất, đều xuất **toàn bộ** danh sách theo bộ lọc, trong phạm vi chi nhánh của người xuất:
-
-| Nút | File CSV | Ai dùng | Nhật ký |
+| Nút | Nội dung | Ai dùng | Nhật ký |
 | --- | --- | --- | --- |
-| **Xuất CSV** | Thông tin máy, số key, các mốc ngày. **Không có key** | IT, Trưởng IT, Admin HQ (tắt được ở Tính năng) | `export_computers` |
-| **Xuất kèm key** | Mỗi dòng một key kèm **recovery password** | Theo Tính năng: tắt (mặc định) / chỉ Admin HQ / IT, Trưởng IT và Admin HQ | Mỗi key một dòng `reveal` + `export_keys`; Admin HQ nhận cảnh báo |
+| **Xuất CSV** | Thông tin máy, số key. **Không có key** | IT, Trưởng IT, Admin HQ | `export_computers` |
+| **Xuất kèm key** | Mỗi key kèm **recovery password** | Theo Tính năng: tắt (mặc định) / chỉ Admin HQ / IT và Admin HQ | `reveal` từng key + `export_keys`; Admin HQ nhận cảnh báo |
 
-Xuất kèm key phải chọn lý do như khi hiện key. **Lưu file có key ở nơi an toàn và xóa ngay khi dùng xong.**
+Xuất kèm key phải chọn lý do. **Lưu file ở nơi an toàn và xóa ngay khi dùng xong.**
 
 ### 6.5. Thông tin bổ sung của máy và cách tìm
 
-**Serial máy** và **Email người dùng** do người dùng nhập (sync không ghi đè), sửa ở trang chi tiết máy, ghi `computer_edit`. API: `PUT /api/computers/:id/info`.
-
-Ô Tìm máy: **Key ID** từ 4 ký tự đầu (có hay không dấu `-`); **tên máy, serial, email** từ 3 ký tự bất kỳ, bỏ qua `-`, `_`, `.` và khoảng trắng (`lt0231` ra `HN-LT-0231`); **GUID máy** dán cả GUID.
+**Serial máy** và **Email người dùng** do người dùng nhập (sync không ghi đè), sửa ở trang chi tiết máy (`PUT /api/computers/:id/info`). Ô Tìm máy: **Key ID** từ 4 ký tự đầu; **tên máy, serial, email** từ 3 ký tự bất kỳ (bỏ qua `-`, `_`, `.`, khoảng trắng); **GUID máy** dán cả GUID.
 
 ### 6.6. Mẫu email
 
-Nội dung mọi email và tin Teams nằm trong **một file** `server/templates/mail-templates.yaml` (đầu file có bảng giải thích mẫu và biến). Chỉ sửa `subject` / `body`, giữ tên mẫu và thụt lề YAML, chỉ dùng biến có trong `variables` của mẫu (không biến nào chứa recovery password). Lưu file là xong, **không cần khởi động lại**; file hỏng thì app giữ bản tốt trước đó (khi khởi động, file hỏng làm app từ chối chạy). Thử bằng **Gửi thử** ở Quản trị > Mail server.
-
-Production Docker: chép file ra máy chủ (ví dụ `/etc/blk/mail-templates.yaml`), mount `-v /etc/blk/mail-templates.yaml:/app/config/mail-templates.yaml:ro` và đặt `MAIL_TEMPLATES_FILE=/app/config/mail-templates.yaml` để cập nhật app không ghi đè bản sửa; khi nâng cấp, so với file mẫu mới (thiếu mẫu thì app báo lỗi).
+Nội dung mọi email và tin Teams nằm trong `server/templates/mail-templates.yaml` (đầu file có bảng giải thích). Chỉ sửa `subject` / `body`, giữ tên mẫu và thụt lề, chỉ dùng biến có trong `variables`. Lưu là xong, không cần khởi động lại; file hỏng thì app giữ bản tốt trước đó. Thử bằng **Gửi thử** ở Quản trị > Mail server. Production Docker: mount file ra ngoài (`-v /etc/blk/mail-templates.yaml:/app/config/mail-templates.yaml:ro` và `MAIL_TEMPLATES_FILE=/app/config/mail-templates.yaml`) để cập nhật app không ghi đè.
 
 ### 6.7. Thời gian lưu trữ
 
-Tab Quản trị > Lưu trữ. Job `data-retention` chạy hằng ngày (mặc định 03:00) hoặc khi bấm **Dọn dẹp ngay**:
+Quản trị > Lưu trữ. Job `data-retention` chạy hằng ngày (03:00) hoặc khi bấm **Dọn dẹp ngay**:
 
-| Dữ liệu | Mặc định | Giới hạn | Ghi chú |
-| --- | --- | --- | --- |
-| Nhật ký truy cập (`access_log`) | Giữ mãi | Tùy chọn, từ 1 ngày | Xem dưới |
-| Lịch sử sync (lượt sync, số liệu, cảnh báo đã đóng) | 180 ngày | Tối thiểu 30 | Luôn giữ lượt sync thành công và lượt full thành công gần nhất |
-| Email đã gửi / thất bại | 90 ngày | 1–3650 | Mail chờ gửi không bị xóa |
+| Dữ liệu | Mặc định |
+| --- | --- |
+| Nhật ký truy cập | Giữ mãi (tùy chọn, từ 1 ngày) |
+| Lịch sử sync (lượt, số liệu, cảnh báo đã đóng) | 180 ngày (tối thiểu 30); luôn giữ lượt thành công gần nhất |
+| Email đã gửi / thất bại | 90 ngày (1–3650) |
 
-Máy, recovery key và người dùng không bao giờ bị xóa.
-
-Nhật ký truy cập là append-only: app không có quyền DELETE, trigger chặn UPDATE / DELETE / TRUNCATE. Khi bật hạn lưu trữ, việc xóa chỉ đi qua hàm `purge_access_log()`: chỉ xóa **phần cũ nhất liên tục từ đầu chuỗi**, không xóa dòng mới nhất, và lưu mốc (số dòng, người chạy) vào `access_log_purge`. Việc xóa được ghi nhật ký (`log_purge`). Nên lưu bản sao nhật ký ở nơi khác (hệ thống thu log, mục 6.15) trước khi bật.
+Máy, key và người dùng không bao giờ bị xóa. Nhật ký truy cập là append-only: chỉ xóa được phần cũ nhất liên tục từ đầu qua `purge_access_log()`, có ghi nhật ký (`log_purge`). Nên lưu bản sao nhật ký ở hệ thống thu log (mục 6.15) trước khi bật hạn lưu trữ.
 
 ### 6.8. Sao lưu và khôi phục
 
-Quản trị > **Sao lưu** (Admin HQ) tạo file **.zip** theo lịch hằng ngày hoặc khi bấm **Sao lưu ngay**. Chọn một hoặc cả hai loại:
+Quản trị > **Sao lưu** (Admin HQ) tạo file `.zip` theo lịch hằng ngày hoặc khi bấm **Sao lưu ngay**. Hai loại:
 
-| Loại | File | Nội dung |
+| Loại | File | Dùng khi |
 | --- | --- | --- |
-| Máy và key | `bitlocker-keys-YYYYMMDD-HHMMSS.zip` | `computers.csv` (id, objectGUID, tên, DNS, DN, chi nhánh, OS, serial, email, ngày tạo / sửa trên AD, trạng thái giám sát, số key), `recovery_keys.csv` (Key ID, **mật khẩu khôi phục**, DN key, volume GUID, trạng thái, ngày giờ, máy chứa key), `key_moves.csv`, `manifest.json` (SHA-256), `README.txt`. Tra key khi hệ thống hoặc DB không chạy |
-| Database | `bitlocker-db-YYYYMMDD-HHMMSS.zip` | `bitlocker.dump` (`pg_dump` toàn bộ DB), `manifest.json`. Khôi phục toàn hệ thống |
+| Máy và key | `bitlocker-keys-*.zip` (`computers.csv`, `recovery_keys.csv` có **mật khẩu khôi phục**, ...) | Tra key khi hệ thống hoặc DB không chạy |
+| Database | `bitlocker-db-*.zip` (`pg_dump` toàn bộ DB) | Khôi phục toàn hệ thống |
 
-- **Mã hóa AES-256** (mặc định bật, nên giữ): mở bằng **7-Zip** hoặc WinRAR, File Explorer không mở được. Tắt thì là zip thường, ai có file đọc được mọi key:
-  chỉ tắt khi nơi chứa đã mã hóa và giới hạn quyền (trang hiện cảnh báo đỏ; bảng file có cột Mã hóa).
-- **Mật khẩu** (≥ 16 ký tự; ô chỉ nhập được khi tích "Mã hóa", không thì bị mờ): lưu mã hóa, **không hiện lại**, không ghi vào file. **Giữ ở kho mật khẩu**: mất là không mở được file.
-  Đổi mật khẩu thì file cũ vẫn dùng mật khẩu cũ.
-- **Sao lưu ngay** chạy nền (trang báo "Đang sao lưu", tải lại sau ít phút xem kết quả); mỗi lúc chỉ một lượt. Dump database ghi thẳng ra file rồi mã hóa theo luồng, nên RAM không tăng theo cỡ DB (giới hạn 4 GB mỗi file zip).
-- **Giờ chạy** theo `APP_TZ` (mặc định 01:30), chạy bù nếu app tắt lúc đến giờ. **Giữ N bản mới nhất** mỗi loại (mặc định 14).
-- Ghi nhật ký `backup_run`, `backup_download` (không chứa key). Lượt lỗi gửi cảnh báo "Sao lưu lỗi".
-- File nằm ở `BACKUP_DIR` (Docker: `./backups`), **cùng máy chủ**: cần job chép sang nơi khác hằng ngày.
+- **Mã hóa AES-256** (mặc định bật, nên giữ): mở bằng 7-Zip hoặc WinRAR. Tắt thì ai có file đọc được mọi key.
+- **Mật khẩu** (≥ 16 ký tự): lưu mã hóa, không hiện lại, không ghi vào file; **giữ ở kho mật khẩu**, mất là không mở được file. Đổi mật khẩu thì file cũ vẫn dùng mật khẩu cũ.
+- Giờ chạy theo `APP_TZ` (mặc định 01:30, chạy bù nếu app tắt), giữ 14 bản mới nhất mỗi loại. File nằm ở `BACKUP_DIR` (Docker: `./backups`) **cùng máy chủ**: cần job chép sang nơi khác hằng ngày.
+- Cài bằng `tools/install.sh` thì sao lưu database đã sẵn sàng (`BACKUP_DATABASE_URL`, tài khoản chỉ đọc `blk_backup`). Tự cài thì tạo `blk_backup` với `BYPASSRLS` và quyền `SELECT` trên schema `public`, đặt `BACKUP_DATABASE_URL` và `BACKUP_DIR` trong `server/.env` (ngoài Docker cần `pg_dump` 17). Rồi vào trang Sao lưu: đặt mật khẩu, bật, bấm **Sao lưu ngay** để thử. **Thử khôi phục định kỳ.**
 
-**Cài sao lưu database (một lần).** Dùng `pg_dump` (có sẵn trong image) với tài khoản **chỉ đọc** `blk_backup` (cần `BYPASSRLS` để dump đủ mọi chi nhánh):
+  Tạo `blk_backup` (khi tự cài):
 
-```sql
-CREATE ROLE blk_backup LOGIN NOSUPERUSER NOCREATEROLE BYPASSRLS PASSWORD '<mật-khẩu-backup>';
-\c blk
-GRANT USAGE ON SCHEMA public TO blk_backup;
-GRANT SELECT ON ALL TABLES IN SCHEMA public TO blk_backup;
-GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO blk_backup;
-ALTER DEFAULT PRIVILEGES FOR ROLE blk_owner IN SCHEMA public GRANT SELECT ON TABLES TO blk_backup;
-ALTER DEFAULT PRIVILEGES FOR ROLE blk_owner IN SCHEMA public GRANT SELECT ON SEQUENCES TO blk_backup;
-```
+  ```sql
+  CREATE ROLE blk_backup LOGIN NOSUPERUSER NOCREATEROLE BYPASSRLS PASSWORD '<mật-khẩu-backup>';
+  \c blk
+  GRANT USAGE ON SCHEMA public TO blk_backup;
+  GRANT SELECT ON ALL TABLES IN SCHEMA public TO blk_backup;
+  GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO blk_backup;
+  ALTER DEFAULT PRIVILEGES FOR ROLE blk_owner IN SCHEMA public GRANT SELECT ON TABLES TO blk_backup;
+  ALTER DEFAULT PRIVILEGES FOR ROLE blk_owner IN SCHEMA public GRANT SELECT ON SEQUENCES TO blk_backup;
+  ```
 
-Cài bằng `tools/install.sh` thì `BACKUP_DATABASE_URL` đã được điền sẵn (DB trong Docker: tài khoản `blk_backup` có sẵn). Nếu tự cài, thêm vào `server/.env`: `BACKUP_DATABASE_URL=postgres://blk_backup:<mk>@<db-host>:5432/blk?sslmode=require` và `BACKUP_DIR=/app/backups`
-(ngoài Docker cần `pg_dump` 17, hoặc `PG_DUMP_PATH`). Docker Compose tự cấp quyền ghi cho `./backups` (dịch vụ `backups-init`), không phải chown tay. Rồi vào trang Sao lưu: đặt mật khẩu, chọn loại, giờ, bật, bấm **Sao lưu ngay** để thử. **Thử khôi phục định kỳ.**
+**Tra key khi hệ thống không chạy.** Giải nén `bitlocker-keys-*.zip` bằng 7-Zip vào thư mục chỉ mình đọc được, mở `recovery_keys.csv` bằng Excel, lọc `key_id_first8` theo 8 ký tự trên màn hình BitLocker, đọc `recovery_password`. Xong **xóa** file giải nén.
 
-**Tra key khi hệ thống không chạy.** Giải nén `bitlocker-keys-*.zip` bằng 7-Zip vào thư mục chỉ mình bạn đọc được, mở `recovery_keys.csv` bằng Excel
-(Data > From Text/CSV, UTF-8), lọc cột `key_id_first8` theo 8 ký tự trên màn hình BitLocker, đọc `recovery_password`. Xong thì **xóa** file giải nén.
-
-**Khôi phục database (một lệnh).** Cần DB `blk` (trong Docker hay ngoài đều được) và hai tài khoản `blk_owner`, `app_node` (mục 3.2 hoặc 3.3). Chép file `bitlocker-db-....zip` vào `./backups`, rồi:
+**Khôi phục database.** Cần DB `blk` và hai tài khoản `blk_owner`, `app_node` (mục 3.2 hoặc 3.3). Chép `bitlocker-db-....zip` vào `./backups` rồi:
 
 ```bash
 docker compose run --rm --no-deps server node src/cli/restore.js backups/bitlocker-db-20261018-013000.zip
 ```
 
-Lệnh hỏi mật khẩu của file, kiểm tra SHA-256, nạp dữ liệu, chạy migration và báo kết quả (kèm các mật khẩu cần nhập lại). DB đã có dữ liệu thì từ chối trừ khi thêm `--force`. Tùy chọn:
+Lệnh hỏi mật khẩu file (hoặc biến `RESTORE_ZIP_PASSWORD`), kiểm tra, nạp dữ liệu, chạy migration. DB đã có dữ liệu thì từ chối trừ khi thêm `--force`. Tùy chọn khác: `--reset-2fa` (tắt 2 bước cho mọi user), `--reset-admin` (mật khẩu một lần mới cho admin gốc). Xong thì khởi động app, đăng nhập và chạy một lượt full.
 
-| Tùy chọn | Dùng khi |
-| --- | --- |
-| `--force` | Thay toàn bộ dữ liệu đang có (hỏi gõ lại tên DB; thêm `--yes` để bỏ hỏi) |
-| `--reset-2fa` | Tắt xác thực 2 bước cho mọi user (khi 2 bước không đọc được hoặc mất điện thoại) |
-| `--reset-admin` | Cấp mật khẩu một lần mới cho admin gốc (in một lần, phải đổi khi đăng nhập) |
-
-Xong thì khởi động app, đăng nhập và chạy một lượt full. Mật khẩu file lấy từ ô nhập, hoặc biến `RESTORE_ZIP_PASSWORD`. Cần `pg_restore` 17 (đã có trong image). File zip lớn hơn 1,5 GB: giải nén bằng 7-Zip rồi `pg_restore --no-owner -d blk bitlocker.dump`.
-
-**Sau khi khôi phục.** Các mật khẩu lưu mã hóa trong DB (SMTP, mật khẩu sao lưu, khóa 2 bước) chỉ đọc được trên máy cùng `SECRET_KEY` với bản sao lưu. Máy mới thì lệnh tự xóa những giá trị không đọc được và báo, bạn chỉ cần vào Quản trị nhập lại: mật khẩu mail server, mật khẩu sao lưu; user có 2 bước sẽ quét mã QR mới ở lần đăng nhập kế (hoặc `--reset-2fa` để tắt hẳn 2 bước). Dữ liệu máy, key, người dùng, nhật ký còn nguyên.
-
-**Sao lưu tay** trước khi nâng cấp: `pg_dump -U blk_backup -h <db-host> -d blk --format=custom -f bitlocker.dump`, rồi `7z a -tzip -mem=AES256 -p x.zip bitlocker.dump` và `shred -u bitlocker.dump`.
+**Sau khi khôi phục.** Mật khẩu lưu mã hóa trong DB (SMTP, sao lưu, 2 bước) chỉ đọc được trên máy cùng `SECRET_KEY`. Máy mới thì lệnh tự xóa giá trị không đọc được và báo; bạn vào Quản trị nhập lại mật khẩu mail server, mật khẩu sao lưu; user có 2 bước quét lại mã QR ở lần đăng nhập kế.
 
 Cất **tách khỏi** file sao lưu: `SECRET_KEY`, `server/.env`, mật khẩu sao lưu, `cert/` và cấu hình worker.
 
 ### 6.9. Quản lý người dùng bằng dòng lệnh
 
-Chạy trên máy chủ app, **không cần web**: dùng khi web hỏng, quên mật khẩu, mất điện thoại 2 bước hoặc tài khoản bị khóa. Áp dụng cho mọi tài khoản, kể cả admin gốc (mục 6.14). Mỗi lệnh ghi nhật ký `admin_change` với người thực hiện là `cli`.
+Chạy trên máy chủ app, không cần web: dùng khi web hỏng, quên mật khẩu, mất điện thoại 2 bước hoặc tài khoản bị khóa. Áp dụng mọi tài khoản, kể cả admin gốc. Mỗi lệnh ghi nhật ký `admin_change` (người thực hiện `cli`).
 
 ```bash
 docker compose exec server node src/cli/users.js list
 docker compose exec server node src/cli/users.js create nguyenvana "Nguyen Van A" email=nguyenvana@corp.local it:HN
 docker compose exec server node src/cli/users.js create-local backup.admin "Backup admin" email=it-hq@corp.local admin
-docker compose exec server node src/cli/users.js email admin it-hq@corp.local
-docker compose exec server node src/cli/users.js reset-password <user>   # mật khẩu một lần mới (chỉ tài khoản local), phải đổi ở lần đăng nhập đầu
-docker compose exec server node src/cli/users.js unlock <user>           # mở khóa (bị khóa do nhập sai mật khẩu)
-docker compose exec server node src/cli/users.js disable-2fa <user>      # tắt hẳn đăng nhập 2 bước của user
-docker compose exec server node src/cli/users.js reset-2fa <user>        # quên authenticator: lần đăng nhập tới quét QR mới
+docker compose exec server node src/cli/users.js reset-password <user>   # chỉ tài khoản local; mật khẩu một lần, phải đổi khi đăng nhập
+docker compose exec server node src/cli/users.js unlock <user>           # bị khóa vì nhập sai
+docker compose exec server node src/cli/users.js reset-2fa <user>        # mất điện thoại: lần đăng nhập tới quét QR mới
+docker compose exec server node src/cli/users.js disable-2fa <user>      # tắt hẳn 2 bước (bật lại ở Quản trị > Người dùng)
 docker compose exec server node src/cli/users.js enable <user>           # bật lại tài khoản bị vô hiệu hóa (disable: tắt)
+docker compose exec server node src/cli/users.js email <user> <email>
 ```
 
-| Việc | Lệnh |
-| --- | --- |
-| Quên mật khẩu (tài khoản local) | `reset-password` |
-| Bị khóa vì nhập sai | `unlock` |
-| Mất điện thoại, muốn quét lại | `reset-2fa` |
-| App xác thực hỏng, cần vào ngay | `disable-2fa` (bật lại ở Quản trị > Người dùng) |
-| Tài khoản AD | mật khẩu do AD quản lý; `reset-password` không áp dụng |
-
+Tài khoản AD: mật khẩu do AD quản lý, `reset-password` không áp dụng.
 
 ### 6.10. Truy vết sync trong log
 
-Mỗi lượt sync có **STT** `runId` (số nguyên tăng dần, worker dùng) và **mã hiển thị** `runRef` dạng `YYYYMMDD-NNNN` (ngày chạy theo `APP_TZ`). Mọi thay đổi do sync tạo ra được ghi vào log ứng dụng (JSON, mỗi dòng một sự kiện, tiếng Anh) với `"component":"sync"` và `runId`: mở / kết thúc / lỗi lượt, máy mới, máy đổi tên hoặc đổi chi nhánh, máy trở lại hoặc bị gắn "Không còn trong phạm vi giám sát", key mới hoặc không đọc được mật khẩu, bất thường và lượt bị giữ lại (mục 6.1). Máy / key không đổi thì không ghi.
-
-Truy vết: lọc theo `"runId":812`, `"name":"HN-LT-0231"`, `"objectGuid":"..."` hoặc `"keyId":"..."`:
+Mỗi lượt sync có **STT** `runId` và **mã hiển thị** `runRef` dạng `YYYYMMDD-NNNN`. Mọi thay đổi do sync tạo ra được ghi vào log ứng dụng (JSON, tiếng Anh, `"component":"sync"`, kèm `runId`): lượt mở / kết thúc / lỗi, máy mới, đổi tên hoặc chi nhánh, rời / trở lại phạm vi, key mới, bất thường, lượt bị giữ lại. Truy vết theo `runId`, `name`, `objectGuid` hoặc `keyId`:
 
 ```bash
 docker compose logs server | grep '"component":"sync"' | grep '"runId":812'
 ```
 
-#### Log nằm ở đâu, rotate thế nào
-
-App không tự ghi file: mọi log in ra **stdout** dạng JSON, môi trường chạy giữ và xoay vòng. `docker compose`: `docker compose logs server` (file compose đã cấu hình rotate sẵn); Node bằng systemd: `journalctl -u blk` (giới hạn bằng `SystemMaxUse=2G`); Node ghi ra file: logrotate với `copytruncate`. Docker mặc định `json-file` **không rotate**, log lớn mãi tới khi đầy đĩa: luôn đặt một cấu hình ở trên. Muốn giữ lâu và tìm kiếm, đẩy log JSON về hệ thống thu log (mục 6.15).
-
----
+**Log nằm ở đâu:** app ghi ra **stdout**, môi trường chạy giữ và xoay vòng. Docker: `docker compose logs server` (compose đã cấu hình rotate; `json-file` mặc định không rotate sẽ làm đầy đĩa); systemd: `journalctl -u blk`; ghi file: logrotate `copytruncate`. Muốn giữ lâu, đẩy về hệ thống thu log (mục 6.15).
 
 ### 6.11. Trang Báo cáo
 
-Cho Trưởng IT, Admin HQ và Auditor, trong phạm vi chi nhánh của người xem. Chọn kỳ (mặc định 30 ngày, tối đa 366, hoặc **Toàn bộ thời gian**), chi nhánh và bộ lọc đăng nhập AD (như Tìm máy, mục 6.4; áp dụng cho số máy và số key, không áp dụng cho lượt hiện key). Gồm: tổng quan, chi tiết từng chi nhánh, hoạt động của máy theo đăng nhập AD, xem key theo chi nhánh, máy chưa có key. Số máy và số key là số **hiện tại**; máy mới, key mới, máy rời phạm vi và lượt hiện key tính **trong kỳ**. Máy mới và key mới tính theo **ngày ghi nhận trên hệ thống** (mặc định, lần đầu thấy qua sync; lần cài đầu mọi máy đều tính là mới trong ngày đó) hoặc **ngày tạo trên AD**, chọn ở ô "Máy mới / key mới theo"; máy rời phạm vi (ngày gắn nhãn) và lượt hiện key không đổi; "ngoài giờ" chỉ tính khi đã cấu hình giờ làm việc.
+Cho Trưởng IT, Admin HQ và Auditor, trong phạm vi chi nhánh của người xem. Chọn kỳ (mặc định 30 ngày, tối đa 366, hoặc toàn bộ), chi nhánh và bộ lọc đăng nhập AD. Số máy và số key là số **hiện tại**; máy mới, key mới, máy rời phạm vi và lượt hiện key tính **trong kỳ**. Máy mới / key mới tính theo **ngày ghi nhận** (mặc định) hoặc **ngày tạo trên AD**, chọn ở ô "Máy mới / key mới theo".
 
-**Xuất Excel** (`.xlsx`, đúng kỳ, chi nhánh và bộ lọc đang chọn): các sheet *Tổng quan*, *Theo chi nhánh*, *Xem key theo CN*, *Người xem key*, *Máy chưa có key*, *Máy rời phạm vi*; một chi nhánh có thêm sheet *Máy đã có key*. Cột xếp theo nhóm: định danh, số hiện tại, hoạt động đăng nhập AD, rồi số trong kỳ; các sheet danh sách máy xếp máy, các mốc ngày theo thời gian, thông tin key hoặc sync, DN ở cuối. File **không bao giờ chứa recovery key**; mỗi lần xuất ghi `export_report`.
+**Xuất Excel** (`.xlsx`, theo kỳ, chi nhánh và bộ lọc đang chọn): tổng quan, theo chi nhánh, xem key theo chi nhánh, người xem key, máy chưa có key, máy rời phạm vi. File **không bao giờ chứa recovery key**; mỗi lần xuất ghi `export_report`.
 
-**Báo cáo hằng ngày bằng email** (Quản trị > Thông báo, mặc định tắt): mỗi ngày một email cho Admin HQ và các địa chỉ thêm, giờ gửi theo `APP_TZ` (mặc định 07:30; app tắt lúc đến giờ thì gửi bù), số liệu của *hôm qua* hoặc *hôm nay tính đến giờ gửi*. Nội dung: trạng thái Worker và Đồng bộ AD, lượt sync, cảnh báo đang mở, tổng máy và key kèm tăng giảm, máy và key mới, **tỉ lệ % máy đã có recovery key** (toàn hệ thống, kèm biểu đồ 10 ngày và mức tăng giảm theo điểm %). Số **máy và key** chỉ tính máy hoạt động gần đây (key của máy đó) (đăng nhập AD trong `computer.recent_months` tháng, mặc định 3; máy chưa có dữ liệu đăng nhập vẫn tính). Câu chữ sửa ở mẫu `daily_report` (mục 6.6); có nút **Gửi thử báo cáo ngay**.
+**Báo cáo hằng ngày bằng email** (Quản trị > Thông báo, mặc định tắt): mỗi ngày một email cho Admin HQ và các địa chỉ thêm (mặc định 07:30, số liệu của hôm qua hoặc hôm nay). Gồm trạng thái Worker và Đồng bộ AD, lượt sync, cảnh báo đang mở, tổng máy và key kèm tăng giảm, máy và key mới, **tỉ lệ % máy đã có recovery key** (biểu đồ 10 ngày, tăng giảm theo điểm %). Số máy và key chỉ tính máy hoạt động gần đây (`computer.recent_months`, mặc định 3 tháng; máy chưa có dữ liệu đăng nhập vẫn tính). Sửa câu chữ ở mẫu `daily_report` (mục 6.6); có nút **Gửi thử báo cáo ngay**.
 
 ### 6.12. Định danh máy và key, các tình huống thường gặp
 
-Hệ thống **không định danh theo tên**: máy theo `objectGUID` do AD cấp (không đổi khi đổi tên hay chuyển OU, không cấp lại); key theo Key ID (`msFVE-RecoveryGuid`, 8 ký tự đầu hiện trên màn hình recovery) và thuộc máy có `objectGUID` mà worker gửi kèm key.
-
-**Không bao giờ xóa** máy hay key (tài khoản ứng dụng không có quyền DELETE trên hai bảng này). Máy rời phạm vi chỉ đổi trạng thái; xóa chi nhánh chỉ chuyển máy về N/A. Key của máy ngoài phạm vi hiện nhãn xám **"Máy ngoài phạm vi"** (key vẫn lưu và tra được).
+Máy định danh theo `objectGUID` (không đổi khi đổi tên hay chuyển OU); key theo Key ID (`msFVE-RecoveryGuid`) và thuộc máy mà worker gửi kèm key. **Không bao giờ xóa** máy hay key: máy rời phạm vi chỉ đổi trạng thái; key của máy đó hiện nhãn "Máy ngoài phạm vi".
 
 | Tình huống | Hệ thống làm gì |
 | --- | --- |
-| **Máy đổi tên / chuyển OU** | Cùng GUID nên vẫn **một máy**: cập nhật tên, DN, chi nhánh (ghi `computer_moved` nếu đổi chi nhánh); giữ key, lịch sử, serial / email đã nhập; không email "máy mới". Tìm tên cũ không ra, tìm GUID hoặc Key ID vẫn ra |
-| **Máy bị xóa khỏi AD rồi join lại cùng tên** | AD tạo **object mới, GUID mới** nên thành **máy mới**. Máy cũ ở lượt full kế tiếp thành "ngoài phạm vi", **giữ key cũ**. Serial / email của máy cũ không tự chép sang |
-| Máy cài lại nhưng admin **"Reset account"** | Vẫn object cũ, cùng GUID: vẫn máy cũ, key mới thêm vào cùng máy |
-| **Key mới cho cùng một ổ đĩa** (cùng `msFVE-VolumeGuid`) | Thêm key mới, không ghi đè: key mới **Đang dùng**, key cũ của ổ đó **Có key mới hơn** (vẫn giữ). Ổ khác không ảnh hưởng |
-| Đẩy lại đúng key cũ | Cùng Key ID: không có gì mới, không email |
-| **Unjoin rồi join lại, đẩy lại key cũ** (Key ID không đổi, nằm dưới object mới) | Key **chuyển sang máy mới** (không xóa, không nhân đôi) và ghi lịch sử chuyển. **Cùng tên, cùng domain**: chuyển ngay, máy cũ thành "ngoài phạm vi". **Khác tên**: tạm ghi là Key ID trùng, lượt full sau thấy máy cũ rời phạm vi thì chuyển và tự đóng, không mail |
-| **Cùng Key ID dưới 2 máy đều còn trong phạm vi** (clone image đã bật BitLocker) | Key **giữ ở máy đang giữ**, ghi Key ID trùng; sau khi lượt full xác nhận, gửi **1 mail** (mỗi cặp 1 lần). Xem ở Quản trị > Sync AD, hai nút: **Gán cho máy mới hơn** (so ngày tạo trên AD của 2 máy, key chuyển sang máy tạo sau; không thực hiện nếu mật khẩu khác nhau, thiếu ngày tạo hoặc máy đang giữ key đã là máy mới hơn) và **Dùng chung 2 máy** (key giữ nguyên, trang của cả 2 máy hiện ghi chú dùng chung, không đổi quyền xem). Cả hai đóng cảnh báo, các lượt full sau không báo lại cặp đã xử lý, và ghi `key_duplicate_review` kèm kết quả. Tự đóng khi một máy rời phạm vi |
-| Cùng Key ID nhưng **mật khẩu khác** | Không chuyển, không ghi đè; xử lý như Key ID trùng |
-| Key bị xóa trong AD | Hệ thống vẫn giữ |
+| Máy đổi tên / chuyển OU | Cùng GUID nên vẫn một máy: cập nhật tên, DN, chi nhánh; giữ key, serial, email |
+| Máy bị xóa khỏi AD rồi join lại cùng tên | AD tạo GUID mới nên là máy mới; máy cũ thành "ngoài phạm vi", giữ key cũ |
+| Admin "Reset account" | Vẫn object cũ: key mới thêm vào cùng máy |
+| Key mới cho cùng ổ đĩa | Key mới **Đang dùng**, key cũ **Có key mới hơn** (vẫn giữ) |
+| Unjoin rồi join lại, đẩy lại key cũ | Key chuyển sang máy mới, ghi lịch sử. Cùng tên: chuyển ngay; khác tên: tạm ghi Key ID trùng, lượt full sau chuyển và tự đóng |
+| Cùng Key ID dưới 2 máy đều còn trong phạm vi (clone image) | Key giữ ở máy đang giữ, ghi Key ID trùng, gửi 1 mail sau lượt full. Xử lý ở Quản trị > Sync AD: **Gán cho máy mới hơn** (chuyển key sang máy tạo sau; không làm được nếu mật khẩu khác nhau hoặc thiếu ngày tạo) hoặc **Dùng chung 2 máy** (key giữ nguyên, hai máy hiện ghi chú). Cả hai đóng cảnh báo, các lượt full sau không báo lại |
+| Cùng Key ID, **mật khẩu khác** | Không chuyển, không ghi đè; xử lý như Key ID trùng |
 
-Khi xóa máy khỏi AD, AD xóa luôn key của máy. Xóa **nhiều** máy cùng lúc làm lượt full thấy giảm mạnh nên bị **giữ lại** chờ Admin HQ duyệt (mục 6.1): đó là cơ chế an toàn, không phải lỗi.
+Xóa **nhiều** máy cùng lúc làm lượt full thấy giảm mạnh nên bị **giữ lại** chờ duyệt (mục 6.1): đó là cơ chế an toàn, không phải lỗi.
 
 ### 6.13. Hiện key và sao chép
 
@@ -1056,38 +994,29 @@ Trang hiện key tự ẩn sau 60 giây; **Sao chép key** chép cả key kèm d
 
 ### 6.14. Bảo mật tài khoản: 2 bước, khóa, mật khẩu, phiên, admin gốc
 
-- **Xác thực 2 bước** (TOTP): bật từng người ở Quản trị > Người dùng (AD và nội bộ đều dùng được). Mã dùng một lần; khóa bí mật mã hóa bằng khóa suy ra từ `SECRET_KEY` (đổi `SECRET_KEY` thì mọi người phải thiết lập lại). Mất điện thoại: Admin HQ bấm **Đặt lại xác thực 2 bước** (hoặc CLI `reset-2fa`, mục 6.9). Tài khoản dùng cho script nên tắt 2 bước.
-- **Khóa khi đăng nhập sai** (Quản trị > Bảo mật): mặc định 5 lần sai liên tiếp thì khóa 15 phút (0 = khóa tới khi Admin HQ mở); mở khóa ở Người dùng hoặc CLI `unlock`.
-- **Mật khẩu nội bộ:** tối thiểu 12 ký tự (8–64), tùy chọn bắt buộc chữ hoa / thường / số / ký tự đặc biệt; không chứa tên đăng nhập. Tài khoản AD theo chính sách của AD.
-- **Phiên:** tự đăng xuất sau 15 phút không hoạt động (`SESSION_IDLE_MINUTES`), tối đa 8 giờ (`SESSION_MAX_HOURS`); chỉnh ở Bảo mật.
-- **Admin gốc** (`admin` tạo lúc khởi tạo, nhãn Superadmin): không admin nào khác đổi được nó (403), chỉ nó bỏ quyền hoặc khóa admin khác, và không tự bỏ quyền hay tự khóa mình. Khi web hỏng hoặc mất mật khẩu / điện thoại: dùng CLI trên máy chủ (mục 6.9), áp dụng cho mọi tài khoản.
+- **Xác thực 2 bước** (TOTP): bật từng người ở Quản trị > Người dùng. Mất điện thoại: Admin HQ bấm **Đặt lại xác thực 2 bước** (hoặc CLI `reset-2fa`). Đổi `SECRET_KEY` thì mọi người phải thiết lập lại. Tài khoản dùng cho script nên tắt 2 bước.
+- **Khóa khi đăng nhập sai** (Quản trị > Bảo mật): mặc định 5 lần sai thì khóa 15 phút; mở khóa ở Người dùng hoặc CLI `unlock`.
+- **Mật khẩu nội bộ:** tối thiểu 12 ký tự, không chứa tên đăng nhập. Tài khoản AD theo chính sách AD.
+- **Phiên:** tự đăng xuất sau 15 phút không hoạt động, tối đa 8 giờ; chỉnh ở Bảo mật.
+- **Admin gốc** (`admin`, nhãn Superadmin): admin khác không đổi được nó, và nó không tự bỏ quyền hay tự khóa mình. Web hỏng hoặc mất mật khẩu: dùng CLI (mục 6.9).
 
 ### 6.15. Log ra stdout cho hệ thống thu log (SIEM...)
 
-Ngoài log ứng dụng, app ghi ra **stdout** của container server, mỗi sự kiện **một dòng JSON** (`log_type` để lọc). Hệ thống thu log của bạn (SIEM, Promtail, Filebeat, driver Docker...) đọc stdout; app không có cấu hình riêng cho việc này.
-
-| `log_type` | Tương ứng | Khi nào |
-| --- | --- | --- |
-| `audit` | Nhật ký truy cập | Ngay khi dòng nhật ký được lưu (kèm `id`) |
-| `mail` | Log email | Mỗi lần đổi trạng thái của email |
-| `sync_run` | Danh sách lượt sync | Mở, kết thúc, bị giữ lại, đã quyết định |
-| `alert` | Cảnh báo | Mở, đã gửi, đã đóng |
-
-Không dòng nào chứa recovery password; không phụ thuộc `LOG_LEVEL`. Ghi **bất đồng bộ và chấp nhận mất**: hàng đợi đầy thì bỏ dòng mới và ghi một dòng `event_gap` cho biết số dòng bị bỏ; không lưu trạng thái, không gửi bù khi khởi động lại. Dùng `id` của dòng nhật ký để bỏ trùng.
+Ngoài log ứng dụng, app ghi ra stdout mỗi sự kiện **một dòng JSON**, lọc theo `log_type`: `audit` (nhật ký truy cập), `mail` (đổi trạng thái email), `sync_run` (lượt sync), `alert` (cảnh báo). Không dòng nào chứa recovery password. Ghi bất đồng bộ và chấp nhận mất: hàng đợi đầy thì bỏ dòng mới và ghi một dòng `event_gap`; dùng `id` của dòng nhật ký để bỏ trùng.
 
 ### 6.16. Lịch chạy các job
 
-Mỗi job có giờ / chu kỳ mặc định, chỉnh ngay trên trang của job, áp dụng trong một phút, không cần khởi động lại. Giờ theo `APP_TZ`.
+Chỉnh ngay trên trang của job, áp dụng trong một phút, không cần khởi động lại. Giờ theo `APP_TZ`.
 
 | Job | Mặc định | Chỉnh ở |
 | --- | --- | --- |
-| Gửi mail đang chờ | mỗi **1 phút** (1–60) | Quản trị > Mail server |
-| Watchdog | mỗi **5 phút** (1–60) | Quản trị > Đồng bộ AD > Cảnh báo sync |
-| Dọn dữ liệu quá hạn | **03:00** | Quản trị > Lưu trữ |
-| Báo cáo email hằng ngày | **07:30** (tắt) | Quản trị > Thông báo |
-| Sao lưu | **01:30** (tắt) | Quản trị > Sao lưu |
+| Gửi mail đang chờ | mỗi 1 phút | Quản trị > Mail server |
+| Watchdog | mỗi 5 phút | Quản trị > Đồng bộ AD > Cảnh báo sync |
+| Dọn dữ liệu quá hạn | 03:00 | Quản trị > Lưu trữ |
+| Báo cáo email hằng ngày | 07:30 (tắt) | Quản trị > Thông báo |
+| Sao lưu | 01:30 (tắt) | Quản trị > Sao lưu |
 
-Giờ đọc AD của **worker** (delta 15 phút, full 01:00, heartbeat 5 phút) nằm trong file cấu hình của worker (`Schedule.*`, mục 4).
+Giờ đọc AD của worker (delta 15 phút, full 01:00, heartbeat 5 phút) nằm trong cấu hình worker (`Schedule.*`, mục 4).
 
 ## 7. Xử lý sự cố
 
