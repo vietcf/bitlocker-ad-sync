@@ -21,17 +21,37 @@ cd "$D"
 
 DB_MODE="" WORKER_IPS="" AD_SERVERS="" AD_DOMAIN="" AD_BASE_DN="" AD_PROTOCOL="" TZ_NAME=""
 DB_HOST="" DB_PORT="" DB_NAME="" DB_SSL="" UP=0 UPDATE=0 YES=0 MAKE_CERT="" P_HTTPS="" P_INGEST="" P_HTTP=""
-usage() { sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; cat <<'EOF'
+usage() { cat <<'EOF'
+Cai dat production bang Docker Compose: tao server/.env (va server/db.env neu DB trong Docker) voi gia tri DUNG,
+kiem tra, roi (tuy chon) khoi dong.
+
+Cach dung:
+  bash install.sh                                   hoi tung thong tin
+  bash install.sh --db docker --up                  DB trong Docker, cai moi va khoi dong
+  bash install.sh --db external --up                DB ngoai (da tao san blk_owner, app_node, DB blk)
+  bash install.sh --db docker --update --up         DA CAI ROI: giu cau hinh, cap nhat ban moi
+  bash install.sh --help
+
+Chay lai (an toan, khong xoa nham du lieu):
+  DB trong Docker, DA co data/postgres   canh bao va THOAT, khong dong vao cau hinh hay database.
+                                         Cap nhat: them --update. Cai lai tu dau (MAT DATABASE):
+                                         docker compose -f docker-compose.prod.yml --profile db down && rm -rf data
+  DB trong Docker, CHUA co data/postgres xoa cau hinh cu (server/.env, server/db.env, .env, nginx/redirect.conf),
+                                         tao moi toan bo. Khong dong vao data/, backups/, cert/.
+  DB ngoai                               chay lai giu cau hinh va khoa bi mat da co.
+
 Tuy chon (bo trong thi script hoi):
   --db docker|external       DB trong Docker hoac PostgreSQL ngoai
-  --worker-ips A,B           IP may chay worker (duoc goi cong 8443)
+  --update                   da cai roi (co data/postgres): giu cau hinh, chi cap nhat / khoi dong lai
+  --worker-ips A,B           IP may chay worker duoc goi cong 8443 (de trong = cho moi IP, van can HTTPS va API key)
   --ad-servers dc1,dc2       may chu AD (de trong = chi dung tai khoan noi bo)
   --ad-domain corp.local     --ad-base-dn DC=corp,DC=local     --ad-protocol ldap|starttls|ldaps
   --db-host H --db-port P --db-name blk --db-ssl true|false      (DB ngoai)
   Mat khau DB ngoai: bien moi truong BLK_APP_PASSWORD, BLK_OWNER_PASSWORD (hoac nhap khi duoc hoi)
   --https-port 443 --ingest-port 8443 --http-port 80     cong ra ngoai (doi khi cong chuan bi chiem)
   --tz Asia/Ho_Chi_Minh      --up (khoi dong luon)      --yes (khong hoi, dung gia tri mac dinh)
-  --update                   da cai roi (co data/postgres): giu cau hinh, chi cap nhat / khoi dong lai
+
+Trong goi offline script nam o thu muc goc cua goi (install.sh), cung cho voi docker-compose.prod.yml.
 EOF
 }
 while [[ $# -gt 0 ]]; do
