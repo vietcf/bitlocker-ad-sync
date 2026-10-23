@@ -55,9 +55,11 @@ describe('daily report', () => {
     const d = await report().build('yesterday');
     expect(d.series[9].computers).toBe(2); // 3 minus the old SRV-0001 (was +new -left: HN-LT, HN-PC-NEW, SRV)
     expect(d.changes.new_computers).toBe(1); // recent logon
+    expect(d.series[9].keys).toBe(3); // the key of the old SRV-0001 is not counted either
     await asOwner(`UPDATE computer SET last_logon_at = now() - interval '400 days' WHERE name = 'HN-PC-NEW'`);
     const d2 = await report().build('yesterday');
     expect(d2.changes.new_computers).toBe(0);
+    expect(d2.changes.new_keys).toBe(0); // its key is new yesterday, but the computer is not recent
     expect(d2.series[9].computers).toBe(1);
   });
 
@@ -65,8 +67,9 @@ describe('daily report', () => {
     const r = report();
     const m = r.render(await r.build('yesterday'));
     expect(m.subject).toMatch(/^Báo cáo BitLocker \d\d\/\d\d\/\d{4}: worker Online, AD bình thường, máy 0, key \+1$/);
-    expect(m.text).toContain('MÁY (không tính máy đã quá 3 tháng không đăng nhập AD): 3 (0): 1 mới ghi nhận, 1 không còn trong phạm vi giám sát');
+    expect(m.text).toContain('MÁY: 3 (0): 1 mới ghi nhận, 1 không còn trong phạm vi giám sát');
     expect(m.text).toContain('Chưa có worker nào gửi heartbeat');
+    expect(m.text).toContain('gồm máy chưa có dữ liệu đăng nhập');
     expect(m.html).toContain('Số máy, 10 ngày gần nhất');
     expect(m.html).toContain('&lt;b&gt;Ha Noi&lt;/b&gt;');
     expect(m.html).not.toContain('<b>Ha Noi</b>');

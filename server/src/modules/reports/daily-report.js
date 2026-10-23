@@ -118,10 +118,12 @@ export class DailyReportService {
         `SELECT
            (SELECT count(*)::int FROM computer c WHERE c.first_seen_at >= $1 AND c.first_seen_at < $2 AND ${recent}) AS new_computers,
            (SELECT count(*)::int FROM computer c WHERE c.deleted_in_ad_at >= $1 AND c.deleted_in_ad_at < $2 AND ${recent}) AS left_computers,
-           (SELECT count(*)::int FROM recovery_key WHERE first_synced_at >= $1 AND first_synced_at < $2) AS new_keys,
            (SELECT count(*)::int FROM recovery_key k JOIN computer c ON c.id = k.computer_id
-             WHERE c.deleted_in_ad_at >= $1 AND c.deleted_in_ad_at < $2) AS keys_of_left,
-           (SELECT count(*)::int FROM key_owner_change WHERE at >= $1 AND at < $2) AS keys_moved`,
+             WHERE k.first_synced_at >= $1 AND k.first_synced_at < $2 AND ${recent}) AS new_keys,
+           (SELECT count(*)::int FROM recovery_key k JOIN computer c ON c.id = k.computer_id
+             WHERE c.deleted_in_ad_at >= $1 AND c.deleted_in_ad_at < $2 AND ${recent}) AS keys_of_left,
+           (SELECT count(*)::int FROM key_owner_change o JOIN computer c ON c.id = o.to_computer_id
+             WHERE o.at >= $1 AND o.at < $2 AND ${recent}) AS keys_moved`,
         range,
       );
       const { rows: byBranch } = await tx.query(
@@ -129,8 +131,8 @@ export class DailyReportService {
            SELECT c.branch_id,
                   count(*) FILTER (WHERE c.first_seen_at >= $1 AND c.first_seen_at < $2 AND ${recent})::int AS new_computers,
                   count(*) FILTER (WHERE c.deleted_in_ad_at >= $1 AND c.deleted_in_ad_at < $2 AND ${recent})::int AS left_computers,
-                  coalesce(sum((SELECT count(*) FROM recovery_key k
-                                 WHERE k.computer_id = c.id AND k.first_synced_at >= $1 AND k.first_synced_at < $2)), 0)::int AS new_keys
+                  coalesce(sum(CASE WHEN ${recent} THEN (SELECT count(*) FROM recovery_key k
+                                 WHERE k.computer_id = c.id AND k.first_synced_at >= $1 AND k.first_synced_at < $2) ELSE 0 END), 0)::int AS new_keys
              FROM computer c GROUP BY c.branch_id) x
            LEFT JOIN branch b ON b.id = x.branch_id
           WHERE x.new_computers + x.left_computers + x.new_keys > 0
@@ -220,6 +222,8 @@ export class DailyReportService {
     });
     const runText = (r) => `${num(r.success ?? 0)} thành công, ${num(r.failed ?? 0)} lỗi, ${num(r.quarantined ?? 0)} bị giữ lại`;
 
+    const note = `Chỉ tính máy hoạt động gần đây (đăng nhập AD trong ${d.recentMonths} tháng, gồm máy chưa có dữ liệu đăng nhập) và key của các máy đó.`;
+
     // ---- plain text ----
     const lines = [
       t.body,
@@ -234,13 +238,14 @@ export class DailyReportService {
       ...d.sync.alerts.map((a) => `- Cảnh báo: ${a.subject}`),
       d.sync.duplicates ? `- ${num(d.sync.duplicates)} Key ID trùng giữa nhiều máy chưa xem xét` : null,
       '',
-      `MÁY (không tính máy đã quá ${d.recentMonths} tháng không đăng nhập AD): ${num(last?.computers)} (${signed(last?.dComputers ?? 0)}): ${num(c.new_computers)} mới ghi nhận, ${num(c.left_computers)} không còn trong phạm vi giám sát`,
+      `MÁY: ${num(last?.computers)} (${signed(last?.dComputers ?? 0)}): ${num(c.new_computers)} mới ghi nhận, ${num(c.left_computers)} không còn trong phạm vi giám sát`,
       `KEY: ${num(last?.keys)} (${signed(last?.dKeys ?? 0)}): ${num(c.new_keys)} mới ghi nhận${c.keys_of_left ? `, ${num(c.keys_of_left)} key thuộc máy vừa rời phạm vi giám sát (vẫn lưu)` : ''}${c.keys_moved ? `, ${num(c.keys_moved)} key chuyển sang máy mới (join lại AD)` : ''}`,
       '',
       ...(d.byBranch.length ? ['THEO CHI NHÁNH (có thay đổi):', ...d.byBranch.map((b) => `- ${b.code ?? 'N/A'}: máy +${b.new_computers} / −${b.left_computers}, key +${b.new_keys}`), ''] : []),
       `${CHART_DAYS} NGÀY GẦN NHẤT (cuối mỗi ngày):`,
       ...d.series.map((s) => `- ${dm(s.day)}: ${num(s.computers)} máy (${signed(s.dComputers)}), ${num(s.keys)} key (${signed(s.dKeys)})`),
       '',
+      note,
       'Email không chứa recovery key. Tắt hoặc đổi giờ gửi: Quản trị > Thông báo > Báo cáo hằng ngày.',
     ].filter((l) => l !== null);
 
@@ -275,7 +280,7 @@ export class DailyReportService {
       const deltas = d.series.map((s) => `<td align="center" style="${font}font-size:11px;color:${s[dKey] < 0 ? '#b42318' : s[dKey] > 0 ? '#1b7a43' : '#62646c'};">${esc(signed(s[dKey]))}</td>`).join('');
       return `
         <h3 style="${font}font-size:15px;margin:22px 0 2px;color:#1c1d21;">${esc(title)}</h3>
-        <div style="${font}font-size:12px;${muted}margin-bottom:8px;">Số cuối mỗi ngày${key === 'computers' ? ` (không tính máy quá ${d.recentMonths} tháng không đăng nhập AD)` : ''}; trục bắt đầu từ ${esc(num(lo))} để thấy rõ thay đổi nhỏ. Dòng dưới: tăng/giảm so với ngày trước.</div>
+        <div style="${font}font-size:12px;${muted}margin-bottom:8px;">Số cuối mỗi ngày; trục bắt đầu từ ${esc(num(lo))} để thấy rõ thay đổi nhỏ. Dòng dưới: tăng/giảm so với ngày trước.</div>
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
           <tr>${cols}</tr><tr>${labels}</tr><tr>${deltas}</tr>
         </table>`;
@@ -311,7 +316,7 @@ export class DailyReportService {
 
   <h3 style="font-size:15px;margin:22px 0 8px;color:#1c1d21;">Thay đổi trong kỳ</h3>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-    ${stat('Máy hoạt động gần đây', num(last?.computers), signed(last?.dComputers ?? 0), `${esc(num(c.new_computers))} mới ghi nhận · ${esc(num(c.left_computers))} không còn trong phạm vi giám sát`)}
+    ${stat('Máy trên hệ thống', num(last?.computers), signed(last?.dComputers ?? 0), `${esc(num(c.new_computers))} mới ghi nhận · ${esc(num(c.left_computers))} không còn trong phạm vi giám sát`)}
     ${stat('Recovery key', num(last?.keys), signed(last?.dKeys ?? 0), `${esc(num(c.new_keys))} mới ghi nhận${c.keys_of_left ? ` · ${esc(num(c.keys_of_left))} thuộc máy rời phạm vi giám sát (vẫn lưu)` : ''}${c.keys_moved ? ` · ${esc(num(c.keys_moved))} chuyển máy` : ''}`)}
   </tr></table>
   ${d.byBranch.length ? `
@@ -322,7 +327,7 @@ export class DailyReportService {
   ${chart(`Số máy, ${CHART_DAYS} ngày gần nhất`, 'computers', 'dComputers', '#2a78d6')}
   ${chart(`Số key, ${CHART_DAYS} ngày gần nhất`, 'keys', 'dKeys', '#eb6834')}
   ${link}
-  <p style="font-size:12px;${muted}margin:20px 0 0;border-top:1px solid #dcdee4;padding-top:10px;">Email không chứa recovery key. Tắt hoặc đổi giờ gửi: Quản trị &gt; Thông báo &gt; Báo cáo hằng ngày.</p>
+  <p style="font-size:12px;${muted}margin:20px 0 0;border-top:1px solid #dcdee4;padding-top:10px;">${esc(note)} Email không chứa recovery key. Tắt hoặc đổi giờ gửi: Quản trị &gt; Thông báo &gt; Báo cáo hằng ngày.</p>
 </td></tr></table>
 </td></tr></table>
 </body></html>`;

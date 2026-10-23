@@ -52,7 +52,7 @@ export async function inventoryByBranch(tx, branches) {
 export async function inventoryPerDay(tx, branches, days, tz, { recentMonths = null } = {}) {
   const params = [days, tz];
   const scope = branchFilter('c.branch_id', branches, params);
-  // bo may lau khong dang nhap AD (bao cao hang ngay); may chua co du lieu dang nhap van tinh; mac dinh dem tat ca
+  // bo may (va key cua may) lau khong dang nhap AD (bao cao hang ngay); may chua co du lieu dang nhap van tinh; mac dinh dem tat ca
   let compScope = scope;
   if (recentMonths) {
     params.push(recentMonths);
@@ -76,7 +76,7 @@ export async function inventoryPerDay(tx, branches, days, tz, { recentMonths = n
      key_days AS MATERIALIZED (
        SELECT (k.first_synced_at AT TIME ZONE $2)::date AS day, count(*)::int AS added
          FROM recovery_key k JOIN computer c ON c.id = k.computer_id
-        WHERE ${scope} AND k.first_synced_at IS NOT NULL GROUP BY 1
+        WHERE ${compScope} AND k.first_synced_at IS NOT NULL GROUP BY 1
      )
      SELECT to_char(d.day, 'YYYY-MM-DD') AS day,
             (SELECT coalesce(sum(added - left_n), 0)::int FROM comp WHERE comp.day <= d.day) AS computers,

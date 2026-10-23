@@ -13,6 +13,12 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.21.3] - 2026-10-23
+
+### Đổi
+
+- Báo cáo hằng ngày: số **key** (tổng, biểu đồ, key mới, theo chi nhánh) cũng chỉ tính key của máy hoạt động gần đây, giống số máy. Mail có đúng một dòng chú thích ở cuối (đăng nhập AD trong N tháng, gồm máy chưa có dữ liệu đăng nhập).
+
 ## [2.21.2] - 2026-10-22
 
 ### Đổi
