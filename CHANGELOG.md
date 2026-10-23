@@ -13,6 +13,16 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.22.2] - 2026-10-23
+
+### Đổi
+
+- Cài dev chỉ cần **một lệnh** `docker compose up --build --watch`: dịch vụ `certs` tự tạo chứng chỉ tự ký lần đầu (không cần `bash cert/generate-self-signed.sh`). Có `DB_PORT` để đổi cổng PostgreSQL dev.
+
+### Sửa
+
+- Healthcheck của DB (dev và production) kiểm tra qua TCP, nên `migrate` không còn chạy trước khi khởi tạo DB xong (đôi khi lỗi ở lần cài đầu tiên).
+
 ## [2.22.1] - 2026-10-23
 
 ### Sửa

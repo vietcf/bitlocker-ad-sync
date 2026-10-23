@@ -41,7 +41,7 @@ services:
       - blk-pg:/var/lib/postgresql/data
     logging: *logging
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "postgres", "-d", "blk_test"]
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "postgres", "-d", "blk_test"]
       interval: 2s
       timeout: 3s
       retries: 30

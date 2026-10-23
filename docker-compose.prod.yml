@@ -31,7 +31,7 @@ services:
     restart: unless-stopped
     logging: *logging
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "postgres", "-d", "blk"]
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "postgres", "-d", "blk"]
       interval: 5s
       timeout: 3s
       retries: 30
