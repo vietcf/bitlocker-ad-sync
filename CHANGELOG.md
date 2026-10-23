@@ -13,6 +13,12 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.22.1] - 2026-10-23
+
+### Sửa
+
+- `docker-compose.yml` (dev): nginx thiếu mount `nginx/redirect.conf`, nên tạo lại container nginx báo `open() "/etc/nginx/blk-redirect.conf" failed`. Production không bị (compose production đã có mount).
+
 ## [2.22.0] - 2026-10-23
 
 ### Thêm

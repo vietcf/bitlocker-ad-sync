@@ -126,6 +126,7 @@ services:
       - "${BIND_ADDR:-127.0.0.1}:${HTTP_PORT:-80}:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/redirect.conf:/etc/nginx/blk-redirect.conf:ro
       - ./cert:/etc/nginx/cert:ro
     depends_on:
       - server
