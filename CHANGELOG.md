@@ -13,6 +13,12 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.23.1] - 2026-10-23
+
+### Sửa
+
+- nginx không còn chết khi thiếu file `blk-redirect.conf` (chuyển hướng cổng 80): thiếu file thì dùng chuyển hướng mặc định sang HTTPS, nginx vẫn khởi động. Trước đó thiếu file là lỗi `[emerg] open() "/etc/nginx/blk-redirect.conf" failed`.
+
 ## [2.23.0] - 2026-10-23
 
 ### Đổi
