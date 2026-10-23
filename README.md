@@ -36,18 +36,11 @@ Mục lục:
                               └─ 8443 -> server:8443  /api/ingest (chỉ worker)
 ```
 
-- **Worker** chỉ đọc AD và gửi dữ liệu lên. Mọi quyết định nằm ở server: máy thuộc chi nhánh nào,
-  key nào còn hiệu lực, máy nào không còn trong phạm vi giám sát, lượt sync nào bất thường.
-- **Máy** được nhận diện bằng `objectGUID` của AD, nên đổi tên hay chuyển OU vẫn là cùng một máy.
-  **Key** được nhận diện bằng Key ID (`msFVE-RecoveryGuid`). Một máy có thể có nhiều ổ được mã hóa,
-  mỗi ổ một hoặc nhiều key (`msFVE-VolumeGuid` cho biết key thuộc ổ nào).
-- **Không có gì bị xóa.** Máy không còn trong phạm vi giám sát chỉ được gắn nhãn "Không còn trong phạm vi giám sát" và key vẫn
-  được giữ để mở ổ cứng cũ.
-- **Phân quyền** nằm trong app, không lấy từ group AD. Người dùng đăng nhập bằng tài khoản AD (kiểm
-  tra mật khẩu qua LDAP/LDAPS) hoặc tài khoản local.
-- **Ngôn ngữ:** giao diện web bằng tiếng Việt. Thông báo trong API và log bằng tiếng Anh; client dựa
-  vào mã lỗi `error`, không dựa vào câu chữ. Nội dung email và cảnh báo lấy từ file mẫu email (mục
-  6.6), hiện viết bằng tiếng Việt.
+- **Worker** chỉ đọc AD và gửi lên; mọi quyết định (chi nhánh, key còn hiệu lực, lượt sync bất thường) nằm ở server.
+- **Máy** nhận diện bằng `objectGUID`, nên đổi tên hay chuyển OU vẫn là một máy. **Key** nhận diện bằng Key ID.
+- **Không xóa gì.** Máy rời phạm vi giám sát chỉ bị gắn nhãn, key vẫn giữ.
+- **Phân quyền** nằm trong app, đăng nhập bằng tài khoản AD hoặc local.
+- **Ngôn ngữ:** giao diện và email tiếng Việt; API và log tiếng Anh (client dựa vào mã lỗi `error`).
 
 ---
 
