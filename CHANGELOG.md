@@ -13,6 +13,12 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.24.1] - 2026-10-23
+
+### Đổi
+
+- `install.sh` cài mới (chưa có `data/postgres`): nếu còn container cũ của project (cài dở, hoặc chạy cấu hình cũ) thì **dừng và xóa container** trước khi làm mới cấu hình. Không xóa volume, `data/`, `backups/`, `cert/`, không đụng project khác. Đã có database thì vẫn chỉ cảnh báo và thoát, không dừng gì.
+
 ## [2.24.0] - 2026-10-23
 
 ### Khi nâng cấp

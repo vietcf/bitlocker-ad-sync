@@ -182,7 +182,7 @@ bash tools/install.sh --db docker
 
 Script hỏi IP máy worker, máy chủ AD (có thể để trống), múi giờ rồi tự làm hết: mật khẩu database tự sinh ở `server/db.env`, `server/.env`, khóa bí mật, chứng chỉ tự ký tạm, khởi động.
 
-**Chạy lại:** chưa có `data/postgres` (chưa có database) thì script **xóa cấu hình cũ** (`server/.env`, `server/db.env`, `.env`, `nginx/redirect.conf`) và tạo mới toàn bộ. Đã có `data/postgres` thì script **cảnh báo và thoát**, không đụng gì vào cấu hình hay database đang chạy. Cài lại từ đầu: `docker compose -f docker-compose.prod.yml --profile db down && rm -rf data` (**mất database**), rồi chạy lại. Cập nhật bản mới, giữ cấu hình: thêm `--update` (mục 3.7). Từ nay mọi lệnh `docker compose` của cách này cần thêm `--profile db`.
+**Chạy lại:** chưa có `data/postgres` (chưa có database) thì script **dừng các container cũ của project** (nếu còn, không đụng project khác), rồi **xóa cấu hình cũ** (`server/.env`, `server/db.env`, `.env`, `nginx/redirect.conf`) và tạo mới toàn bộ. Đã có `data/postgres` thì script **cảnh báo và thoát**, không đụng gì vào cấu hình hay database đang chạy. Cài lại từ đầu: `docker compose -f docker-compose.prod.yml --profile db down && rm -rf data` (**mất database**), rồi chạy lại. Cập nhật bản mới, giữ cấu hình: thêm `--update` (mục 3.7). Từ nay mọi lệnh `docker compose` của cách này cần thêm `--profile db`.
 
 **Bước 3. Kiểm tra.** Script in `OK` khi chạy được. Mở `https://<tên máy chủ>/`, đăng nhập `admin` / `admin`, đổi mật khẩu ngay.
 

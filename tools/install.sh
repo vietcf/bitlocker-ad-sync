@@ -3,7 +3,8 @@
 # kiem tra, roi (tuy chon) khoi dong. Chay lai duoc nhieu lan:
 #   - DB trong Docker, da co data/postgres: canh bao va THOAT (khong dong vao cau hinh hay database dang dung);
 #     them --update de giu cau hinh va chi cap nhat / khoi dong lai.
-#   - Chua co data/postgres: xoa cau hinh cu (server/.env, server/db.env, .env, nginx/redirect.conf), tao moi toan bo.
+#   - Chua co data/postgres: dung container cu cua project (neu con), xoa cau hinh cu (server/.env, server/db.env,
+#     .env, nginx/redirect.conf), tao moi toan bo.
 #   - DB ngoai: chay lai giu cau hinh va khoa bi mat da co.
 #
 #   bash tools/install.sh                       # hoi tung thong tin
@@ -36,8 +37,9 @@ Chay lai (an toan, khong xoa nham du lieu):
   DB trong Docker, DA co data/postgres   canh bao va THOAT, khong dong vao cau hinh hay database.
                                          Cap nhat: them --update. Cai lai tu dau (MAT DATABASE):
                                          docker compose -f docker-compose.prod.yml --profile db down && rm -rf data
-  DB trong Docker, CHUA co data/postgres xoa cau hinh cu (server/.env, server/db.env, .env, nginx/redirect.conf),
-                                         tao moi toan bo. Khong dong vao data/, backups/, cert/.
+  DB trong Docker, CHUA co data/postgres dung cac container cu cua project (neu con), xoa cau hinh cu
+                                         (server/.env, server/db.env, .env, nginx/redirect.conf), tao moi toan bo.
+                                         Khong dong vao data/, backups/, cert/.
   DB ngoai                               chay lai giu cau hinh va khoa bi mat da co.
 
 Tuy chon (bo trong thi script hoi):
@@ -124,6 +126,17 @@ if [[ "$DB_MODE" == docker && $UPDATE -eq 0 ]]; then
     say "  Cap nhat ban moi, giu cau hinh:   bash install.sh --db docker --update --up"
     say "  Cai lai tu dau (MAT TOAN BO DATABASE):  docker compose -f docker-compose.prod.yml --profile db down && rm -rf data, roi chay lai install.sh"
     exit 1
+  fi
+  # Chua co database ma van con container cua project nay (cai do, hoac chay cau hinh cu): dung truoc khi lam moi.
+  # Phai dung truoc khi xoa .env (.env ghim ten project Compose). Khong xoa volume, khong dong vao project khac.
+  PN="$(get_env .env COMPOSE_PROJECT_NAME)"
+  [[ -n "$PN" ]] || PN="$(basename "$PWD" | tr 'A-Z' 'a-z' | sed 's/[^a-z0-9_-]//g; s/^[-_]*//')"
+  CIDS="$(docker ps -aq --filter "label=com.docker.compose.project=$PN" 2>/dev/null || true)"
+  if [[ -n "$CIDS" ]]; then
+    say "Chua co database nhung con container cu cua project '$PN': dang dung truoc khi cai moi ..."
+    docker compose -f docker-compose.prod.yml --profile db down >/dev/null 2>&1 || true
+    CIDS="$(docker ps -aq --filter "label=com.docker.compose.project=$PN" 2>/dev/null || true)"   # con sot (down loi, hoac container ngoai file compose)
+    [[ -z "$CIDS" ]] || docker rm -f $CIDS >/dev/null 2>&1 || true
   fi
   old=()
   for f in server/.env server/db.env .env nginx/redirect.conf; do [[ -e $f ]] && old+=("$f"); done
