@@ -302,7 +302,22 @@ if [[ $UP -eq 0 ]]; then
   say ""; say "Khoi dong khi san sang:"; say "  ${CMD[*]}"; final_info; exit 0
 fi
 say ""; say "Khoi dong: ${CMD[*]}"
-"${CMD[@]}"
+START_LOG="$(mktemp)"
+if ! "${CMD[@]}" 2>&1 | tee "$START_LOG"; then
+  # Container cu tham chieu mang Docker da bi xoa ("network ... not found"): xoa cac container cua project nay
+  # (khong dong vao data/, backups/, cert/) roi khoi dong lai mot lan.
+  if grep -qi 'network .* not found' "$START_LOG"; then
+    PN="$(get_env .env COMPOSE_PROJECT_NAME)"
+    [[ -n "$PN" ]] || PN="$(basename "$PWD" | tr 'A-Z' 'a-z' | sed 's/[^a-z0-9_-]//g; s/^[-_]*//')"
+    CIDS="$(docker ps -aq --filter "label=com.docker.compose.project=$PN" 2>/dev/null || true)"
+    say "Container cu tro toi mang Docker khong con: xoa container cu cua project '$PN' roi khoi dong lai (du lieu trong data/ giu nguyen) ..."
+    [[ -z "$CIDS" ]] || docker rm -f $CIDS >/dev/null 2>&1 || true
+    "${CMD[@]}"
+  else
+    rm -f "$START_LOG"; die "Khoi dong loi (xem thong bao tren)."
+  fi
+fi
+rm -f "$START_LOG"
 URL="${BLK_HEALTH_URL:-https://localhost$SUFFIX/healthz}"
 say "Doi he thong san sang ($URL) ..."
 for _ in $(seq 1 45); do

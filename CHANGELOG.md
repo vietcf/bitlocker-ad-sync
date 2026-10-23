@@ -13,6 +13,12 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.24.2] - 2026-10-23
+
+### Sửa
+
+- `install.sh --up`: gặp lỗi `network ... not found` (container cũ trỏ tới mạng Docker đã bị xóa) thì tự xóa container cũ của project rồi khởi động lại một lần. Không đụng `data/`, `backups/`, `cert/`.
+
 ## [2.24.1] - 2026-10-23
 
 ### Đổi
