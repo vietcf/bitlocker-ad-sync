@@ -13,6 +13,12 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.23.2] - 2026-10-23
+
+### Đổi
+
+- Dev: nginx nghe mặc định trên `0.0.0.0` (máy khác truy cập được); `BIND_ADDR=127.0.0.1` để chỉ máy này. PostgreSQL dev vẫn chỉ `127.0.0.1`. Dev dùng tài khoản và mật khẩu mặc định, đừng mở ra mạng không tin cậy.
+
 ## [2.23.1] - 2026-10-23
 
 ### Sửa

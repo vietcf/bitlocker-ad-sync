@@ -65,7 +65,7 @@ Compose dựng `db` (PostgreSQL 17, có DB `blk` và `blk_test`; lần đầu t�
 - https://localhost:8443/api/ingest: ingest API cho worker. https://localhost:8443/docs: Swagger ingest (cần API key).
 - `localhost:5432`: PostgreSQL, tài khoản dev `postgres` / `dev_postgres_pw`.
 
-Trình duyệt báo "không an toàn" vì chứng chỉ tự ký, tới khi bạn tin `cert/ca.crt` (mục 3.5 nói cách dùng chứng chỉ thật). Cổng bị chiếm thì đổi: `HTTPS_PORT=8444 HTTP_PORT=8080 DB_PORT=15432 docker compose up -d`. Mặc định chỉ máy này truy cập được; cho máy khác vào: `BIND_ADDR=0.0.0.0`.
+Trình duyệt báo "không an toàn" vì chứng chỉ tự ký, tới khi bạn tin `cert/ca.crt` (mục 3.5 nói cách dùng chứng chỉ thật). Cổng bị chiếm thì đổi: `HTTPS_PORT=8444 HTTP_PORT=8080 DB_PORT=15432 docker compose up -d`. Mặc định nginx nghe mọi địa chỉ (máy khác vào được); chỉ cho máy này: `BIND_ADDR=127.0.0.1`. PostgreSQL dev luôn chỉ mở trên `127.0.0.1`.
 
 ### 2.3. Đăng nhập lần đầu
 
