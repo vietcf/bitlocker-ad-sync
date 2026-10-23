@@ -63,6 +63,27 @@ describe('daily report', () => {
     expect(d2.series[9].computers).toBe(1);
   });
 
+  it('gives the share of computers with a key and how it moved over the days', async () => {
+    let d = await report().build('yesterday');
+    expect(d.series[9]).toMatchObject({ computers: 3, withKey: 3, pct: 100, dPct: 0 });
+    await asOwner(`INSERT INTO computer (object_guid, name, distinguished_name, branch_id, first_seen_at)
+      VALUES (gen_random_uuid(), 'HN-NOKEY', 'CN=HN-NOKEY,OU=Computers,OU=HN,DC=corp,DC=local', 1, now() - interval '30 days')`);
+    d = await report().build('yesterday');
+    expect(d.series[9]).toMatchObject({ computers: 4, withKey: 3, pct: 75, dPct: 0 }); // no key, before and after
+    expect(d.series[0]).toMatchObject({ computers: 3 + 1 - 0, pct: 75 }); // 10 days ago: HN-LT, HCM-LT, SRV + HN-NOKEY, 3 with a key
+    await asOwner(`INSERT INTO recovery_key (computer_id, key_id, recovery_password, ad_created_at, first_synced_at)
+      SELECT id, 'dddddddd-0000-0000-0000-000000000005', '111111-222222-333333-444444-555555-666666-777777-888888', now(), now() - interval '1 day'
+        FROM computer WHERE name = 'HN-NOKEY'`);
+    d = await report().build('yesterday');
+    expect(d.series[9]).toMatchObject({ withKey: 4, pct: 100, dPct: 25 }); // its key arrived yesterday
+    await asOwner(`UPDATE computer SET last_logon_at = now() - interval '400 days' WHERE name = 'HN-NOKEY'`);
+    d = await report().build('yesterday');
+    expect(d.series[9]).toMatchObject({ computers: 3, withKey: 3, pct: 100 }); // not recent: out of both
+    const m = report().render(d);
+    expect(m.text).toContain('TỈ LỆ MÁY CÓ KEY: 100,0%');
+    expect(m.html).toContain('Tỉ lệ máy có recovery key, 10 ngày gần nhất');
+  });
+
   it('renders text and HTML: sync status, charts, escaped names, never a password', async () => {
     const r = report();
     const m = r.render(await r.build('yesterday'));

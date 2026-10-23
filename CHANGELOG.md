@@ -13,6 +13,12 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.22.0] - 2026-10-23
+
+### Thêm
+
+- Báo cáo hằng ngày: **tỉ lệ % máy có recovery key** (toàn hệ thống, chỉ máy hoạt động gần đây) ở dòng chữ và thêm biểu đồ 10 ngày; dòng dưới biểu đồ là tăng giảm so với ngày trước, tính bằng điểm %.
+
 ## [2.21.3] - 2026-10-23
 
 ### Đổi

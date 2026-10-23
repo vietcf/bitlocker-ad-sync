@@ -21,6 +21,8 @@ const addDays = (iso, n) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86_400
 const dm = (iso) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 const dmy = (iso) => `${dm(iso)}/${iso.slice(0, 4)}`;
 const num = (n) => new Intl.NumberFormat('vi-VN').format(n ?? 0);
+const pctText = (n) => `${new Intl.NumberFormat('vi-VN', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(n ?? 0)}%`;
+const signedPct = (n) => (n > 0 ? `+${pctText(n).slice(0, -1)}` : n < 0 ? `−${pctText(-n).slice(0, -1)}` : '0');
 const signed = (n) => (n > 0 ? `+${num(n)}` : n < 0 ? `−${num(-n)}` : '0');
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
@@ -154,11 +156,15 @@ export class DailyReportService {
       const { rows: [dup] } = await tx.query('SELECT count(*)::int AS n FROM key_duplicate WHERE resolved_at IS NULL');
 
       // End-of-day totals: 12 days ending today, so each shown day has the day before it.
-      const inv = await inventoryPerDay(tx, 'all', CHART_DAYS + 2, this.tz, { recentMonths: months });
+      const inv = await inventoryPerDay(tx, 'all', CHART_DAYS + 2, this.tz, { recentMonths: months, withKey: true });
       const end = period === 'today' ? inv.length - 1 : inv.length - 2;
+      const pct = (r) => (r.computers > 0 ? Math.round((1000 * r.computers_with_key) / r.computers) / 10 : 0);
       const series = inv.slice(end - CHART_DAYS + 1, end + 1).map((r, i) => {
         const prev = inv[end - CHART_DAYS + i];
-        return { day: r.day, computers: r.computers, keys: r.keys, dComputers: r.computers - prev.computers, dKeys: r.keys - prev.keys };
+        return {
+          day: r.day, computers: r.computers, keys: r.keys, dComputers: r.computers - prev.computers, dKeys: r.keys - prev.keys,
+          withKey: r.computers_with_key, pct: pct(r), dPct: Math.round((pct(r) - pct(prev)) * 10) / 10,
+        };
       });
 
       const heartbeatMax = Number(await this.settings.get('watchdog.heartbeat_max_minutes', 15));
@@ -239,11 +245,12 @@ export class DailyReportService {
       d.sync.duplicates ? `- ${num(d.sync.duplicates)} Key ID trùng giữa nhiều máy chưa xem xét` : null,
       '',
       `MÁY: ${num(last?.computers)} (${signed(last?.dComputers ?? 0)}): ${num(c.new_computers)} mới ghi nhận, ${num(c.left_computers)} không còn trong phạm vi giám sát`,
+      `TỈ LỆ MÁY CÓ KEY: ${pctText(last?.pct)} (${signedPct(last?.dPct ?? 0)} điểm %): ${num(last?.withKey)}/${num(last?.computers)} máy`,
       `KEY: ${num(last?.keys)} (${signed(last?.dKeys ?? 0)}): ${num(c.new_keys)} mới ghi nhận${c.keys_of_left ? `, ${num(c.keys_of_left)} key thuộc máy vừa rời phạm vi giám sát (vẫn lưu)` : ''}${c.keys_moved ? `, ${num(c.keys_moved)} key chuyển sang máy mới (join lại AD)` : ''}`,
       '',
       ...(d.byBranch.length ? ['THEO CHI NHÁNH (có thay đổi):', ...d.byBranch.map((b) => `- ${b.code ?? 'N/A'}: máy +${b.new_computers} / −${b.left_computers}, key +${b.new_keys}`), ''] : []),
       `${CHART_DAYS} NGÀY GẦN NHẤT (cuối mỗi ngày):`,
-      ...d.series.map((s) => `- ${dm(s.day)}: ${num(s.computers)} máy (${signed(s.dComputers)}), ${num(s.keys)} key (${signed(s.dKeys)})`),
+      ...d.series.map((s) => `- ${dm(s.day)}: ${num(s.computers)} máy (${signed(s.dComputers)}), ${num(s.keys)} key (${signed(s.dKeys)}), có key ${pctText(s.pct)} (${signedPct(s.dPct)})`),
       '',
       note,
       'Email không chứa recovery key. Tắt hoặc đổi giờ gửi: Quản trị > Thông báo > Báo cáo hằng ngày.',
@@ -264,23 +271,23 @@ export class DailyReportService {
           </td></tr>
         </table>
       </td>`;
-    const chart = (title, key, dKey, color) => {
+    const chart = (title, key, dKey, color, fmt = num, dfmt = signed, unit = '') => {
       const vals = d.series.map((s) => s[key]);
       const { lo, hi } = niceRange(Math.min(...vals), Math.max(...vals));
       const H = 110;
       const h = (v) => Math.max(4, Math.round(4 + ((v - lo) / (hi - lo || 1)) * (H - 4)));
       const cols = d.series.map((s) => `
           <td width="${Math.floor(100 / d.series.length)}%" align="center" valign="bottom" style="padding:0 3px;">
-            <div style="${font}font-size:11px;color:#1c1d21;padding-bottom:2px;">${esc(num(s[key]))}</div>
+            <div style="${font}font-size:11px;color:#1c1d21;padding-bottom:2px;">${esc(fmt(s[key]))}</div>
             <table role="presentation" width="70%" cellpadding="0" cellspacing="0"><tr>
               <td height="${h(s[key])}" style="height:${h(s[key])}px;line-height:${h(s[key])}px;font-size:0;background:${color};border-radius:3px 3px 0 0;">&nbsp;</td>
             </tr></table>
           </td>`).join('');
       const labels = d.series.map((s) => `<td align="center" style="${font}font-size:11px;${muted}padding-top:4px;border-top:1px solid #62646c;">${dm(s.day)}</td>`).join('');
-      const deltas = d.series.map((s) => `<td align="center" style="${font}font-size:11px;color:${s[dKey] < 0 ? '#b42318' : s[dKey] > 0 ? '#1b7a43' : '#62646c'};">${esc(signed(s[dKey]))}</td>`).join('');
+      const deltas = d.series.map((s) => `<td align="center" style="${font}font-size:11px;color:${s[dKey] < 0 ? '#b42318' : s[dKey] > 0 ? '#1b7a43' : '#62646c'};">${esc(dfmt(s[dKey]))}</td>`).join('');
       return `
         <h3 style="${font}font-size:15px;margin:22px 0 2px;color:#1c1d21;">${esc(title)}</h3>
-        <div style="${font}font-size:12px;${muted}margin-bottom:8px;">Số cuối mỗi ngày; trục bắt đầu từ ${esc(num(lo))} để thấy rõ thay đổi nhỏ. Dòng dưới: tăng/giảm so với ngày trước.</div>
+        <div style="${font}font-size:12px;${muted}margin-bottom:8px;">Số cuối mỗi ngày; trục bắt đầu từ ${esc(fmt(lo))} để thấy rõ thay đổi nhỏ. Dòng dưới: tăng/giảm so với ngày trước${unit}.</div>
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
           <tr>${cols}</tr><tr>${labels}</tr><tr>${deltas}</tr>
         </table>`;
@@ -326,6 +333,7 @@ export class DailyReportService {
   </table>` : ''}
   ${chart(`Số máy, ${CHART_DAYS} ngày gần nhất`, 'computers', 'dComputers', '#2a78d6')}
   ${chart(`Số key, ${CHART_DAYS} ngày gần nhất`, 'keys', 'dKeys', '#eb6834')}
+  ${chart(`Tỉ lệ máy có recovery key, ${CHART_DAYS} ngày gần nhất`, 'pct', 'dPct', '#1b7a43', pctText, signedPct, ' (điểm %)')}
   ${link}
   <p style="font-size:12px;${muted}margin:20px 0 0;border-top:1px solid #dcdee4;padding-top:10px;">${esc(note)} Email không chứa recovery key. Tắt hoặc đổi giờ gửi: Quản trị &gt; Thông báo &gt; Báo cáo hằng ngày.</p>
 </td></tr></table>

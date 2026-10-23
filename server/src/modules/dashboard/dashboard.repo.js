@@ -49,7 +49,7 @@ export async function inventoryByBranch(tx, branches) {
  * One pass: computers and keys are bucketed by local day once, then each day's figure is a running sum over those
  * few hundred buckets (MATERIALIZED: otherwise the planner inlines the buckets and recomputes them per day; the old form scanned both tables once per day: 30 scans, seconds on 50k computers).
  */
-export async function inventoryPerDay(tx, branches, days, tz, { recentMonths = null } = {}) {
+export async function inventoryPerDay(tx, branches, days, tz, { recentMonths = null, withKey = false } = {}) {
   const params = [days, tz];
   const scope = branchFilter('c.branch_id', branches, params);
   // bo may (va key cua may) lau khong dang nhap AD (bao cao hang ngay); may chua co du lieu dang nhap van tinh; mac dinh dem tat ca
@@ -58,6 +58,27 @@ export async function inventoryPerDay(tx, branches, days, tz, { recentMonths = n
     params.push(recentMonths);
     compScope = `${scope} AND (c.last_logon_at IS NULL OR c.last_logon_at >= now() - make_interval(months => $${params.length}))`;
   }
+  // withKey: them cot computers_with_key = so may (dang tinh) da co it nhat 1 key tai cuoi moi ngay
+  const keyCte = withKey
+    ? `,
+     cs AS MATERIALIZED (
+       SELECT greatest((c.first_seen_at AT TIME ZONE $2)::date, fk.day) AS s,
+              CASE WHEN c.deleted_in_ad_at IS NOT NULL
+                   THEN greatest((c.first_seen_at AT TIME ZONE $2)::date, (c.deleted_in_ad_at AT TIME ZONE $2)::date) END AS gone
+         FROM computer c
+         JOIN (SELECT computer_id, min((first_synced_at AT TIME ZONE $2)::date) AS day
+                 FROM recovery_key WHERE first_synced_at IS NOT NULL GROUP BY computer_id) fk ON fk.computer_id = c.id
+        WHERE ${compScope} AND c.first_seen_at IS NOT NULL
+     ),
+     wk AS MATERIALIZED (
+       SELECT day, sum(added)::int AS added, sum(left_n)::int AS left_n FROM (
+         SELECT s AS day, count(*) AS added, 0 AS left_n FROM cs WHERE gone IS NULL OR s <= gone GROUP BY 1
+         UNION ALL
+         SELECT gone, 0, count(*) FROM cs WHERE gone IS NOT NULL AND s <= gone GROUP BY 1
+       ) u GROUP BY day
+     )`
+    : '';
+  const keyCol = withKey ? ', (SELECT coalesce(sum(added - left_n), 0)::int FROM wk WHERE wk.day <= d.day) AS computers_with_key' : '';
   const { rows } = await tx.query(
     `WITH d AS (
        SELECT g::date AS day
@@ -77,10 +98,10 @@ export async function inventoryPerDay(tx, branches, days, tz, { recentMonths = n
        SELECT (k.first_synced_at AT TIME ZONE $2)::date AS day, count(*)::int AS added
          FROM recovery_key k JOIN computer c ON c.id = k.computer_id
         WHERE ${compScope} AND k.first_synced_at IS NOT NULL GROUP BY 1
-     )
+     )${keyCte}
      SELECT to_char(d.day, 'YYYY-MM-DD') AS day,
             (SELECT coalesce(sum(added - left_n), 0)::int FROM comp WHERE comp.day <= d.day) AS computers,
-            (SELECT coalesce(sum(added), 0)::int FROM key_days WHERE key_days.day <= d.day) AS keys
+            (SELECT coalesce(sum(added), 0)::int FROM key_days WHERE key_days.day <= d.day) AS keys${keyCol}
        FROM d ORDER BY d.day`,
     params,
   );
