@@ -29,10 +29,8 @@
   //     (ldap_search_base_failed). Sua xong chay: blk-sync check  -> moi OU mot dong OK / FAIL.
   //   - OU trung hoac OU con cua OU da liet ke duoc tu bo qua (khong doc 2 lan).
   //
-  // Bi mat (Ldap.Password, Ingest.ApiKey) - khong ghi gia tri that vao file:
-  //   "cred:ldap-password"                 systemd credential (khuyen nghi tren may chu, xem README 4B.7)
-  //   "file:/etc/blk-sync/ldap-password"   file chi user blk-sync doc duoc (chmod 0400)
-  //   "env:BLK_LDAP_PASSWORD"              bien moi truong (khi phat trien)
+  // Mat khau AD (Ldap.Password) va API key (Ingest.ApiKey): ghi THANG vao file nay.
+  // File chi root va user blk-sync doc duoc (install.sh dat quyen 0640), khong de cho nguoi khac doc.
   // =====================================================================================================
   "Ldap": {
     // Ldap (doc AD that) | JsonFile (chi de phat trien: doc JsonFilePath)
@@ -48,8 +46,8 @@
     // Simple bind. Vi du: "svc-blk@corp.local" | "CORP\\svc-blk" | "CN=svc-blk,OU=Service,DC=corp,DC=local"
     "Auth": "Basic",
     "Username": "svc-blk@corp.local",
-    // Vi du: "cred:ldap-password" | "file:/etc/blk-sync/ldap-password" | "env:BLK_LDAP_PASSWORD"
-    "Password": "cred:ldap-password",
+    // Mat khau cua tai khoan tren (ghi thang)
+    "Password": "MAT_KHAU_AD",
     // Vi du: "DC=corp,DC=local" (domain corp.local) | "DC=example,DC=local" (domain example.local)
     "BaseDn": "DC=corp,DC=local",
     // Xem quy tac o dau file. [] = ca domain.
@@ -71,8 +69,8 @@
     "BaseUrl": "https://blk.corp.local:8443/api/ingest",
     // API key = INGEST_API_KEY trong server/.env, gui "Authorization: Bearer <key>" qua HTTPS. Day la cach
     // xac thuc duy nhat cua worker; server con kiem tra IP worker (INGEST_ALLOWED_IPS).
-    // Vi du: "cred:ingest-api-key" | "file:/etc/blk-sync/ingest-api-key" | "env:BLK_INGEST_API_KEY"
-    "ApiKey": "cred:ingest-api-key",
+    // Gia tri INGEST_API_KEY lay tu server (ghi thang)
+    "ApiKey": "INGEST_API_KEY",
     // File PEM cua CA cap chung chi HTTPS cho server, neu may chua tin CA do. Vi du: "/etc/blk-sync/corp-ca.pem"
     "CaFile": "",
     "TimeoutSeconds": 60,           // 5-600

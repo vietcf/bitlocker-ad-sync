@@ -13,6 +13,10 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+### Đổi
+
+- Worker (Go và .NET): hướng dẫn và script triển khai lưu **mật khẩu AD và API key thẳng trong file cấu hình** (quyền file bị khóa), bỏ systemd credential và DPAPI khỏi luồng chính. Worker Go lên 1.3.0 (xem `worker-go/CHANGELOG.md`; máy đang dùng `cred:` phải sửa `config.json` sau khi cập nhật).
+
 ## [2.24.2] - 2026-10-23
 
 ### Sửa

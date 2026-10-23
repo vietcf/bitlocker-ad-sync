@@ -72,30 +72,12 @@ install -m 0644 "$UNIT_SRC" /etc/systemd/system/blk-sync.service
 ensure_state_dir
 systemctl daemon-reload
 
-if (( LEGACY )); then
 cat <<'EOF'
-Installed (old systemd: using the legacy unit). Next:
-  1. Edit /etc/blk-sync/config.json (servers, BaseDn, SearchBases, Username, BaseUrl) and set
-       "Password": "file:/etc/blk-sync/ldap-password"     (in the Ldap section)
-       "ApiKey":   "file:/etc/blk-sync/ingest-api-key"    (in the Ingest section)
-  2. Store the secrets in files only the service user can read (typed at a prompt, not on the command line):
-       read -rsp "AD password: " p; echo; (umask 077; printf '%s' "$p" > /etc/blk-sync/ldap-password); chown blk-sync:blk-sync /etc/blk-sync/ldap-password; unset p
-       read -rsp "Ingest API key: " p; echo; (umask 077; printf '%s' "$p" > /etc/blk-sync/ingest-api-key); chown blk-sync:blk-sync /etc/blk-sync/ingest-api-key; unset p
-  3. Test as the service user:
+Installed$( (( LEGACY )) && echo ' (old systemd: using the legacy unit)' || true). Next:
+  1. Edit /etc/blk-sync/config.json: servers, BaseDn, SearchBases, Username, Password (AD password),
+     BaseUrl and ApiKey (INGEST_API_KEY of the server). The secrets are written straight into this file;
+     it is readable only by root and the service user (mode 0640).
+  2. Test as the service user:
        sudo -u blk-sync /opt/blk-sync/blk-sync --config /etc/blk-sync/config.json check
-  4. Start:  systemctl enable --now blk-sync   and watch:  journalctl -u blk-sync -f
-EOF
-exit 0
-fi
-
-cat <<'EOF'
-Installed. Next:
-  1. Edit /etc/blk-sync/config.json (servers, BaseDn, SearchBases, Username, BaseUrl).
-  2. Store the secrets as encrypted systemd credentials (typed at a prompt, never on the command line):
-       systemd-ask-password -n "AD password:"      | systemd-creds encrypt --name=ldap-password  - /etc/blk-sync/ldap-password.cred
-       systemd-ask-password -n "Ingest API key:"   | systemd-creds encrypt --name=ingest-api-key - /etc/blk-sync/ingest-api-key.cred
-  3. Test (runs with the same credentials as the service):
-       systemd-run --pty --wait -p User=blk-sync -p LoadCredentialEncrypted=ldap-password:/etc/blk-sync/ldap-password.cred \
-         -p LoadCredentialEncrypted=ingest-api-key:/etc/blk-sync/ingest-api-key.cred /opt/blk-sync/blk-sync --config /etc/blk-sync/config.json check
-  4. Start:  systemctl enable --now blk-sync   and watch:  journalctl -u blk-sync -f
+  3. Start:  systemctl enable --now blk-sync   and watch:  journalctl -u blk-sync -f
 EOF

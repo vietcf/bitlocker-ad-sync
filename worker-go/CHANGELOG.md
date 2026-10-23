@@ -3,6 +3,16 @@
 Định dạng theo [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/), phiên bản theo
 [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [1.3.0] - 2026-10-23
+
+### Đổi
+
+- Bí mật (`Ldap.Password`, `Ingest.ApiKey`) ghi **thẳng trong `config.json`** (quyền `0640`, chủ `root`, nhóm `blk-sync`), không còn dùng systemd credential trong hướng dẫn và unit. `blk-sync.service` bỏ `LoadCredentialEncrypted`; `install.sh` bỏ bước tạo credential. Cấu hình cũ dạng `cred:`, `file:`, `env:` vẫn đọc được.
+
+### Khi nâng cấp
+
+- Máy đang dùng `cred:ldap-password` / `cred:ingest-api-key`: sau `install.sh --update` (unit mới không còn nạp credential), sửa `config.json` thành mật khẩu và API key thật rồi `systemctl restart blk-sync`. Máy dùng `file:` hoặc `env:` không phải làm gì.
+
 ## [1.2.0] - 2026-10-20
 
 ### Thêm

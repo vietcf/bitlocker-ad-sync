@@ -7,7 +7,7 @@ dữ liệu trên ổ đĩa đã mã hóa, vì vậy các điểm dưới đây 
 
 | Dữ liệu | Ở đâu | Bảo vệ |
 | --- | --- | --- |
-| Mật khẩu tài khoản đọc AD | Bí mật `Ldap.Password` | systemd credential mã hóa (`cred:`), hoặc file `0400` |
+| Mật khẩu tài khoản đọc AD | Bí mật `Ldap.Password` | ghi trong `config.json`, quyền `0640` (chỉ root và user `blk-sync` đọc được) |
 | API key của ingest | Bí mật `Ingest.ApiKey` | Như trên |
 | Recovery key | Chỉ trong bộ nhớ, khi gửi lên server | Không bao giờ ghi ra file hay log; kiểu dữ liệu in ra `[REDACTED]` |
 | `state.json` | `/var/lib/blk-sync` | Không có bí mật (DC, invocationId, ngày full) |

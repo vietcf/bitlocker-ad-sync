@@ -457,19 +457,9 @@ dotnet publish src/BitlockerSync.Worker -c Release -o .\publish
 
 Chép thư mục `publish` (kèm thư mục `scripts`) lên máy worker, ví dụ vào `C:\BitlockerSync`.
 
-### 4.3. Mã hóa secret bằng DPAPI
+### 4.3. Lưu bí mật
 
-Không ghi mật khẩu hay API key dạng rõ vào file cấu hình. Mã hóa trên **chính máy worker**: chuỗi
-mã hóa chỉ giải được trên máy đó.
-
-```powershell
-cd C:\BitlockerSync
-.\BitlockerSync.Worker.exe protect
-# Nhập secret (không hiện ra màn hình) -> nhận chuỗi dpapi:AQAAANCMnd8B...
-```
-
-Dán chuỗi `dpapi:...` vào `Ingest:ApiKey`, và vào `Ldap:Password` nếu dùng user + mật khẩu thay
-vì gMSA.
+Ghi thẳng vào `appsettings.json`: `Ingest:ApiKey` (`INGEST_API_KEY` của server) và `Ldap:Password` nếu dùng user + mật khẩu thay vì gMSA. `install-service.ps1` khóa quyền file này (chỉ Administrators, SYSTEM và tài khoản service đọc được).
 
 ### 4.4. Sửa `C:\BitlockerSync\appsettings.json`
 
@@ -482,7 +472,7 @@ vì gMSA.
     "Auth": "Negotiate",          // Negotiate: dùng tài khoản chạy service (gMSA) hoặc Username/Password
                                   // Basic: simple bind bằng Username/Password
     "Username": "",               // để trống khi dùng gMSA; ví dụ "CORP\\svc-blk"
-    "Password": "",               // "dpapi:..." nếu có Username
+    "Password": "",               // mật khẩu nếu có Username
     "BaseDn": "DC=corp,DC=local",
     "SearchBases": [],            // để trống = cả BaseDn; hoặc danh sách OU được cấp quyền đọc (xem dưới)
     "ExcludeOperatingSystems": [],  // tùy chọn: bỏ qua máy theo hệ điều hành, ví dụ ["Windows Server*"] (xem dưới)
@@ -492,7 +482,7 @@ vì gMSA.
   },
   "Ingest": {
     "BaseUrl": "https://blk.corp.local:8443/api/ingest",
-    "ApiKey": "dpapi:...",               // giá trị INGEST_API_KEY đã mã hóa (cách xác thực duy nhất)
+    "ApiKey": "INGEST_API_KEY",          // giá trị INGEST_API_KEY của server (cách xác thực duy nhất)
     "CaFile": "",                        // CA gốc dạng PEM nếu Windows chưa tin chứng chỉ của server
     "BatchSize": 500,
     "RetryForMinutes": 60
@@ -555,7 +545,7 @@ Chọn một trong ba cách đọc AD, sửa `appsettings.json` cho khớp, rồ
 | --- | --- | --- | --- | --- |
 | **A. gMSA** (khuyến nghị) | `CORP\gmsa-blk$` | `Negotiate` | để trống | AD tự quản lý và đổi |
 | **B. Tài khoản domain chạy service** | `CORP\svc-blk` | `Negotiate` | để trống | Windows lưu khi cài service |
-| **C. User + mật khẩu trong file cấu hình** | `NT SERVICE\BitlockerSync` (tài khoản ảo) | `Negotiate` hoặc `Basic` | `CORP\svc-blk` / `dpapi:...` | `appsettings.json`, mã hóa DPAPI |
+| **C. User + mật khẩu trong file cấu hình** | `NT SERVICE\BitlockerSync` (tài khoản ảo) | `Negotiate` hoặc `Basic` | `CORP\svc-blk` / mật khẩu | `appsettings.json` (khóa quyền file) |
 
 **Cách A (gMSA)** và **cách B (tài khoản domain)**:
 
@@ -573,23 +563,22 @@ Cách B cần lưu ý:
 
 **Cách C (user + mật khẩu trong `appsettings.json`)**: service chạy bằng tài khoản ảo, không cần mật khẩu; worker bind LDAP bằng user và mật khẩu trong file. Cũng là cách duy nhất khi máy worker **không join domain**.
 
-1. Mã hóa mật khẩu trên chính máy worker: `cd C:\BitlockerSync` rồi `.\BitlockerSync.Worker.exe protect` (nhập mật khẩu, nhận chuỗi `dpapi:...`).
-2. Sửa `appsettings.json`:
+1. Sửa `appsettings.json`:
 
    ```jsonc
    "Ldap": {
      "Protocol": "Ldaps",
      "Auth": "Negotiate",            // hoặc "Basic" (simple bind, bắt buộc Ldaps hoặc StartTls)
      "Username": "CORP\\svc-blk",    // hoặc "svc-blk@corp.local"; trong JSON phải viết \\
-     "Password": "dpapi:AQAAANCMnd8B...",
+     "Password": "MAT_KHAU_AD",
      ...
    }
    ```
 
-3. Cài service: `C:\BitlockerSync\scripts\install-service.ps1 -Account 'NT SERVICE\BitlockerSync' -InstallDir C:\BitlockerSync`, rồi `Start-Service BitlockerSync`.
+2. Cài service: `C:\BitlockerSync\scripts\install-service.ps1 -Account 'NT SERVICE\BitlockerSync' -InstallDir C:\BitlockerSync`, rồi `Start-Service BitlockerSync`.
 
-- Chuỗi `dpapi:` chỉ giải mã được trên đúng máy đã mã hóa nhưng mọi tiến trình trên máy đó đều giải mã được, nên script khóa quyền `appsettings.json` (chỉ Administrators, SYSTEM và tài khoản service). Chép cấu hình sang máy khác thì chạy lại `protect`.
-- Đổi mật khẩu `svc-blk` trên AD: chạy lại `protect`, dán chuỗi mới vào `Ldap:Password`, `Restart-Service BitlockerSync`.
+- Mật khẩu nằm trong `appsettings.json` nên script khóa quyền file này (chỉ Administrators, SYSTEM và tài khoản service). Đừng chép file sang chỗ người khác đọc được.
+- Đổi mật khẩu `svc-blk` trên AD: sửa `Ldap:Password`, `Restart-Service BitlockerSync`.
 - Máy không join domain: dùng `Ldaps`, đặt `Ldap:Servers` là tên DC phân giải được, và import CA đã cấp chứng chỉ LDAPS của DC vào `LocalMachine\Trusted Root Certification Authorities`.
 
 **Sau khi cài (cả ba cách)**
@@ -617,7 +606,7 @@ Cập nhật **server trước, worker sau** (server mới nhận được dữ 
    D:\drop\BitlockerSync-1.1\scripts\update-worker.ps1 -Source D:\drop\BitlockerSync-1.1 -InstallDir C:\BitlockerSync
    ```
 
-   Script: sao lưu `C:\BitlockerSync` sang `.bak-<ngày-giờ>`; dừng service (lượt đang dở được đóng với mã `cancelled`, không cảnh báo, lượt sau đọc lại phần thiếu); chép bản mới đè lên **trừ `appsettings.json`** (giữ cấu hình, secret và phân quyền; bản mẫu mới lưu thành `appsettings.new.json`); chạy `check` (lỗi thì **để service dừng** để bạn sửa hoặc quay lại); khởi động lại. Trạng thái sync (`state.json`) không đổi nên delta tiếp tục từ mốc cũ; không cần chạy lại `install-service.ps1` hay `protect`.
+   Script: sao lưu `C:\BitlockerSync` sang `.bak-<ngày-giờ>`; dừng service (lượt đang dở được đóng với mã `cancelled`, không cảnh báo, lượt sau đọc lại phần thiếu); chép bản mới đè lên **trừ `appsettings.json`** (giữ cấu hình, secret và phân quyền; bản mẫu mới lưu thành `appsettings.new.json`); chạy `check` (lỗi thì **để service dừng** để bạn sửa hoặc quay lại); khởi động lại. Trạng thái sync (`state.json`) không đổi nên delta tiếp tục từ mốc cũ; không cần chạy lại `install-service.ps1`.
 
 3. Kiểm tra: so `appsettings.new.json` với `appsettings.json`, chép tay thiết lập mới cần dùng rồi `Restart-Service BitlockerSync` (thiết lập vắng mặt dùng mặc định); lượt sync kế tiếp báo `success` (Event Viewer, source `BitlockerSync`) và Quản trị > Sync AD có heartbeat mới (bấm yêu cầu sync để kiểm tra ngay). Nếu bản mới đọc thêm thuộc tính AD, dữ liệu cũ chỉ được bổ sung ở lượt **full** tới (01:00) trừ khi bạn bấm yêu cầu sync full.
 
@@ -665,7 +654,7 @@ Mặc định chạy được ngay không phải đổi gì trên AD, nhưng ghi
   "Servers": [ "dc01.corp.local", "dc02.corp.local" ],
   "Protocol": "Ldap",
   "Username": "svc-blk@corp.local",
-  "Password": "cred:ldap-password",
+  "Password": "MAT_KHAU_AD",
   "BaseDn": "DC=corp,DC=local"
 }
 ```
@@ -700,10 +689,10 @@ Trên máy build (Linux, kể cả CentOS 7.6 đã cài Go; hoặc Windows):
 ```bash
 cd worker-go
 go test ./...
-make package VERSION=1.2.0
+make package VERSION=1.3.0
 ```
 
-Kết quả: `worker-go/dist/blk-sync-1.2.0-linux-amd64.tar.gz`. Gói gồm:
+Kết quả: `worker-go/dist/blk-sync-1.3.0-linux-amd64.tar.gz`. Gói gồm:
 - binary `blk-sync` (build tĩnh);
 - `install.sh`, `blk-sync.service` (systemd mới) và `blk-sync-legacy.service` (systemd cũ như CentOS 7);
 - `config.example.json`, `README.md`.
@@ -713,13 +702,13 @@ Máy chủ đích là ARM thì dùng `make linux-arm64`. Không có `make` (Wind
 ### 4B.5. Cài lên máy chủ
 
 ```bash
-scp worker-go/dist/blk-sync-1.2.0-linux-amd64.tar.gz admin@sync01:/tmp/
+scp worker-go/dist/blk-sync-1.3.0-linux-amd64.tar.gz admin@sync01:/tmp/
 ssh admin@sync01
-mkdir /tmp/blk-sync && tar -C /tmp/blk-sync -xzf /tmp/blk-sync-1.2.0-linux-amd64.tar.gz
+mkdir /tmp/blk-sync && tar -C /tmp/blk-sync -xzf /tmp/blk-sync-1.3.0-linux-amd64.tar.gz
 cd /tmp/blk-sync && sudo ./install.sh
 ```
 
-Script tạo user hệ thống `blk-sync` và cài các file. Nó tự nhận biết systemd: từ v250 dùng `blk-sync.service` (bí mật dạng credential mã hóa, mục 4B.7); cũ hơn (CentOS/RHEL 7 là v219) dùng `blk-sync-legacy.service`, tạo sẵn `/var/lib/blk-sync` và để bí mật trong file.
+Script tạo user hệ thống `blk-sync` và cài các file. Nó tự nhận biết systemd: từ v250 dùng `blk-sync.service`; cũ hơn (CentOS/RHEL 7 là v219) dùng `blk-sync-legacy.service` và tạo sẵn `/var/lib/blk-sync`. Cả hai đều lấy bí mật từ `config.json` (mục 4B.7).
 
 | File | Nội dung |
 | --- | --- |
@@ -743,7 +732,7 @@ Các khóa cần sửa:
   "Servers": [ "dc01.corp.local", "dc02.corp.local" ],
   "Protocol": "Ldap",                     // mặc định (389, không mã hóa); Ldaps/StartTls khi DC có chứng chỉ
   "Username": "svc-blk@corp.local",
-  "Password": "cred:ldap-password",       // systemd credential, tạo ở 4B.7
+  "Password": "MAT_KHAU_AD",              // ghi thẳng, mục 4B.7
   "BaseDn": "DC=corp,DC=local",
   "SearchBases": [],                      // hoặc danh sách OU tài khoản được đọc
   "ExcludeOperatingSystems": [],          // tùy chọn: bỏ qua máy theo hệ điều hành, ví dụ ["Windows Server*"]
@@ -751,7 +740,7 @@ Các khóa cần sửa:
 },
 "Ingest": {
   "BaseUrl": "https://blk.corp.local:8443/api/ingest",
-  "ApiKey": "cred:ingest-api-key"         // mặc định chỉ cần API key
+  "ApiKey": "INGEST_API_KEY"              // ghi thẳng, lấy từ server/.env
 }
 ```
 
@@ -763,32 +752,14 @@ máy worker: thêm IP đó vào `INGEST_ALLOWED_IPS`. **Để trống = cho mọ
 
 ### 4B.7. Lưu bí mật
 
-Mật khẩu AD và API key lưu thành **systemd credential mã hóa**. Unit đã khai báo sẵn hai credential này.
-Giá trị được gõ ở dấu nhắc, không nằm trong lịch sử shell:
-
-```bash
-sudo sh -c 'systemd-ask-password -n "AD password:" | systemd-creds encrypt --name=ldap-password - /etc/blk-sync/ldap-password.cred'
-```
-
-```bash
-sudo sh -c 'systemd-ask-password -n "Ingest API key:" | systemd-creds encrypt --name=ingest-api-key - /etc/blk-sync/ingest-api-key.cred'
-```
-
-**systemd cũ** (CentOS/RHEL 7, không có `systemd-creds`, trước v250): `install.sh` đã cài `blk-sync-legacy.service` (không có `LoadCredentialEncrypted`). Ghi bí mật vào file chỉ user `blk-sync` đọc được và trỏ cấu hình tới file đó:
-
-```bash
-read -rsp "AD password: " p; echo; (umask 077; printf '%s' "$p" > /etc/blk-sync/ldap-password); chown blk-sync:blk-sync /etc/blk-sync/ldap-password; unset p
-read -rsp "Ingest API key: " p; echo; (umask 077; printf '%s' "$p" > /etc/blk-sync/ingest-api-key); chown blk-sync:blk-sync /etc/blk-sync/ingest-api-key; unset p
-```
-
-Trong `/etc/blk-sync/config.json`: `"Password": "file:/etc/blk-sync/ldap-password"` (mục `Ldap`) và `"ApiKey": "file:/etc/blk-sync/ingest-api-key"` (mục `Ingest`). Thử bằng `sudo -u blk-sync /opt/blk-sync/blk-sync --config /etc/blk-sync/config.json check`.
+Ghi thẳng vào `/etc/blk-sync/config.json`: `Ldap.Password` (mật khẩu tài khoản đọc AD) và `Ingest.ApiKey` (`INGEST_API_KEY` của server). File được cài với quyền `0640` (chủ `root`, nhóm `blk-sync`), chỉ service đọc được. Thử: `sudo -u blk-sync /opt/blk-sync/blk-sync --config /etc/blk-sync/config.json check`.
 
 ### 4B.8. Kiểm tra rồi bật service
 
-Chạy `check` bằng đúng user và credential của service:
+Chạy `check` bằng user của service:
 
 ```bash
-sudo systemd-run --pty --wait -p User=blk-sync -p LoadCredentialEncrypted=ldap-password:/etc/blk-sync/ldap-password.cred -p LoadCredentialEncrypted=ingest-api-key:/etc/blk-sync/ingest-api-key.cred /opt/blk-sync/blk-sync --config /etc/blk-sync/config.json check
+sudo -u blk-sync /opt/blk-sync/blk-sync --config /etc/blk-sync/config.json check
 ```
 
 Kết quả tốt in `LDAP OK: ...` và một dòng `OK` cho mỗi OU. Mã thoát:
@@ -813,7 +784,7 @@ sẽ tranh nhau mở lượt sync (409 `run_in_progress`; lượt của worker �
 
 ### 4B.9. Cập nhật và gỡ cài đặt
 
-Cập nhật: build gói mới (`make package VERSION=1.2.0`), chép lên máy chủ, giải nén, rồi:
+Cập nhật: build gói mới (`make package VERSION=1.3.0`), chép lên máy chủ, giải nén, rồi:
 
 ```bash
 sudo ./install.sh --update
@@ -1127,7 +1098,7 @@ Giờ đọc AD của **worker** (delta 15 phút, full 01:00, heartbeat 5 phút)
 | Đăng nhập báo tài khoản bị khóa (kể cả Admin) | Nhập sai mật khẩu quá số lần cho phép (Quản trị > Bảo mật) | Chờ hết thời gian khóa, hoặc Admin khác mở khóa; không còn Admin nào thì `docker compose exec server node src/cli/users.js unlock <tên>` (mục 6.14) |
 | Đăng nhập AD báo không kết nối được máy chủ AD | Sai `LDAP_SERVERS` / `LDAP_PROTOCOL`, chặn cổng 389 hoặc 636, hoặc app không tin CA của DC | Thử `openssl s_client -connect dc01.corp.local:636`, đặt `LDAP_CA_FILE` |
 | Tài khoản AD "không khớp" | Tài khoản AD bị xóa rồi tạo lại | Admin bấm "Gỡ liên kết AD" cho user đó |
-| Worker nhận 401 | Sai API key | So khớp `INGEST_API_KEY` với `Ingest:ApiKey` (mã hóa lại bằng `protect`) |
+| Worker nhận 401 | Sai API key | So khớp `INGEST_API_KEY` với `Ingest:ApiKey` |
 | Worker nhận 403 | `INGEST_ALLOWED_IPS` có giá trị mà IP worker không nằm trong đó | Log server ghi `ingest: address not allowed` kèm IP nhìn thấy; bổ sung IP rồi khởi động lại server |
 | Worker không kết nối được HTTPS (lỗi chứng chỉ) | Máy worker không tin CA, hoặc `BaseUrl` dùng IP / tên không có trong chứng chỉ | Mục 3.6: đặt `Ingest.CaFile`, dùng đúng tên |
 | Key không có mật khẩu (`keysEmptyPassword` > 0) | Tài khoản worker thiếu quyền đọc `msFVE-RecoveryPassword` | Cấp quyền theo mục 4.1, chạy `check` |

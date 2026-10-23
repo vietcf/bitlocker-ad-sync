@@ -41,22 +41,17 @@ scripts/update-worker.ps1     cập nhật lên bản mới, giữ nguyên appse
 | `Ldap:Servers` | Danh sách DC theo thứ tự. DC đầu là DC chính, các DC sau dự phòng. Đổi DC sẽ buộc chạy full |
 | `Ldap:Protocol` | `Ldaps` (636, mặc định) · `StartTls` (389 + TLS) · `Ldap` (389, không TLS) |
 | `Ldap:Auth` | `Negotiate` (mặc định: tài khoản chạy service/gMSA, hoặc `Username` + `Password`) · `Basic` (simple bind bằng `Username` + `Password`) |
-| `Ldap:Username` / `Ldap:Password` | `CORP\svc-blk` hoặc `svc-blk@corp.local`; mật khẩu dạng `dpapi:...` (xem bên dưới) |
+| `Ldap:Username` / `Ldap:Password` | `CORP\svc-blk` hoặc `svc-blk@corp.local`; mật khẩu ghi thẳng (khóa quyền file) |
 | `Ldap:ExcludeOperatingSystems` | Tùy chọn: mẫu hệ điều hành cần bỏ qua cùng key của máy, ví dụ `["Windows Server*"]` (`*` là ký tự đại diện). Mặc định `[]` = đọc tất cả |
 | `Ldap:BaseDn`, `Ldap:SearchBases` | DN của domain; danh sách OU cần đọc (để trống = cả `BaseDn`). Các OU được đọc **lần lượt** trong cùng một lượt sync; OU phải nằm trong `BaseDn`; OU trùng hoặc OU con của OU đã có được bỏ qua. Một OU không đọc được (không tồn tại, thiếu quyền) làm cả lượt dừng với mã `ldap_search_base_failed`, để lượt full không coi máy trong OU đó là "Không còn trong phạm vi giám sát" |
 | `Ldap:AllowInsecure` | `Ldap` + `Basic` gửi mật khẩu và mọi key dạng rõ, nên worker từ chối chạy trừ khi đặt `true` (chỉ dùng cho lab). `Ldap` + `Negotiate` được chấp nhận vì Kerberos signing + sealing mã hóa phiên |
 | `Ingest:BaseUrl` | `https://blk.corp.local:8443/api/ingest` (chỉ localhost mới được dùng http) |
-| `Ingest:ApiKey` | API key (`dpapi:...`): cách xác thực duy nhất của worker, gửi qua HTTPS |
+| `Ingest:ApiKey` | API key (`INGEST_API_KEY` của server) ghi thẳng: cách xác thực duy nhất của worker, gửi qua HTTPS |
 | `Ingest:CaFile` | File PEM của CA gốc khi Windows chưa tin chứng chỉ của server (dev: CA tự ký trong `cert/`) |
 | `Ingest:SkipCertificateValidation` | `true` = không kiểm tra chứng chỉ server (chứng chỉ tự ký, chỉ cho lab; có cảnh báo trong log). Mặc định `false` |
 | `Schedule:*` | Chu kỳ chạy, giờ full sync, worker id |
 
-Trên máy chủ, không ghi secret dạng rõ vào file. Mã hóa bằng DPAPI cho đúng máy đó:
-
-```powershell
-.\BitlockerSync.Worker.exe protect    # hỏi secret mà không hiện lên màn hình (không lưu vào lịch sử shell)
-# -> dpapi:AQAAANCMnd8BFdERjHoAwE...  : dán chuỗi này làm giá trị
-```
+Bí mật ghi thẳng trong `appsettings.json`; `scripts/install-service.ps1` khóa quyền file (chỉ Administrators, SYSTEM và tài khoản service đọc được).
 
 ## Quyền trên Active Directory
 
@@ -113,4 +108,4 @@ DOTNET_ENVIRONMENT=Development dotnet run -- run-once full
 ```
 
 Với AD lab: đặt `Ldap:Source` = `Ldap`, điền `Servers`, `BaseDn` và phần xác thực trong
-`appsettings.Development.json` (mật khẩu dạng `dpapi:...`), rồi chạy `dotnet run -- check`.
+`appsettings.Development.json` (mật khẩu ghi thẳng), rồi chạy `dotnet run -- check`.

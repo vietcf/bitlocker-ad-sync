@@ -1,5 +1,5 @@
 # blk-sync (Go). Needs Go 1.26+.
-VERSION ?= 1.2.0
+VERSION ?= 1.3.0
 LDFLAGS := -s -w -X main.version=$(VERSION)
 
 .PHONY: build linux linux-arm64 test vet package clean

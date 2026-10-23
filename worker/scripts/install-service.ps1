@@ -57,8 +57,8 @@ sc.exe description $ServiceName "Syncs BitLocker recovery keys from Active Direc
 # Restart after 1 minute on any crash (design doc: Windows Service recovery).
 sc.exe failure $ServiceName reset= 86400 actions= restart/60000/restart/60000/restart/60000 | Out-Null
 
-# appsettings.json may hold dpapi: secrets, which any process on this machine could decrypt
-# (machine scope): only administrators, SYSTEM and the service account may read it.
+# appsettings.json holds the secrets (Ldap:Password, Ingest:ApiKey) in plain text:
+# only administrators, SYSTEM and the service account may read it.
 $settings = Join-Path $InstallDir 'appsettings.json'
 icacls $settings /inheritance:r /grant:r '*S-1-5-32-544:F' '*S-1-5-18:F' "${Account}:R" | Out-Null
 

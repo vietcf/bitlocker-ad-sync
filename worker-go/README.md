@@ -32,7 +32,7 @@ Tài liệu liên quan: [CHANGELOG.md](CHANGELOG.md) · [SECURITY.md](SECURITY.m
 | Kết nối AD | Ldaps, StartTls, Ldap | Ldap (mặc định), Ldaps, StartTls |
 | Xác thực AD | Negotiate (gMSA / Kerberos / NTLM) hoặc Basic | **Chỉ Basic** (simple bind bằng user + mật khẩu) |
 | LDAP thường (389) | Với Negotiate: Kerberos tự mã hóa phiên | **Không mã hóa** (chỉ dùng trên mạng tin cậy) |
-| Cất bí mật | `dpapi:...` | `cred:` (systemd credential), `file:`, `env:` |
+| Cất bí mật | ghi thẳng trong file cấu hình (khóa quyền file) | ghi thẳng trong `config.json` (quyền `0640`) |
 | Xác thực tới server | API key qua HTTPS | API key qua HTTPS (giống hệt) |
 | Tin chứng chỉ server không có trong máy | `Ingest:CaFile` (PEM) | `Ingest.CaFile` (PEM) |
 | Lệnh | `run-once`, `check`, `protect` | `run-once`, `check`, `version` (không có `protect`) |
@@ -87,7 +87,7 @@ LDAP signing sẽ từ chối simple bind trên 389 (lỗi `ldap_bind_failed`, L
   "Servers": [ "dc01.corp.local", "dc02.corp.local" ],
   "Protocol": "Ldap",            // mặc định: cổng 389, không TLS
   "Username": "svc-blk@corp.local",
-  "Password": "cred:ldap-password",
+  "Password": "MAT_KHAU_AD",
   "BaseDn": "DC=corp,DC=local"
 }
 ```
@@ -121,7 +121,7 @@ worker-go/
   internal/syncrun/           một lượt sync; file state.json
   internal/scheduler/         vòng lặp: heartbeat, delta, full hằng đêm, yêu cầu từ Admin HQ
   internal/testfakes/         AD giả và server giả cho test
-  deploy/blk-sync.service     unit systemd (có hardening, systemd credentials)
+  deploy/blk-sync.service     unit systemd (có hardening)
   deploy/install.sh           cài mới / cập nhật (tự quay lại bản cũ nếu lỗi)
   scripts/lab-test.ps1        thử với AD lab trên Windows (hỏi mật khẩu ở dấu nhắc ẩn)
   config.example.json         mẫu cấu hình có chú thích (commit)
@@ -177,16 +177,7 @@ File là JSON, cho phép comment `//`, `/* */` và dấu phẩy thừa, giống 
 ghi đè được bằng biến môi trường `Mục__Khóa` (không phân biệt hoa thường), ví dụ `Ldap__Servers=dc01,dc02`,
 `Schedule__DeltaEveryMinutes=10`. Danh sách đầy đủ ở [docs/configuration.md](docs/configuration.md).
 
-**Bí mật** (`Ldap.Password`, `Ingest.ApiKey`) không ghi thẳng vào file. Dùng một trong các dạng:
-
-| Dạng | Đọc từ |
-| --- | --- |
-| `cred:ldap-password` | systemd credential (khuyến nghị: mã hóa bằng khóa của máy, TPM nếu có) |
-| `file:/etc/blk-sync/ldap-password` | file chỉ user của service đọc được (`chmod 0400`) |
-| `env:BLK_LDAP_PASSWORD` | biến môi trường |
-| giá trị thường | chính giá trị đó (chỉ dùng khi thử nhanh) |
-
-Giá trị `dpapi:...` của bản .NET không dùng được trên Linux.
+**Bí mật** (`Ldap.Password`, `Ingest.ApiKey`) ghi thẳng trong `config.json`. File chỉ root và user `blk-sync` đọc được (`install.sh` đặt quyền `0640`); đừng chép file này ra chỗ người khác đọc được. Cũng dùng được `file:/đường/dẫn` hoặc `env:TÊN` nếu bạn muốn tách riêng, nhưng không cần.
 
 Tối thiểu cần sửa trong `config.json`: `Ldap.Servers`, `Ldap.Protocol`, `Ldap.Username`, `Ldap.Password`,
 `Ldap.BaseDn`, `Ldap.SearchBases` (nếu chỉ được đọc vài OU), `Ingest.BaseUrl`, `Ingest.ApiKey`.
@@ -196,8 +187,7 @@ Tối thiểu cần sửa trong `config.json`: `Ldap.Servers`, `Ldap.Protocol`, 
 Worker xác thực bằng **API key qua HTTPS**, và server chỉ nhận từ **IP của máy worker**. Không có cách nào khác.
 
 1. Lấy giá trị `INGEST_API_KEY` trong `server/.env` của server (chuỗi ngẫu nhiên, tối thiểu 32 ký tự).
-2. Lưu nó làm bí mật cho worker (systemd credential `ingest-api-key`, mục 6.3) và đặt
-   `"ApiKey": "cred:ingest-api-key"`.
+2. Dán nó vào `config.json`: `"ApiKey": "<giá trị>"`.
 3. Thêm IP máy worker vào `INGEST_ALLOWED_IPS` của server.
 4. `BaseUrl` dùng `https://` và đúng tên trong chứng chỉ của server (ví dụ `https://blk.corp.local:8443/api/ingest`).
    Máy worker chưa tin CA đã cấp chứng chỉ đó thì đặt `CaFile` là file PEM của CA gốc
@@ -207,7 +197,7 @@ Worker gửi key trong header `Authorization: Bearer <key>`. Server trả 401 `b
 không nằm trong danh sách.
 
 Đổi key: tạo key mới (`openssl rand -base64 48`), cập nhật `INGEST_API_KEY` trên server rồi khởi động lại
-server, sau đó cập nhật credential của worker và `systemctl restart blk-sync`. Giữa hai bước worker nhận
+server, sau đó sửa `ApiKey` trong `config.json` của worker và `systemctl restart blk-sync`. Giữa hai bước worker nhận
 401 và tự thử lại (trong `RetryForMinutes`).
 
 ## 6. Cài lên máy chủ Linux
@@ -248,27 +238,16 @@ Script **không** tự bật service.
 sudo nano /etc/blk-sync/config.json
 ```
 
-Lưu bí mật thành systemd credential đã mã hóa. Bí mật được gõ ở dấu nhắc, không nằm trong lịch sử shell:
-
-```bash
-sudo sh -c 'systemd-ask-password -n "AD password:" | systemd-creds encrypt --name=ldap-password - /etc/blk-sync/ldap-password.cred'
-```
-
-```bash
-sudo sh -c 'systemd-ask-password -n "Ingest API key:" | systemd-creds encrypt --name=ingest-api-key - /etc/blk-sync/ingest-api-key.cred'
-```
-
-Trong `config.json` đặt `"Password": "cred:ldap-password"` và `"ApiKey": "cred:ingest-api-key"`. Unit
-`blk-sync.service` đã khai báo hai credential này (`LoadCredentialEncrypted=`). **systemd cũ** (CentOS/RHEL 7 là systemd 219, không có `systemd-creds`): `install.sh` tự cài `blk-sync-legacy.service` (không có `LoadCredentialEncrypted` và `StateDirectory`) và tạo sẵn `/var/lib/blk-sync`; bí mật để trong file `chmod 0400`, chủ sở hữu `blk-sync`, cấu hình `"Password": "file:/etc/blk-sync/ldap-password"` và `"ApiKey": "file:/etc/blk-sync/ingest-api-key"`.
+Điền thẳng `Ldap.Password` (mật khẩu tài khoản đọc AD) và `Ingest.ApiKey` vào file này. File được cài với quyền `0640` (chủ `root`, nhóm `blk-sync`), chỉ service đọc được.
 
 Binary là bản tĩnh (`CGO_ENABLED=0`): build một lần ở máy có Go 1.26+ rồi chép sang máy chủ chạy ngay, không cần cài Go hay thư viện (đã thử chạy trên CentOS 7.9).
 
 ### 6.4. Kiểm tra rồi bật service
 
-Chạy `check` với đúng user và credential của service:
+Chạy `check` bằng user của service:
 
 ```bash
-sudo systemd-run --pty --wait -p User=blk-sync -p LoadCredentialEncrypted=ldap-password:/etc/blk-sync/ldap-password.cred -p LoadCredentialEncrypted=ingest-api-key:/etc/blk-sync/ingest-api-key.cred /opt/blk-sync/blk-sync --config /etc/blk-sync/config.json check
+sudo -u blk-sync /opt/blk-sync/blk-sync --config /etc/blk-sync/config.json check
 ```
 
 Kết quả mong đợi:
@@ -338,5 +317,4 @@ Lịch chạy giống bản .NET:
 | `ldap_search_base_failed` | OU trong `SearchBases` sai tên hoặc tài khoản không có quyền | `check` cho biết OU nào `FAIL` |
 | `check` báo key "without a readable password" | Thiếu quyền đọc `msFVE-RecoveryPassword` | Cấp quyền như mục 6.1 |
 | Worker không khởi động: `invalid configuration` | Cấu hình sai | Đọc danh sách lỗi in ra, sửa `config.json` |
-| `secret: cred: needs a systemd credential` | Chạy tay nhưng cấu hình dùng `cred:` | Chạy qua `systemd-run` như mục 6.4, hoặc tạm dùng `env:` |
 | Server trả 409 `run_in_progress` | Bản .NET hoặc worker khác vẫn đang chạy | Chỉ chạy một worker |

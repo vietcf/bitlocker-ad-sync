@@ -16,11 +16,6 @@ TimeoutStopSec=30
 StateDirectory=blk-sync
 StateDirectoryMode=0750
 
-# Secrets as systemd credentials: config "cred:ldap-password" / "cred:ingest-api-key".
-# Encrypted with this host's key (and TPM if present): systemd-creds encrypt --name=ldap-password - /etc/blk-sync/ldap-password.cred
-LoadCredentialEncrypted=ldap-password:/etc/blk-sync/ldap-password.cred
-LoadCredentialEncrypted=ingest-api-key:/etc/blk-sync/ingest-api-key.cred
-
 # Hardening: the worker only needs the network, its state directory and its config.
 NoNewPrivileges=yes
 ProtectSystem=strict

@@ -7,7 +7,7 @@ dấu phẩy, ví dụ `Ldap__SearchBases=OU=HN,DC=corp,DC=local;...` không h�
 
 Đường dẫn tương đối (`StateFile`, `CaFile`, `JsonFilePath`, file chứng chỉ) tính từ thư mục chứa file cấu hình.
 
-Bí mật (đánh dấu 🔒) nhận các dạng `cred:TÊN` (systemd credential), `file:/đường/dẫn`, `env:TÊN_BIẾN`
+Bí mật (đánh dấu 🔒) ghi thẳng giá trị trong file; cũng nhận `file:/đường/dẫn` và `env:TÊN_BIẾN` (và `cred:TÊN` của systemd credential)
 hoặc giá trị thường (chỉ khi thử nhanh).
 
 ## Ldap
@@ -67,5 +67,5 @@ Xác thực: **API key qua HTTPS**, server còn kiểm tra IP worker (README m�
 | Biến | Ý nghĩa |
 | --- | --- |
 | `BLKSYNC_CONFIG` | Đường dẫn file cấu hình (khi không có `--config`) |
-| `CREDENTIALS_DIRECTORY` | Do systemd đặt; nơi đọc các bí mật `cred:` |
+| `CREDENTIALS_DIRECTORY` | Do systemd đặt; chỉ dùng nếu bạn tự dùng bí mật `cred:` |
 | `TZ` | Múi giờ cho `FullAt` (mặc định múi giờ của máy) |
