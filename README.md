@@ -79,17 +79,16 @@ docker compose exec server node src/cli/users.js disable-2fa admin   # mất 2 b
 
 ### 2.4. Cấu hình và lệnh hay dùng
 
-LDAP, API key worker, cảnh báo... đặt trong `server/.env` (DB, cổng, secret dev đã có sẵn trong `docker-compose.yml`). Sau khi sửa `.env` phải tạo lại container:
+Không cần tạo file `.env`: mọi giá trị dev đã có sẵn trong `docker-compose.yml`. Lệnh hay dùng:
 
 ```bash
-cp server/.env.example server/.env
-docker compose up -d --force-recreate server
-
 docker compose exec server node src/db/seed-dev.js   # dữ liệu giả: 3 chi nhánh, ~20 máy
 docker compose run --rm migrate                      # áp dụng migration mới
 docker compose logs -f server                        # xem log
 docker compose down -v                               # xóa sạch, kể cả database
 ```
+
+Chỉ khi cần thử LDAP thật hoặc đổi cấu hình khác: `cp server/.env.example server/.env`, sửa, rồi `docker compose up -d --force-recreate server`.
 
 ### 2.5. Chạy test
 
