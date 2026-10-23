@@ -35,7 +35,7 @@ services:
       APP_NODE_PASSWORD: ${APP_NODE_PASSWORD:-dev_app_pw}
       BLK_BACKUP_PASSWORD: ${BLK_BACKUP_PASSWORD:-dev_backup_pw}
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
     volumes:
       - ./server/db/init:/docker-entrypoint-initdb.d:ro
       - blk-pg:/var/lib/postgresql/data
@@ -118,6 +118,16 @@ services:
         - action: rebuild
           path: ./server/package.json
 
+  # Lan dau: tao chung chi tu ky (cert/) bang openssl co san trong image postgres; co roi thi thoat ngay.
+  certs:
+    image: postgres:17.6
+    hostname: localhost
+    working_dir: /cert
+    entrypoint: ["bash", "-c", "[ -f server.crt ] || bash generate-self-signed.sh"]
+    volumes:
+      - ./cert:/cert
+    restart: "no"
+
   nginx:
     image: nginx:1.28.0-alpine
     ports:
@@ -129,7 +139,10 @@ services:
       - ./nginx/redirect.conf:/etc/nginx/blk-redirect.conf:ro
       - ./cert:/etc/nginx/cert:ro
     depends_on:
-      - server
+      server:
+        condition: service_started
+      certs:
+        condition: service_completed_successfully
     restart: unless-stopped
     logging: *logging
     healthcheck:

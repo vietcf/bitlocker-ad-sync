@@ -54,9 +54,10 @@ Docker Desktop (Windows/macOS) hoặc Docker Engine + Compose v2.24 trở lên (
 
 ```bash
 cd bitlocker-management
-bash cert/generate-self-signed.sh      # lần đầu: chứng chỉ tự ký cho HTTPS (thử nghiệm: chứng chỉ tự ký)
 docker compose up --build --watch
 ```
+
+Một lệnh là đủ, chỉ cần Docker. Lần đầu compose tự tạo chứng chỉ tự ký trong `cert/` (dịch vụ `certs`).
 
 Compose dựng `db` (PostgreSQL 17, có DB `blk` và `blk_test`; lần đầu tạo hai tài khoản `blk_owner`, `app_node`), `migrate` (chạy migration rồi thoát), `server` (app, không mở cổng ra ngoài; `--watch` tự cập nhật khi sửa `server/src`, `public`, `openapi`) và `nginx` (HTTPS cho web 443 và ingest 8443, cổng 80 chuyển sang HTTPS).
 
@@ -64,7 +65,7 @@ Compose dựng `db` (PostgreSQL 17, có DB `blk` và `blk_test`; lần đầu t�
 - https://localhost:8443/api/ingest: ingest API cho worker. https://localhost:8443/docs: Swagger ingest (cần API key).
 - `localhost:5432`: PostgreSQL, tài khoản dev `postgres` / `dev_postgres_pw`.
 
-Trình duyệt báo "không an toàn" vì chứng chỉ tự ký, tới khi bạn tin `cert/ca.crt` (mục 3.5 nói cách dùng chứng chỉ thật). Cổng 443/80 bị chiếm thì đổi: `HTTPS_PORT=8444 HTTP_PORT=8080 docker compose up -d`. Mặc định chỉ máy này truy cập được; cho máy khác vào: `BIND_ADDR=0.0.0.0`.
+Trình duyệt báo "không an toàn" vì chứng chỉ tự ký, tới khi bạn tin `cert/ca.crt` (mục 3.5 nói cách dùng chứng chỉ thật). Cổng bị chiếm thì đổi: `HTTPS_PORT=8444 HTTP_PORT=8080 DB_PORT=15432 docker compose up -d`. Mặc định chỉ máy này truy cập được; cho máy khác vào: `BIND_ADDR=0.0.0.0`.
 
 ### 2.3. Đăng nhập lần đầu
 
