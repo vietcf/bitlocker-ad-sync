@@ -111,9 +111,6 @@ const schema = z
       if (c.SESSION_SECRET.startsWith('dev-only')) {
         ctx.addIssue({ code: 'custom', path: ['SESSION_SECRET'], message: 'the dev placeholder must not be used in production' });
       }
-      if (c.INGEST_ALLOWED_IPS.length === 0) {
-        ctx.addIssue({ code: 'custom', path: ['INGEST_ALLOWED_IPS'], message: 'required in production' });
-      }
     }
   });
 

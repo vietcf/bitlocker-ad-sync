@@ -180,7 +180,9 @@ git clone git@github.com:vietcf/bitlocker-ad-sync.git blk && cd blk
 bash tools/install.sh --db docker
 ```
 
-Script hỏi IP máy worker, máy chủ AD (có thể để trống), múi giờ rồi tự làm hết: mật khẩu database tự sinh ở `server/db.env`, `server/.env`, khóa bí mật, chứng chỉ tự ký tạm, khởi động. Chạy lại an toàn (giữ khóa và mật khẩu cũ). Từ nay mọi lệnh `docker compose` của cách này cần thêm `--profile db`.
+Script hỏi IP máy worker, máy chủ AD (có thể để trống), múi giờ rồi tự làm hết: mật khẩu database tự sinh ở `server/db.env`, `server/.env`, khóa bí mật, chứng chỉ tự ký tạm, khởi động.
+
+**Chạy lại:** chưa có `data/postgres` (chưa có database) thì script **xóa cấu hình cũ** (`server/.env`, `server/db.env`, `.env`, `nginx/redirect.conf`) và tạo mới toàn bộ. Đã có `data/postgres` thì script **cảnh báo và thoát**, không đụng gì vào cấu hình hay database đang chạy. Cài lại từ đầu: `docker compose -f docker-compose.prod.yml --profile db down && rm -rf data` (**mất database**), rồi chạy lại. Cập nhật bản mới, giữ cấu hình: thêm `--update` (mục 3.7). Từ nay mọi lệnh `docker compose` của cách này cần thêm `--profile db`.
 
 **Bước 3. Kiểm tra.** Script in `OK` khi chạy được. Mở `https://<tên máy chủ>/`, đăng nhập `admin` / `admin`, đổi mật khẩu ngay.
 
@@ -409,10 +411,10 @@ Build sẵn image trên một máy có internet, đóng thành một file, chép
    bash load.sh
    ```
 
-4. Chạy lại installer: giữ nguyên các khóa cũ, chỉ bổ sung dòng còn thiếu (ví dụ `BACKUP_DATABASE_URL`), rồi khởi động bằng image vừa nạp (không build):
+4. Chạy lại installer với `--update`: giữ nguyên các khóa cũ, chỉ bổ sung dòng còn thiếu (ví dụ `BACKUP_DATABASE_URL`), rồi khởi động bằng image vừa nạp (không build). Thiếu `--update` mà đã có `data/postgres` thì script chỉ cảnh báo và thoát:
 
    ```bash
-   bash install.sh --db docker --up     # DB ngoài Docker: --db external
+   bash install.sh --db docker --update --up     # DB ngoài Docker: --db external --up
    ```
 
 5. Kiểm tra: `docker compose -f docker-compose.prod.yml --profile db ps` (`db`, `server`, `nginx` là `Up (healthy)`, `migrate` là `Exited (0)`) và log server hiện đúng phiên bản (`docker compose -f docker-compose.prod.yml logs --tail=20 server`). Migration tự chạy khi `migrate` chạy.
@@ -773,11 +775,11 @@ Các khóa cần sửa:
 }
 ```
 
-**Xác thực với server: HTTPS + API key** (`INGEST_API_KEY` trong `server/.env`), và server chỉ nhận từ IP
-máy worker: thêm IP đó vào `INGEST_ALLOWED_IPS`. Máy worker chưa tin CA của chứng chỉ server thì đặt
+**Xác thực với server: HTTPS + API key** (`INGEST_API_KEY` trong `server/.env`), và (tùy chọn) server chỉ nhận từ IP
+máy worker: thêm IP đó vào `INGEST_ALLOWED_IPS`. **Để trống = cho mọi IP** (vẫn cần HTTPS và API key). Máy worker chưa tin CA của chứng chỉ server thì đặt
 `Ingest.CaFile` (mục 3.5).
 
-**Worker cài cùng máy với Docker (server app).** Kết nối từ máy chủ vào cổng 8443 đi qua cầu nối Docker nên server thấy IP nguồn là **gateway của mạng Docker** (thường `172.18.0.1`), không phải IP của máy. Log server ghi `ingest: address not allowed` và worker nhận 403. Lấy gateway bằng `docker network inspect <tên-thư-mục>_default --format '{{(index .IPAM.Config 0).Gateway}}'` rồi thêm vào `INGEST_ALLOWED_IPS`: `bash install.sh --db ... --worker-ips <gateway> --up`. Worker ở máy khác thì dùng IP thật của máy đó.
+**Worker cài cùng máy với Docker (server app), khi có lọc IP.** Để trống `INGEST_ALLOWED_IPS` thì bỏ qua mục này. Kết nối từ máy chủ vào cổng 8443 đi qua cầu nối Docker nên server thấy IP nguồn là **gateway của mạng Docker** (thường `172.18.0.1`), không phải IP của máy. Log server ghi `ingest: address not allowed` và worker nhận 403. Lấy gateway bằng `docker network inspect <tên-thư-mục>_default --format '{{(index .IPAM.Config 0).Gateway}}'` rồi thêm vào `INGEST_ALLOWED_IPS`: `bash install.sh --db ... --worker-ips <gateway> --up`. Worker ở máy khác thì dùng IP thật của máy đó.
 
 ### 4B.7. Lưu bí mật
 
@@ -1146,7 +1148,7 @@ Giờ đọc AD của **worker** (delta 15 phút, full 01:00, heartbeat 5 phút)
 | Đăng nhập AD báo không kết nối được máy chủ AD | Sai `LDAP_SERVERS` / `LDAP_PROTOCOL`, chặn cổng 389 hoặc 636, hoặc app không tin CA của DC | Thử `openssl s_client -connect dc01.corp.local:636`, đặt `LDAP_CA_FILE` |
 | Tài khoản AD "không khớp" | Tài khoản AD bị xóa rồi tạo lại | Admin bấm "Gỡ liên kết AD" cho user đó |
 | Worker nhận 401 | Sai API key | So khớp `INGEST_API_KEY` với `Ingest:ApiKey` (mã hóa lại bằng `protect`) |
-| Worker nhận 403 | IP worker không có trong `INGEST_ALLOWED_IPS` | Log server ghi `ingest: address not allowed` kèm IP nhìn thấy; bổ sung IP rồi khởi động lại server |
+| Worker nhận 403 | `INGEST_ALLOWED_IPS` có giá trị mà IP worker không nằm trong đó | Log server ghi `ingest: address not allowed` kèm IP nhìn thấy; bổ sung IP rồi khởi động lại server |
 | Worker không kết nối được HTTPS (lỗi chứng chỉ) | Máy worker không tin CA, hoặc `BaseUrl` dùng IP / tên không có trong chứng chỉ | Mục 3.6: đặt `Ingest.CaFile`, dùng đúng tên |
 | Key không có mật khẩu (`keysEmptyPassword` > 0) | Tài khoản worker thiếu quyền đọc `msFVE-RecoveryPassword` | Cấp quyền theo mục 4.1, chạy `check` |
 | Worker Go: `ldap_tls_failed`, connection reset ở 636 | DC chưa có chứng chỉ TLS | Cấp chứng chỉ cho DC, hoặc dùng `Protocol: Ldap` (mặc định, mục 4B.2) |
@@ -1177,7 +1179,7 @@ Giờ đọc AD của **worker** (delta 15 phút, full 01:00, heartbeat 5 phút)
 | `INGEST_TLS_CERT`, `INGEST_TLS_KEY` | | Chỉ khi không dùng nginx: app tự giữ chứng chỉ HTTPS của ingest API |
 | `COOKIE_SECURE` | bật khi production | Cookie chỉ gửi qua HTTPS |
 | `INGEST_API_KEY` | | API key của worker (32 ký tự trở lên), gửi qua header `Authorization: Bearer` |
-| `INGEST_ALLOWED_IPS` | | Danh sách IP được gọi ingest API, cách nhau bởi dấu phẩy |
+| `INGEST_ALLOWED_IPS` | | Danh sách IP được gọi ingest API, cách nhau bởi dấu phẩy. Trống = cho mọi IP (vẫn cần HTTPS và API key) |
 | `DATABASE_URL` | | Kết nối bằng `app_node` |
 | `MIGRATION_DATABASE_URL` | | Kết nối bằng `blk_owner` (chỉ dùng cho migration) |
 | `DB_SSL`, `DB_POOL_MAX` | `false`, `10` | Hết kết nối trong pool sau 15 giây thì báo lỗi; câu lệnh chạy quá 120 giây bị hủy |

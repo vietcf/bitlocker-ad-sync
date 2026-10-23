@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 # Cai dat production bang Docker Compose: tao server/.env (va server/db.env neu DB trong Docker) voi gia tri DUNG,
-# kiem tra, roi (tuy chon) khoi dong. Chay lai nhieu lan van an toan: khoa bi mat da co thi giu nguyen.
+# kiem tra, roi (tuy chon) khoi dong. Chay lai duoc nhieu lan:
+#   - DB trong Docker, da co data/postgres: canh bao va THOAT (khong dong vao cau hinh hay database dang dung);
+#     them --update de giu cau hinh va chi cap nhat / khoi dong lai.
+#   - Chua co data/postgres: xoa cau hinh cu (server/.env, server/db.env, .env, nginx/redirect.conf), tao moi toan bo.
+#   - DB ngoai: chay lai giu cau hinh va khoa bi mat da co.
 #
 #   bash tools/install.sh                       # hoi tung thong tin
 #   bash tools/install.sh --db docker --up      # DB trong Docker, khoi dong luon
+#   bash tools/install.sh --db docker --update --up   # da cai roi: giu cau hinh, cap nhat ban moi
 #   bash tools/install.sh --db external --up    # DB ngoai (da tao san blk_owner, app_node, DB blk)
 #   bash tools/install.sh --help
 #
@@ -15,7 +20,7 @@ D="$(cd "$(dirname "$0")" && pwd)"
 cd "$D"
 
 DB_MODE="" WORKER_IPS="" AD_SERVERS="" AD_DOMAIN="" AD_BASE_DN="" AD_PROTOCOL="" TZ_NAME=""
-DB_HOST="" DB_PORT="" DB_NAME="" DB_SSL="" UP=0 YES=0 MAKE_CERT="" P_HTTPS="" P_INGEST="" P_HTTP=""
+DB_HOST="" DB_PORT="" DB_NAME="" DB_SSL="" UP=0 UPDATE=0 YES=0 MAKE_CERT="" P_HTTPS="" P_INGEST="" P_HTTP=""
 usage() { sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; cat <<'EOF'
 Tuy chon (bo trong thi script hoi):
   --db docker|external       DB trong Docker hoac PostgreSQL ngoai
@@ -26,6 +31,7 @@ Tuy chon (bo trong thi script hoi):
   Mat khau DB ngoai: bien moi truong BLK_APP_PASSWORD, BLK_OWNER_PASSWORD (hoac nhap khi duoc hoi)
   --https-port 443 --ingest-port 8443 --http-port 80     cong ra ngoai (doi khi cong chuan bi chiem)
   --tz Asia/Ho_Chi_Minh      --up (khoi dong luon)      --yes (khong hoi, dung gia tri mac dinh)
+  --update                   da cai roi (co data/postgres): giu cau hinh, chi cap nhat / khoi dong lai
 EOF
 }
 while [[ $# -gt 0 ]]; do
@@ -45,6 +51,7 @@ while [[ $# -gt 0 ]]; do
     --http-port) P_HTTP="$2"; shift 2 ;;
     --tz) TZ_NAME="$2"; shift 2 ;;
     --up) UP=1; shift ;;
+    --update) UPDATE=1; shift ;;
     --yes|-y) YES=1; shift ;;
     --help|-h) usage; exit 0 ;;
     *) echo "Tuy chon la: $1 (xem --help)" >&2; exit 2 ;;
@@ -88,6 +95,20 @@ set_env() {
   else printf '%s=%s\n' "$k" "$v" >> "$f"; fi
 }
 mask() { sed -E 's#(://[^:/@]+:)[^@]*@#\1***@#'; }
+
+# --- 0. Chay lai: da co database thi KHONG cai lai (tranh doi khoa / mat khau cua DB dang dung); chua co thi lam moi tu dau ---
+[[ -z "$DB_MODE" ]] && ask DB_MODE "Database: docker (trong Docker) hay external (PostgreSQL ngoai)" "docker"
+if [[ "$DB_MODE" == docker && $UPDATE -eq 0 ]]; then
+  if [[ -d data/postgres && -n "$(ls -A data/postgres 2>&1)" ]]; then
+    say "CANH BAO: da co database trong data/postgres, khong cai lai (se doi khoa va mat khau cua database dang dung)."
+    say "  Cap nhat ban moi, giu cau hinh:   bash install.sh --db docker --update --up"
+    say "  Cai lai tu dau (MAT TOAN BO DATABASE):  docker compose -f docker-compose.prod.yml --profile db down && rm -rf data, roi chay lai install.sh"
+    exit 1
+  fi
+  old=()
+  for f in server/.env server/db.env .env nginx/redirect.conf; do [[ -e $f ]] && old+=("$f"); done
+  if (( ${#old[@]} )); then rm -f "${old[@]}"; say "Chua co database: da xoa cau hinh cu (${old[*]}), tao moi toan bo."; fi
+fi
 
 ENV=server/.env DBENV=server/db.env
 if [[ ! -f $ENV ]]; then cp server/.env.example "$ENV"; say "Tao $ENV tu file mau."; else say "Giu $ENV hien co (chi cap nhat cac gia tri can thiet)."; fi
@@ -141,10 +162,11 @@ case "$DB_MODE" in
 esac
 
 # --- 3. Worker, AD, mui gio ---
-ask WORKER_IPS "IP may chay worker (cach nhau dau phay; de trong neu chua co worker)" ""
+ask WORKER_IPS "IP may chay worker (cach nhau dau phay; de trong = cho moi IP, van can HTTPS va API key)" ""
 if [[ -z "$WORKER_IPS" ]]; then
   WORKER_IPS="$(get_env "$ENV" INGEST_ALLOWED_IPS)"
-  [[ -z "$WORKER_IPS" || "$WORKER_IPS" == "127.0.0.1,::1" ]] && { WORKER_IPS="127.0.0.1"; say "CANH BAO: chua co IP worker, tam dat 127.0.0.1 (worker chua goi duoc). Sua sau: bash install.sh --worker-ips <IP>"; }
+  [[ "$WORKER_IPS" == "127.0.0.1,::1" ]] && WORKER_IPS=""   # gia tri mau cua file .env.example, khong phai lua chon
+  [[ -z "$WORKER_IPS" ]] && say "LUU Y: khong loc theo IP worker (moi IP deu goi duoc, van can HTTPS va API key). Muon gioi han: bash install.sh --worker-ips <IP>"
 fi
 set_env "$ENV" INGEST_ALLOWED_IPS "$WORKER_IPS"
 # Worker cai tren CUNG may voi Docker: server thay nguon la gateway cua mang Docker (thuong 172.18.0.1), khong phai IP that.
@@ -214,7 +236,7 @@ SUFFIX=""; [[ "$P_HTTPS" == 443 ]] || SUFFIX=":$P_HTTPS"
 
 # --- 5. Kiem tra ---
 bad=0
-for k in DATABASE_URL MIGRATION_DATABASE_URL SESSION_SECRET SECRET_KEY INGEST_API_KEY INGEST_ALLOWED_IPS; do
+for k in DATABASE_URL MIGRATION_DATABASE_URL SESSION_SECRET SECRET_KEY INGEST_API_KEY; do
   [[ -n "$(get_env "$ENV" "$k")" ]] || { say "THIEU: $k trong $ENV"; bad=1; }
 done
 [[ "$(get_env "$ENV" SECRET_KEY)" =~ ^[0-9a-fA-F]{64}$ ]] || { say "SAI: SECRET_KEY phai la 64 ky tu hex"; bad=1; }

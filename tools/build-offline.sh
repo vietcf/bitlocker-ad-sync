@@ -77,7 +77,7 @@ BitLocker Key Management $VERSION - cai offline
      DB trong Docker:    bash install.sh --db docker
      DB ngoai:           bash install.sh --db external      (da tao DB blk, blk_owner, app_node theo README.md muc 3.2)
    Muon dung chung chi that: dat server.crt va server.key vao cert/ truoc khi chay. Xem: bash install.sh --help
-Cap nhat ban moi: giai nen goi moi, chay load.sh, chay lai install.sh --db ... --up (khoa cu duoc giu, migration tu chay).
+Cap nhat ban moi: giai nen goi moi, chay load.sh, chay install.sh --db ... --update --up (giu cau hinh va khoa cu, migration tu chay).
 Rollback: nap goi cu roi: BLK_VERSION=<ban-cu> docker compose -f docker-compose.prod.yml up -d --no-build
 EOF
 

@@ -13,6 +13,17 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.24.0] - 2026-10-23
+
+### Khi nâng cấp
+
+- Từ bản này, cập nhật production dùng `bash install.sh --db docker --update --up` (không có `--update` thì script chỉ cảnh báo vì đã có database).
+
+### Đổi
+
+- `install.sh` chạy lại được: DB trong Docker mà đã có `data/postgres` thì **cảnh báo và thoát** (không đụng cấu hình, khóa, database); chưa có thì **xóa cấu hình cũ** (`server/.env`, `server/db.env`, `.env`, `nginx/redirect.conf`) và tạo mới toàn bộ. Thêm `--update` để cập nhật bản mới mà giữ cấu hình. DB ngoài: chạy lại vẫn giữ cấu hình như cũ.
+- `INGEST_ALLOWED_IPS` không còn bắt buộc ở production: **để trống = cho mọi IP** gọi ingest API (vẫn bắt buộc HTTPS và API key). Server ghi cảnh báo khi khởi động nếu để trống. `install.sh` không còn tự đặt `127.0.0.1` khi chưa có IP worker (giá trị đó chặn mọi worker và làm server không khởi động ở một số cấu hình). Muốn giới hạn: `--worker-ips <IP>`.
+
 ## [2.23.2] - 2026-10-23
 
 ### Đổi

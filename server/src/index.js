@@ -65,6 +65,7 @@ ingestServer.listen(config.INGEST_PORT, config.INGEST_HOST, () => {
     { host: config.INGEST_HOST, port: config.INGEST_PORT, tls: !!tls, behindProxy: !!config.INGEST_TRUST_PROXY },
     'ingest API listening',
   );
+  if (!config.INGEST_ALLOWED_IPS.length) logger.warn('INGEST_ALLOWED_IPS is empty: any address may call the ingest API (HTTPS and the API key are still required)');
   if (!tls && !config.INGEST_TRUST_PROXY) logger.warn('ingest API is plain HTTP and not behind an HTTPS proxy: development only');
 });
 

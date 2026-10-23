@@ -56,4 +56,15 @@ describe('ingest API behind the HTTPS reverse proxy', () => {
     expect(() => loadConfig({ ...base, INGEST_TRUST_PROXY: '1' })).not.toThrow();
     expect(() => loadConfig({ ...base, INGEST_TRUST_PROXY: '1', INGEST_API_KEY: undefined })).toThrow(/INGEST_API_KEY/);
   });
+
+  it('an empty INGEST_ALLOWED_IPS means any address in production (no IP filter)', async () => {
+    const base = {
+      NODE_ENV: 'production', DATABASE_URL: 'postgres://x', SESSION_SECRET: 's'.repeat(40), LOG_HMAC_KEY: 'a'.repeat(64),
+      INGEST_API_KEY: KEY, INGEST_TRUST_PROXY: '1', LOCAL_LOGIN_ENABLED: 'true',
+    };
+    expect(() => loadConfig(base)).not.toThrow();
+    expect(loadConfig({ ...base, INGEST_ALLOWED_IPS: '' }).INGEST_ALLOWED_IPS).toEqual([]);
+    const app = ingestApp({ INGEST_TRUST_PROXY: '1', INGEST_ALLOWED_IPS: [] });
+    expect((await request(app).get('/api/ingest/sync-runs/last').set('X-Forwarded-For', '203.0.113.9').set('Authorization', `Bearer ${KEY}`)).status).toBe(200);
+  });
 });
