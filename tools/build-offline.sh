@@ -66,7 +66,7 @@ fi
 cp cert/generate-self-signed.sh "$STAGE/cert/"
 cp tools/offline-load.sh "$STAGE/load.sh"
 cp tools/install.sh "$STAGE/install.sh"
-cp CHANGELOG.md README.md "$STAGE/"
+cp CHANGELOG.md README.md README_vn.md README_en.md "$STAGE/"
 
 cat > "$STAGE/INSTALL.txt" <<EOF
 BitLocker Key Management $VERSION - cai offline
@@ -75,7 +75,7 @@ BitLocker Key Management $VERSION - cai offline
 2. Trong thu muc vua giai nen:   bash load.sh        (kiem tra SHA-256 roi nap image vao Docker)
 3. Cai dat (hoi vai thong tin, tao server/.env dung, tao chung chi tu ky tam neu chua co, khoi dong):
      DB trong Docker:    bash install.sh --db docker
-     DB ngoai:           bash install.sh --db external      (da tao DB blk, blk_owner, app_node theo README.md muc 3.2)
+     DB ngoai:           bash install.sh --db external      (da tao DB blk, blk_owner, app_node theo README_en.md / README_vn.md muc 3.2)
    Muon dung chung chi that: dat server.crt va server.key vao cert/ truoc khi chay. Xem: bash install.sh --help
 Cap nhat ban moi: giai nen goi moi, chay load.sh, chay install.sh --db ... --update --up (giu cau hinh va khoa cu, migration tu chay).
 Rollback: nap goi cu roi: BLK_VERSION=<ban-cu> docker compose -f docker-compose.prod.yml up -d --no-build
