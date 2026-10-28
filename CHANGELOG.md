@@ -13,6 +13,12 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.25.1] - 2026-10-28
+
+### Đổi
+
+- README tách hai bản: `README_vn.md` (tiếng Việt) và `README_en.md` (English), đầu mỗi file có link sang bản kia; `README.md` chỉ là trang chọn ngôn ngữ. `tools/build-offline.sh` đóng gói cả ba file. Không đổi mã server.
+
 ## [2.25.0] - 2026-10-28
 
 ### Thêm

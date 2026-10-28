@@ -1,6 +1,6 @@
 {
   "name": "bitlocker-management-server",
-  "version": "2.25.0",
+  "version": "2.25.1",
   "private": true,
   "description": "BitLocker recovery key management: web API + ingest API",
   "type": "module",
