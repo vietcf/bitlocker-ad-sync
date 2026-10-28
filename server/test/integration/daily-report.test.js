@@ -105,7 +105,9 @@ describe('daily report', () => {
     expect(sent).toMatchObject({ queued: true, recipients: 2 });
     expect(await r.tick()).toEqual({ skipped: 'sent' });
     const mails = await asOwner(`SELECT kind, recipients, html IS NOT NULL AS has_html FROM mail_outbox WHERE kind = 'daily_report'`);
-    expect(mails).toEqual([{ kind: 'daily_report', recipients: ['admin@corp.local', 'boss@corp.local'], has_html: true }]);
+    // one mail per language: the Admin HQ user's own language, and the default one for the plain extra address
+    expect(mails.every((m) => m.kind === 'daily_report' && m.has_html)).toBe(true);
+    expect(mails.flatMap((m) => m.recipients).sort()).toEqual(['admin@corp.local', 'boss@corp.local']);
     await services.settings.set('notify.daily_report', { enabled: true, time: '23:59', period: 'yesterday', admins: true, extra: [] });
     await asOwner(`DELETE FROM app_setting WHERE key = 'notify.daily_report.last_day'`);
     const early = report(() => new Date('2026-10-16T00:30:00Z')); // 07:30 in Ha Noi
@@ -134,6 +136,6 @@ describe('daily report', () => {
     const html = await web.agent.get(`/admin/mail/${id}/html`);
     expect(html.status).toBe(200);
     expect(html.headers['content-security-policy']).toMatch(/^sandbox/);
-    expect(html.text).toContain('Đồng bộ AD');
+    expect(html.text).toContain('AD sync'); // the first mail is the one for the extra address: English
   });
 });

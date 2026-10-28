@@ -112,6 +112,9 @@
 #   severity        HIGH | MEDIUM | INFO
 # ============================================================================================
 
+# Moi mau co them khoi `en:` (subject, body, parts) la ban tieng Anh; nguoi nhan co ngon ngu English nhan khoi nay, nguoi nhan tieng Viet nhan
+# phan chinh o tren. Ca hai dung chung cac bien {{...}} va chung quy tac sua o tren.
+
 # Them vao dau tieu de cua moi mau `kind: alert`.
 alert_subject_prefix: "[BitLocker][{{severity}}] "
 
@@ -130,6 +133,11 @@ templates:
     body: |
       Lượt sync {{runRef}} ({{mode}}, DC {{dc}}) báo lỗi {{errorCode}}.
       Kiểm tra worker và kết nối LDAPS từ worker tới DC.
+    en:
+      subject: "AD sync failed: {{errorCode}}"
+      body: |
+        Sync run {{runRef}} ({{mode}}, DC {{dc}}) reported error {{errorCode}}.
+        Check the worker and the LDAPS connection from the worker to the DC.
 
   sync_failed_recovered:
     kind: alert
@@ -140,6 +148,10 @@ templates:
     subject: "Đã khôi phục: {{alertSubject}}"
     body: |
       Lượt sync {{runRef}} đã chạy thành công.
+    en:
+      subject: "Recovered: {{alertSubject}}"
+      body: |
+        Sync run {{runRef}} completed successfully.
 
   sync_anomaly:
     kind: alert
@@ -152,6 +164,12 @@ templates:
       Lượt sync {{runRef}} bị giữ lại vì:
       {{anomaliesVi}}
       Vào Quản trị > Sync AD để chấp nhận hoặc bác bỏ.
+    en:
+      subject: "AD sync data looks abnormal, run {{runRef}} was held back"
+      body: |
+        Sync run {{runRef}} was held back because:
+        {{anomalies}}
+        Go to Admin > AD Sync to accept or reject it.
 
   sync_anomaly_recovered:
     kind: alert
@@ -162,6 +180,10 @@ templates:
     subject: "Đã xử lý: {{alertSubject}}"
     body: |
       Admin HQ ({{user}}) đã xử lý lượt sync bị giữ lại.
+    en:
+      subject: "Handled: {{alertSubject}}"
+      body: |
+        Admin HQ ({{user}}) handled the held sync run.
 
   # ------------------------------------------------------------------------------------------
   # Canh bao cua watchdog (job sync-watchdog, moi 5 phut)
@@ -183,6 +205,13 @@ templates:
       Đây là sự cố của worker / đường truyền tới app, chưa nói gì về tình trạng AD.
       Kiểm tra dịch vụ worker trên máy chạy worker, mạng, IP whitelist, API key và chứng chỉ HTTPS. Chi tiết ở Quản trị > Đồng bộ AD.
       Mail này gửi tối đa 1 lần mỗi ngày cho tới khi worker gửi heartbeat trở lại.
+    en:
+      subject: "AD sync worker is Offline"
+      body: |
+        Watchdog check at {{checkedAt}}: worker {{worker}} has sent no heartbeat since {{lastHeartbeatAt}} ({{minutesAgo}} minutes, threshold {{maxMinutes}} minutes).
+        This is a fault of the worker or of the path to the app; it says nothing about the state of AD.
+        Check the worker service on the worker machine, the network, the IP whitelist, the API key and the HTTPS certificate. Details: Admin > AD Sync.
+        This email is sent at most once a day until the worker sends heartbeats again.
 
   sync_problem:
     kind: alert
@@ -196,6 +225,13 @@ templates:
       {{conditions}}
       Chi tiết ở Quản trị > Đồng bộ AD.
       Mail này gửi tối đa 1 lần mỗi ngày cho tới khi các vấn đề trên hết.
+    en:
+      subject: "AD sync has problems ({{count}})"
+      body: |
+        Watchdog check at {{checkedAt}}: the worker is running but AD or the sync has problems:
+        {{conditions}}
+        Details: Admin > AD Sync.
+        This email is sent at most once a day until the problems above are over.
 
   worker_silent:
     kind: alert
@@ -207,6 +243,11 @@ templates:
     body: |
       Heartbeat cuối: {{lastHeartbeatAt}} ({{minutesAgo}} phút trước), từ worker {{worker}}.
       Kiểm tra service BitlockerSync trên máy chủ worker.
+    en:
+      subject: "Sync worker is not sending heartbeats"
+      body: |
+        Last heartbeat: {{lastHeartbeatAt}} ({{minutesAgo}} minutes ago), from worker {{worker}}.
+        Check the BitlockerSync service on the worker machine.
 
   sync_stale:
     kind: alert
@@ -217,6 +258,10 @@ templates:
     subject: "Không có lượt sync thành công quá {{maxMinutes}} phút"
     body: |
       Lượt sync thành công gần nhất: #{{lastRunId}} lúc {{lastRunAt}}.
+    en:
+      subject: "No successful sync run for more than {{maxMinutes}} minutes"
+      body: |
+        Last successful sync run: #{{lastRunId}} at {{lastRunAt}}.
 
   full_stale:
     kind: alert
@@ -227,6 +272,10 @@ templates:
     subject: "Không có full sync thành công quá {{maxHours}} giờ"
     body: |
       Lượt full sync thành công gần nhất: #{{lastRunId}} lúc {{lastRunAt}}.
+    en:
+      subject: "No successful full sync for more than {{maxHours}} hours"
+      body: |
+        Last successful full sync run: #{{lastRunId}} at {{lastRunAt}}.
 
   sync_run_aborted:
     kind: alert
@@ -237,6 +286,10 @@ templates:
     subject: "Lượt sync treo đã bị hủy"
     body: |
       Các lượt {{runs}} chạy quá {{maxHours}} giờ và đã bị đánh dấu hủy (aborted).
+    en:
+      subject: "Stuck sync run was cancelled"
+      body: |
+        Runs {{runs}} ran for more than {{maxHours}} hours and were marked cancelled (aborted).
 
   ldap_error:
     kind: alert
@@ -247,6 +300,10 @@ templates:
     subject: "Worker không đọc được AD: {{errorCode}}"
     body: |
       Worker {{worker}} báo lỗi LDAP {{errorCode}} với DC {{dc}}.
+    en:
+      subject: "Worker cannot read AD: {{errorCode}}"
+      body: |
+        Worker {{worker}} reported LDAP error {{errorCode}} with DC {{dc}}.
 
   dc_cert_expiring:
     kind: alert
@@ -257,6 +314,10 @@ templates:
     subject: "Chứng chỉ LDAPS của DC sắp hết hạn"
     body: |
       Chứng chỉ LDAPS của {{dc}} hết hạn sau {{days}} ngày.
+    en:
+      subject: "DC LDAPS certificate is about to expire"
+      body: |
+        The LDAPS certificate of {{dc}} expires in {{days}} days.
 
   canary_stale:
     kind: alert
@@ -268,6 +329,11 @@ templates:
     body: |
       Giá trị canary đọc được đã cũ {{ageMinutes}} phút (ngưỡng {{maxMinutes}} phút).
       Kiểm tra replicate AD, quyền đọc của tài khoản worker và worker.
+    en:
+      subject: "Canary object is not being updated"
+      body: |
+        The canary value read is {{ageMinutes}} minutes old (threshold {{maxMinutes}} minutes).
+        Check AD replication, the worker account's read permission and the worker.
 
   dc_usn_stalled:
     kind: alert
@@ -279,6 +345,11 @@ templates:
     body: |
       highestCommittedUSN không đổi trong {{hours}} giờ ({{usn}}).
       Sync vẫn chạy nhưng có thể đang đọc dữ liệu cũ.
+    en:
+      subject: "The pinned DC may have stopped replicating"
+      body: |
+        highestCommittedUSN has not changed for {{hours}} hours ({{usn}}).
+        Sync still runs but may be reading stale data.
 
   escrow_broken:
     kind: alert
@@ -290,6 +361,11 @@ templates:
     body: |
       {{withoutKey}}/{{created}} máy tạo trong 7 ngày qua (đã quá 48 giờ) chưa có key.
       Kiểm tra GPO lưu BitLocker key lên AD và image cài máy.
+    en:
+      subject: "New computers are not escrowing keys to AD"
+      body: |
+        {{withoutKey}}/{{created}} computers created in the last 7 days (older than 48 hours) have no key.
+        Check the GPO that saves BitLocker keys to AD and the computer image.
 
   no_key_rising:
     kind: alert
@@ -300,6 +376,10 @@ templates:
     subject: "Tỉ lệ máy chưa có key tăng"
     body: |
       {{branches}}
+    en:
+      subject: "Share of computers without a key is rising"
+      body: |
+        {{branches}}
 
   # Dung cho moi thong bao "da khoi phuc" khac (cac canh bao watchdog tu het).
   recovered:
@@ -311,6 +391,10 @@ templates:
     subject: "Đã khôi phục: {{alertSubject}}"
     body: |
       Đã trở lại bình thường.
+    en:
+      subject: "Recovered: {{alertSubject}}"
+      body: |
+        Back to normal.
 
   # ------------------------------------------------------------------------------------------
   # Key
@@ -326,6 +410,12 @@ templates:
       Lượt sao lưu ({{trigger}}) không hoàn tất:
       {{errors}}
       Kiểm tra ở Quản trị > Sao lưu.
+    en:
+      subject: "Backup failed"
+      body: |
+        The backup run ({{trigger}}) did not complete:
+        {{errors}}
+        Check Admin > Backup.
 
   backup_failed_recovered:
     kind: alert
@@ -336,6 +426,10 @@ templates:
     subject: "Đã khôi phục: {{alertSubject}}"
     body: |
       Sao lưu đã chạy thành công: {{files}}
+    en:
+      subject: "Recovered: {{alertSubject}}"
+      body: |
+        Backup ran successfully: {{files}}
 
   key_duplicate:
     kind: alert
@@ -348,6 +442,12 @@ templates:
       Phát hiện Key ID BitLocker nằm dưới nhiều máy cùng còn trong phạm vi giám sát:
       {{items}}
       Key vẫn giữ ở máy cũ, không bị ghi đè. Kiểm tra (máy clone, đặt lại BitLocker) rồi bấm "Đã xem xét" ở Quản trị > Sync AD.
+    en:
+      subject: "Duplicate Key ID across 2 computers ({{count}})"
+      body: |
+        BitLocker Key IDs were found under several computers that are all still in the monitored scope:
+        {{items}}
+        The key stays on the computer that holds it and is not overwritten. Check it (cloned computer, BitLocker reset), then decide in Admin > AD Sync.
 
   reveal_out_of_hours:
     kind: alert
@@ -358,6 +458,10 @@ templates:
     subject: "Xem key ngoài giờ làm việc: {{computer}}"
     body: |
       {{user}} vừa xem recovery key của máy {{computer}} (chi nhánh {{branch}}) ngoài giờ làm việc.
+    en:
+      subject: "Key viewed outside working hours: {{computer}}"
+      body: |
+        {{user}} just viewed the recovery key of computer {{computer}} (branch {{branch}}) outside working hours.
 
   key_export:
     kind: alert
@@ -372,6 +476,14 @@ templates:
       Ghi chú: {{note}}
       Ticket: {{ticket}}
       Chi tiết trong Nhật ký.
+    en:
+      subject: "{{user}} just exported {{count}} recovery keys"
+      body: |
+        {{user}} just exported {{count}} recovery keys to a CSV file.
+        Reason: {{reasonLabel}}
+        Note: {{note}}
+        Ticket: {{ticket}}
+        Details are in the Audit log.
 
   # ------------------------------------------------------------------------------------------
   # Thong bao cho nguoi dung (khong phai canh bao: khong co tien to [BitLocker][MUC DO])
@@ -400,6 +512,23 @@ templates:
       key_line: "- {{name}} (chi nhánh {{branch}}): Key ID {{keyId}}{{link}}"
       more_line: "- ... và {{more}} mục khác (xem trên web)"
       link: "  {{url}}"
+    en:
+      subject: "[BitLocker] Sync {{runRef}}: {{summary}}"
+      body: |
+        Sync run {{runRef}} ({{mode}}, DC {{dc}}) just recorded {{summary}} within your scope.
+
+        {{computers}}{{keys}}Automatic email from the BitLocker key management system.
+        Admin HQ can turn this notification off in Admin > Notifications.
+      parts:
+        summary_computers: "{{count}} new computer(s)"
+        summary_keys: "{{count}} new key(s)"
+        summary_join: ", "
+        computers_title: "New computers:"
+        computer_line: "- {{name}} (branch {{branch}}){{link}}"
+        keys_title: "New keys stored in the system (with their recovery passwords; for safety the email does not include passwords, see them on the web):"
+        key_line: "- {{name}} (branch {{branch}}): Key ID {{keyId}}{{link}}"
+        more_line: "- ... and {{more}} more (see the web)"
+        link: "  {{url}}"
 
   # Bao cao hang ngay cho Admin HQ. Chi tieu de va cau mo dau lay tu day; phan so lieu, bang va
   # bieu do (ban HTML) do code tao.
@@ -412,6 +541,10 @@ templates:
     subject: "Báo cáo BitLocker {{day}}: {{syncStatus}}, máy {{computersChange}}, key {{keysChange}}"
     body: |
       Tình hình hệ thống quản lý recovery key BitLocker {{period}}.
+    en:
+      subject: "BitLocker report {{day}}: {{syncStatus}}, computers {{computersChange}}, keys {{keysChange}}"
+      body: |
+        Status of the BitLocker recovery key management system {{period}}.
 
   smtp_test:
     kind: notification
@@ -423,3 +556,8 @@ templates:
     body: |
       Email thử từ hệ thống quản lý BitLocker Key.
       Nếu bạn nhận được email này, cấu hình SMTP đã đúng.
+    en:
+      subject: "[BitLocker] Test email"
+      body: |
+        Test email from the BitLocker key management system.
+        If you received this email, the SMTP settings are correct.

@@ -542,4 +542,7 @@ export const admin = {
   "Tạm khóa (sai mật khẩu)": "Temporarily locked (wrong password)",
   "Chờ đổi mật khẩu": "Password change pending",
   "<a href=\"/admin/users/{id}/edit\">Sửa</a>": "<a href=\"/admin/users/{id}/edit\">Edit</a>",
+  "Ngôn ngữ": "Language",
+  "Tiếng Việt": "Vietnamese",
+  "Ngôn ngữ giao diện và email gửi cho người này. Họ tự đổi được bằng nút EN | VI.": "Interface and email language of this person. They can change it themselves with the EN | VI switch.",
 };

@@ -62,19 +62,25 @@ export class MailTemplates {
     return this.#doc;
   }
 
-  /** { subject, body } of a template. Alerts get the alert_subject_prefix (with {{severity}}). */
-  render(name, vars = {}, { severity } = {}) {
+  /**
+   * { subject, body } of a template in `lang` ('vi' is the base text of the template, 'en' the `en:` block; a
+   * template without an `en:` block stays Vietnamese). Alerts get the alert_subject_prefix (with {{severity}}).
+   */
+  render(name, vars = {}, { severity, lang = 'vi' } = {}) {
     const doc = this.#current();
-    const t = doc.templates[name];
-    if (!t) throw new Error(`unknown mail template ${name}`);
+    const base = doc.templates[name];
+    if (!base) throw new Error(`unknown mail template ${name}`);
+    const t = lang === 'en' && base.en ? { ...base, ...base.en } : base;
     let subject = fill(t.subject, vars).replace(/\s+/g, ' ').trim();
     if (t.kind === 'alert' && severity) subject = fill(doc.alert_subject_prefix ?? '', { severity: severity.toUpperCase() }) + subject;
     return { subject, body: fill(t.body, vars).replace(/\n+$/, '') };
   }
 
-  /** One of the pieces under `parts` of a template (new_objects), filled in. */
-  part(name, piece, vars = {}) {
-    return fill(this.#current().templates[name]?.parts?.[piece] ?? '', vars);
+  /** One of the pieces under `parts` of a template (new_objects), filled in, in `lang`. */
+  part(name, piece, vars = {}, lang = 'vi') {
+    const base = this.#current().templates[name];
+    const parts = lang === 'en' && base?.en?.parts ? base.en.parts : base?.parts;
+    return fill(parts?.[piece] ?? '', vars);
   }
 
   has(name) {

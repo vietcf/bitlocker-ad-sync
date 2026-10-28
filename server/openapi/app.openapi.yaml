@@ -636,6 +636,7 @@ paths:
               properties:
                 displayName: { type: string }
                 email: { type: string, format: email }
+                language: { type: string, enum: [en, vi], description: 'UI and e-mail language of the user. Omit to keep.' }
                 isActive: { type: boolean }
                 authSource: { type: string, enum: [ldap, local], description: 'Omit to keep. Switching to local returns a one-time password.' }
                 grants: { $ref: '#/components/schemas/Grants' }

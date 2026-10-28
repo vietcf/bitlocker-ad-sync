@@ -44,10 +44,11 @@ describe('alert mails in three groups', () => {
     await send('sync_failed');
     await send('reveal_out_of_hours');
     await send('backup_failed');
-    expect(await mails()).toEqual([
-      { subject: 'sync_failed', recipients: ['ad-team@corp.local'] },
-      { subject: 'reveal_out_of_hours', recipients: ['admin.hq@corp.local', 'security@corp.local'] },
-    ]);
+    // one mail per language: Admin HQ users have their own language, a plain extra address gets the default (English)
+    const sent = await mails();
+    expect(sent.map((m) => m.subject).sort()).toEqual(['reveal_out_of_hours', 'reveal_out_of_hours', 'sync_failed']);
+    expect(sent.filter((m) => m.subject === 'sync_failed').map((m) => m.recipients)).toEqual([['ad-team@corp.local']]);
+    expect(sent.filter((m) => m.subject === 'reveal_out_of_hours').flatMap((m) => m.recipients).sort()).toEqual(['admin.hq@corp.local', 'security@corp.local']);
   });
 
   it('a setting saved before the groups existed applies to all three', async () => {
@@ -59,7 +60,7 @@ describe('alert mails in three groups', () => {
     expect(await mails()).toEqual([]);
     await services.settings.set('notify.alerts', { enabled: true, admins: true, extra: ['all@corp.local'] });
     await send('key_export');
-    expect((await mails())[0].recipients).toEqual(['admin.hq@corp.local', 'all@corp.local']);
+    expect((await mails()).flatMap((m) => m.recipients).sort()).toEqual(['admin.hq@corp.local', 'all@corp.local']);
   });
 
   it('the web page shows the three groups and saves them', async () => {

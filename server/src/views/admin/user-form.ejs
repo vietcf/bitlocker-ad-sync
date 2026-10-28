@@ -31,6 +31,13 @@
       <input type="email" name="email" value="<%= form.email ?? '' %>" maxlength="254" placeholder="nguyenvana@corp.local" autocomplete="off" spellcheck="false">
       <span class="muted hint"><%= t('Tài khoản AD: để trống thì tự lấy từ AD ở lần đăng nhập đầu. Chưa có email thì không nhận được thư cảnh báo. Tài khoản nội bộ: bắt buộc.') %></span>
     </label>
+    <label><%= t('Ngôn ngữ') %>
+      <select name="language">
+        <option value="en" <%= (form.language ?? 'en') === 'en' ? 'selected' : '' %>>English</option>
+        <option value="vi" <%= form.language === 'vi' ? 'selected' : '' %>><%= t('Tiếng Việt') %></option>
+      </select>
+      <span class="muted hint"><%= t('Ngôn ngữ giao diện và email gửi cho người này. Họ tự đổi được bằng nút EN | VI.') %></span>
+    </label>
     <% if (userId) { %>
       <label class="check"><input type="checkbox" name="isActive" <%= form.isActive ? 'checked' : '' %>> <%= t('Đang hoạt động (bỏ chọn để khóa tài khoản)') %></label>
     <% } else { %>

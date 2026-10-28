@@ -16,7 +16,7 @@ import { IngestService } from './modules/sync/ingest.service.js';
 import { SyncAdminService } from './modules/sync/sync-admin.service.js';
 import { DashboardService } from './modules/dashboard/dashboard.service.js';
 import { MailService } from './modules/mail/mail.service.js';
-import { adminEmails, adminsWithoutEmail } from './modules/mail/mail.repo.js';
+import { adminRecipients, adminsWithoutEmail } from './modules/mail/mail.repo.js';
 import { NewObjectsNotifier } from './modules/mail/new-objects.js';
 import { secretKey as deriveSecretKey } from './modules/mail/secret.js';
 import { DEFAULT_TEMPLATES_FILE, MailTemplates } from './modules/mail/templates.js';
@@ -38,7 +38,7 @@ export function createServices({ config, pool, logger, secret, notifier, ldap, m
   // Every e-mail goes through the outbox (mail_outbox); the mail-outbox job sends it.
   const mail = new MailService({ pool, settings, config, logger, secretKey, templates, createTransport: mailTransport, eventLog });
   const retention = new RetentionService({ pool, settings, mail, audit });
-  notifier ??= new Notifier({ config, logger, mail, settings, adminEmails: () => adminEmails(pool), adminsWithoutEmail: () => adminsWithoutEmail(pool) });
+  notifier ??= new Notifier({ config, logger, mail, settings, adminRecipients: () => adminRecipients(pool), adminsWithoutEmail: () => adminsWithoutEmail(pool) });
   const alerts = new AlertsService({ pool, notifier, templates, eventLog });
   // Tests pass their own directory stand-in; otherwise a real LDAP client when LDAP_SERVERS is set.
   ldap ??= ldapEnabled(config)

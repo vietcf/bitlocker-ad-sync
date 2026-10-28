@@ -102,6 +102,8 @@ const userCreateInput = z
     username: z.string().trim().max(128).transform((u) => u.slice(u.lastIndexOf('\\') + 1)),
     displayName: personName,
     email: optionalEmail,
+    // UI and e-mail language of the person (they can change it themselves with the EN | VI switch)
+    language: z.enum(['en', 'vi']).default('en'),
     authSource,
     grants: grantList,
     totpRequired: checkbox,
@@ -117,6 +119,7 @@ const userCreateInput = z
 const userUpdateInput = z.object({
   displayName: personName,
   email: optionalEmail,
+  language: z.enum(['en', 'vi']).optional(), // left out: unchanged
   isActive: checkbox,
   // No default here: leaving it out must never switch how an existing user signs in.
   authSource: z.enum(['ldap', 'local']).optional(),
@@ -352,6 +355,7 @@ export class AdminService {
         op: 'update_user',
         user: before.username,
         email: before.email !== input.email ? { from: before.email, to: input.email } : undefined,
+        language: input.language && before.language !== input.language ? { from: before.language, to: input.language } : undefined,
         isActive: input.isActive,
         authSource: switchTo ? { from: before.auth_source, to: switchTo } : undefined,
         totpRequired: totpChanged ? { from: before.totp_required, to: input.totpRequired } : undefined,

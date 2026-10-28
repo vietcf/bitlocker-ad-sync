@@ -480,7 +480,28 @@ export function pgDumpToFile(bin, url, dest, { timeoutMs = 30 * 60_000 } = {}) {
   });
 }
 
-const KEYS_README = `SAO LƯU MÁY VÀ RECOVERY KEY BITLOCKER
+// The README inside a backup file is written by a scheduled job (no user), so it is in both languages: English, then Vietnamese.
+const KEYS_README_EN = `BITLOCKER COMPUTERS AND RECOVERY KEYS BACKUP
+==========================================
+
+This file contains EVERY recovery key. Keep it as private as the admin password; do not send it by email or leave it
+on a personal computer. Encrypted file (AES-256): extract it with 7-Zip or WinRAR using the backup password that Admin HQ
+set. Unencrypted file: it must be kept somewhere encrypted and with restricted access.
+
+computers.csv       Every computer (including those that left the monitored scope): id in the system, objectGUID (AD identity),
+                    name, DNS, DN, branch, operating system, serial, user email, creation / change time in AD,
+                    first recorded, whether it is still in the monitored scope, number of keys.
+recovery_keys.csv   Every recovery key: Key ID (the first 8 characters shown on the BitLocker screen), RECOVERY PASSWORD,
+                    key DN in AD, volume GUID, status, creation time in AD, recorded, last revealed,
+                    the computer holding the key (id, objectGUID, name, DN, branch).
+key_moves.csv       Keys moved to a new computer when the computer was unjoined and rejoined to AD.
+manifest.json       Creation time, number of computers and keys, SHA-256 of each file for an integrity check.
+
+All times are UTC (columns ..._utc). Open with Excel: Data > From Text/CSV, choose UTF-8.
+Finding a key: filter the key_id_first8 column by the 8 characters the user reads on the recovery screen.
+`;
+
+const KEYS_README_VI = `SAO LƯU MÁY VÀ RECOVERY KEY BITLOCKER
 =====================================
 
 File này chứa TOÀN BỘ recovery key. Giữ kín như mật khẩu quản trị; không gửi qua email, không để
@@ -500,7 +521,26 @@ Mọi thời điểm theo giờ UTC (cột ..._utc). Mở bằng Excel: Data > F
 Tìm key: lọc cột key_id_first8 theo 8 ký tự người dùng đọc trên màn hình recovery.
 `;
 
-const DB_README = `SAO LƯU DATABASE (PostgreSQL)
+const KEYS_README = `${KEYS_README_EN}
+-------------------------------------------------------------------------------
+
+${KEYS_README_VI}`;
+
+const DB_README_EN = `DATABASE BACKUP (PostgreSQL)
+===========================
+
+This file contains the whole database, including every recovery key. Keep it private; an encrypted file is extracted with 7-Zip (AES-256).
+
+bitlocker.dump   A pg_dump in custom format (PostgreSQL 17). Restore it with pg_restore,
+                 see the system README, section "Backup and restore".
+manifest.json    Creation time, size and SHA-256 of bitlocker.dump.
+
+Note: some values in the database (SMTP password, two-step verification secrets, backup password) are encrypted
+with a key derived from SECRET_KEY. Back up SECRET_KEY (the .env file) separately, in a secrets vault,
+so the restore can be used in full.
+`;
+
+const DB_README_VI = `SAO LƯU DATABASE (PostgreSQL)
 =============================
 
 File này chứa toàn bộ database, kể cả mọi recovery key. Giữ kín; file mã hóa giải nén bằng 7-Zip (AES-256).
@@ -513,3 +553,8 @@ Lưu ý: một số giá trị trong DB (mật khẩu SMTP, khóa xác thực 2 
 bằng khóa suy ra từ SECRET_KEY. Phải sao lưu SECRET_KEY (file .env) riêng, ở kho secret,
 để dùng được đầy đủ bản khôi phục.
 `;
+
+const DB_README = `${DB_README_EN}
+-------------------------------------------------------------------------------
+
+${DB_README_VI}`;

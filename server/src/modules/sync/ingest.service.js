@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { withAllBranches } from '../../db/scoped.js';
+import { translate } from '../../i18n/index.js';
 import { conflict, notFound } from '../../http/errors.js';
 import { parse } from '../../http/validate.js';
 import { branchForDn, parentDn } from '../branchmap/branchmap.js';
@@ -51,9 +52,14 @@ export async function mailKeyDuplicates({ pool, alerts, log = null }) {
   try {
     const rows = await withAllBranches(pool, (tx) => takeUnnotifiedDuplicates(tx));
     if (!rows.length) return 0;
-    const items = rows.map((d) =>
-      `- Key ID ${d.key_id.slice(0, 8).toUpperCase()}…: máy ${d.owner_name} (GUID ${d.owner_guid}) và máy ${d.other_name} (GUID ${d.other_guid})${d.same_password ? '' : ', mật khẩu khôi phục khác nhau'}`);
-    await alerts.notifyOnce('key_duplicate', 'medium', { count: rows.length, items: items.join('\n') });
+    const itemsFor = (lang) => {
+      const t = (key, params) => translate(lang, key, params);
+      return rows.map((d) => t('- Key ID {kid}…: máy {owner} (GUID {ownerGuid}) và máy {other} (GUID {otherGuid}){pw}', {
+        kid: d.key_id.slice(0, 8).toUpperCase(), owner: d.owner_name, ownerGuid: d.owner_guid, other: d.other_name, otherGuid: d.other_guid,
+        pw: d.same_password ? '' : t(', mật khẩu khôi phục khác nhau'),
+      }));
+    };
+    await alerts.notifyOnce('key_duplicate', 'medium', (lang) => ({ count: rows.length, items: itemsFor(lang).join('\n') }));
     for (const d of rows) log?.warn({ keyId: d.key_id, ownerId: Number(d.owner_id), otherId: Number(d.other_id) }, 'duplicate key id mailed');
     return rows.length;
   } catch (err) {

@@ -24,11 +24,11 @@
       <div class="muted small"><%= t('Worker đang Offline nên chưa kiểm tra được AD.') %></div>
     <% } else { %>
       <div class="status-row"><span class="status-label"><%= t('Sự cố hệ thống') %></span>
-        <% if (sysAlerts.length) { %><span class="badge badge-bad"><%= t('● Có sự cố') %></span><span class="muted small"><%= sysAlerts.map((x) => x.detail.subject).join('; ') %></span>
+        <% if (sysAlerts.length) { %><span class="badge badge-bad"><%= t('● Có sự cố') %></span><span class="muted small"><%= sysAlerts.map((x) => h.alertSubject(x.detail)).join('; ') %></span>
         <% } else { %><span class="badge badge-good">● OK</span><% } %>
       </div>
       <div class="status-row"><span class="status-label"><%= t('Cảnh báo dữ liệu') %></span>
-        <% if (dataAlerts.length) { %><span class="badge badge-warn"><%= t('● Có cảnh báo nhẹ') %></span><span class="muted small"><%= dataAlerts.map((x) => x.detail.subject).join('; ') %></span>
+        <% if (dataAlerts.length) { %><span class="badge badge-warn"><%= t('● Có cảnh báo nhẹ') %></span><span class="muted small"><%= dataAlerts.map((x) => h.alertSubject(x.detail)).join('; ') %></span>
         <% } else { %><span class="badge badge-good">● OK</span><% if (nSilenced) { %><span class="muted small"><%= t('({nSilenced} đã xử lý / bỏ qua)', { nSilenced: nSilenced }) %></span><% } %><% } %>
         <% if (alertsOff.length) { %><span class="muted small"><%= t('Đã tắt {length} loại cảnh báo (Đồng bộ AD > Cảnh báo sync).', { length: alertsOff.length }) %></span><% } %>
       </div>
@@ -40,9 +40,9 @@
   <h2><%= t('Cảnh báo đang mở') %></h2>
   <% openAlerts.filter((a) => !SUMMARY.includes(a.type)).forEach((a) => { const data = ['escrow_broken', 'no_key_rising', 'full_stale', 'dc_cert_expiring'].includes(a.type); %>
     <div class="notice notice-<%= a.silenced ? 'info' : (a.severity === 'high' ? 'error' : 'warn') %>">
-      <strong><%= a.detail.subject %></strong> <span class="muted"><%= t('· từ {openedAt}', { openedAt: h.dateTime(a.opened_at) }) %></span>
+      <strong><%= h.alertSubject(a.detail) %></strong> <span class="muted"><%= t('· từ {openedAt}', { openedAt: h.dateTime(a.opened_at) }) %></span>
       <% if (a.silenced) { %><span class="badge badge-muted"><%= a.acked_at ? t('Đã xử lý, báo lại sau ') : t('Bỏ qua đến ') %><%= h.dateTime(a.snoozed_until) %></span><% } %>
-      <div class="pre"><%= a.detail.text %></div>
+      <div class="pre"><%= h.alertText(a.detail) %></div>
       <% if (data && a.acked_by && a.silenced) { %><div class="muted small"><%= t('Đã {action} bởi {by}', { action: a.acked_at ? t('xử lý') : t('bỏ qua'), by: a.acked_by }) %><% if (a.acked_at) { %> <%= t('lúc {at}', { at: h.dateTime(a.acked_at) }) %><% } %><% if (a.ack_note) { %>: <%= a.ack_note %><% } %></div><% } %>
       <% if (data && !a.silenced) { %>
       <form method="post" class="alert-form">

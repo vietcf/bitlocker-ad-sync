@@ -3,7 +3,8 @@
 import { admin } from './admin.js';
 import { common } from './common.js';
 import { messages } from './messages.js';
+import { reports } from './reports.js';
 import { ui } from './ui.js';
 
-export const PARTS = { common, admin, messages, ui };
+export const PARTS = { common, admin, messages, reports, ui };
 export const EN = Object.assign({}, ...Object.values(PARTS));

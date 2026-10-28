@@ -202,7 +202,7 @@ export async function replaceGrants(db, userId, grants) {
   }
 }
 
-const USER_COLUMNS = `u.id, u.username, u.display_name, u.email, u.auth_source, u.is_active, u.must_change_password, u.last_login_at,
+const USER_COLUMNS = `u.id, u.username, u.display_name, u.email, u.language, u.auth_source, u.is_active, u.must_change_password, u.last_login_at,
   u.ad_object_guid, u.ad_linked_at, (u.locked_until IS NOT NULL AND u.locked_until > now()) AS is_locked,
   (u.locked_until = 'infinity') AS lock_permanent,
   u.totp_required, u.totp_enrolled_at, u.is_root`;
@@ -232,8 +232,8 @@ export async function getUser(db, id) {
   return rows[0] ?? null;
 }
 
-export async function updateUser(db, id, { displayName, email, isActive }) {
-  await db.query('UPDATE app_user SET display_name = $2, email = $3, is_active = $4 WHERE id = $1', [id, displayName, email, isActive]);
+export async function updateUser(db, id, { displayName, email, isActive, language }) {
+  await db.query('UPDATE app_user SET display_name = $2, email = $3, is_active = $4, language = coalesce($5, language) WHERE id = $1', [id, displayName, email, isActive, language ?? null]);
 }
 
 /** True when the audit log has any entry made by this user (by id or by name). */

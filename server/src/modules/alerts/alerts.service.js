@@ -28,7 +28,7 @@ export class AlertsService {
   /**
    * Opens (or refreshes) the alert of this type. Notifies when new, and again every
    * REMIND_HOURS while it stays open. The message is the mail template named like the type,
-   * filled with `vars`. Returns true if a notification was sent.
+   * filled with `vars` (an object, or a function of the language 'vi' | 'en'). Returns true if a notification was sent.
    */
   async raise(type, severity, vars = {}, detail = {}, { daily = false } = {}) {
     const { alert } = await this.#upsert(type, severity, vars, detail);
@@ -37,41 +37,50 @@ export class AlertsService {
       : Date.now() - alert.last_notified_at.getTime() > REMIND_HOURS * 3600_000);
     if (!due) return false;
     await this.pool.query('UPDATE sync_alert SET last_notified_at = now() WHERE id = $1', [alert.id]);
-    const mail = this.templates.render(type, vars, { severity });
-    await this.notifier.send({ type, severity, subject: mail.subject, text: mail.body });
-    this.eventLog?.emit('alert', { event: 'notified', alert_id: Number(alert.id), type, severity, subject: mail.subject });
+    const render = this.#renderer(type, vars, severity);
+    await this.notifier.send({ type, severity, render });
+    this.eventLog?.emit('alert', { event: 'notified', alert_id: Number(alert.id), type, severity, subject: render('en').subject });
     return true;
   }
 
   /** Sends one message from the template named `type`, without an alert row (one-off notices). */
   async notifyOnce(type, severity, vars = {}) {
-    const mail = this.templates.render(type, vars, { severity });
-    await this.notifier.send({ type, severity, subject: mail.subject, text: mail.body });
+    await this.notifier.send({ type, severity, render: this.#renderer(type, vars, severity) });
+  }
+
+  /** render(lang) -> { subject, text } of the template `name`; `vars` is an object or a function of the language. */
+  #renderer(name, vars, severity, extra = () => ({})) {
+    return (lang) => {
+      const m = this.templates.render(name, { ...(typeof vars === 'function' ? vars(lang) : vars), ...extra(lang) }, { severity, lang });
+      return { subject: m.subject, text: m.body };
+    };
   }
 
   /**
    * Opens (or refreshes) the alert of this type without notifying anyone (shown in the app only).
-   * Returns its subject (the template, without the prefix).
+   * Returns its subject in both languages: { vi, en } (the template, without the prefix).
    */
   async record(type, severity, vars = {}, detail = {}) {
     return (await this.#upsert(type, severity, vars, detail)).subject;
   }
 
   async #upsert(type, severity, vars, detail) {
-    const plain = this.templates.render(type, vars); // stored and shown in the app, without the prefix
-    const subject = plain.subject;
-    const text = plain.body;
+    const varsFor = (lang) => (typeof vars === 'function' ? vars(lang) : vars);
+    // stored and shown in the app (in the viewer's language), without the prefix
+    const vi = this.templates.render(type, varsFor('vi'), { lang: 'vi' });
+    const en = this.templates.render(type, varsFor('en'), { lang: 'en' });
     const { rows } = await this.pool.query(
       `INSERT INTO sync_alert (type, severity, detail) VALUES ($1, $2, $3)
        ON CONFLICT (type) WHERE resolved_at IS NULL
        DO UPDATE SET detail = EXCLUDED.detail, severity = EXCLUDED.severity
        RETURNING id, last_notified_at, (xmax = 0) AS inserted, opened_at`,
-      [type, severity, JSON.stringify({ subject, text, ...detail })],
+      [type, severity, JSON.stringify({ subject: vi.subject, text: vi.body, subject_en: en.subject, text_en: en.body, ...detail })],
     );
     if (rows[0].inserted) {
-      this.eventLog?.emit('alert', { event: 'opened', time: rows[0].opened_at, alert_id: Number(rows[0].id), type, severity, subject, text });
+      // the app log is in English
+      this.eventLog?.emit('alert', { event: 'opened', time: rows[0].opened_at, alert_id: Number(rows[0].id), type, severity, subject: en.subject, text: en.body });
     }
-    return { alert: rows[0], subject };
+    return { alert: rows[0], subject: { vi: vi.subject, en: en.subject } };
   }
 
   /**
@@ -82,15 +91,19 @@ export class AlertsService {
   async clear(type, vars = {}, { announce = true } = {}) {
     const { rows } = await this.pool.query(
       `UPDATE sync_alert SET resolved_at = now() WHERE type = $1 AND resolved_at IS NULL
-       RETURNING id, severity, resolved_at, detail->>'subject' AS subject`,
+       RETURNING id, severity, resolved_at, detail->>'subject' AS subject, detail->>'subject_en' AS subject_en`,
       [type],
     );
     if (!rows[0]) return false;
-    this.eventLog?.emit('alert', { event: 'resolved', time: rows[0].resolved_at, alert_id: Number(rows[0].id), type, severity: rows[0].severity, subject: rows[0].subject });
+    const subjectOf = (lang) => (lang === 'en' ? rows[0].subject_en ?? rows[0].subject : rows[0].subject);
+    this.eventLog?.emit('alert', { event: 'resolved', time: rows[0].resolved_at, alert_id: Number(rows[0].id), type, severity: rows[0].severity, subject: subjectOf('en') });
     if (!announce) return true;
     const name = this.templates.has(`${type}_recovered`) ? `${type}_recovered` : 'recovered';
-    const mail = this.templates.render(name, { ...vars, alertType: type, alertSubject: rows[0].subject }, { severity: 'info' });
-    await this.notifier.send({ type: `${type}_recovered`, severity: 'info', subject: mail.subject, text: mail.body });
+    await this.notifier.send({
+      type: `${type}_recovered`,
+      severity: 'info',
+      render: this.#renderer(name, vars, 'info', (lang) => ({ alertType: type, alertSubject: subjectOf(lang) })),
+    });
     return true;
   }
 
@@ -122,7 +135,7 @@ export class AlertsService {
     const { rows } = await this.pool.query(
       `UPDATE sync_alert SET acked_at = now(), acked_by = $2, ack_note = $3, snoozed_until = NULL, resolved_at = now()
         WHERE id = $1 AND resolved_at IS NULL AND type = ANY($4::text[])
-        RETURNING id, type, severity, resolved_at, detail->>'subject' AS subject`,
+        RETURNING id, type, severity, resolved_at, coalesce(detail->>'subject_en', detail->>'subject') AS subject`,
       [id, by, note || null, DATA_ALERT_TYPES],
     );
     const a = rows[0] ?? null;

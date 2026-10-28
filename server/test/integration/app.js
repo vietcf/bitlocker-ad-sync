@@ -20,7 +20,8 @@ export const config = loadConfig({
 /** A notifier that records messages instead of sending them. */
 export function fakeNotifier() {
   const sent = [];
-  return { sent, send: async (m) => void sent.push(m) };
+  // a message is rendered in Vietnamese here (the tests read Vietnamese texts); `render` is how the real notifier gets each language
+  return { sent, send: async (m) => void sent.push(m.render ? { ...m, ...m.render('vi') } : m) };
 }
 
 /**

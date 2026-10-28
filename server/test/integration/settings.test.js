@@ -158,12 +158,14 @@ describe('alert e-mails', () => {
     const a = await admin();
     await a.put('/api/admin/settings/notifications', { alertsEnabled: true, alertsAdmins: true, alertsExtra: 'security@corp.local\nSecurity@corp.local' });
     await services.notifier.send({ type: 'sync_failed', severity: 'high', subject: '[BitLocker][HIGH] AD sync failed', text: 'x' });
-    const [m] = await asOwner('SELECT kind, recipients, subject FROM mail_outbox');
-    expect(m).toEqual({ kind: 'alert', recipients: ['admin.hq@corp.local', 'security@corp.local'], subject: '[BitLocker][HIGH] AD sync failed' });
+    // one mail per language: the Admin HQ user's own language, and the default one for the plain extra address
+    const sent = await asOwner('SELECT kind, recipients, subject FROM mail_outbox');
+    expect(sent.every((m) => m.kind === 'alert' && m.subject === '[BitLocker][HIGH] AD sync failed')).toBe(true);
+    expect(sent.flatMap((m) => m.recipients).sort()).toEqual(['admin.hq@corp.local', 'security@corp.local']);
 
     await a.put('/api/admin/settings/notifications', { alertsEnabled: false });
     await services.notifier.send({ type: 'sync_failed', severity: 'high', subject: 'again', text: 'x' });
-    expect((await asOwner('SELECT count(*)::int AS n FROM mail_outbox'))[0].n).toBe(1);
+    expect((await asOwner('SELECT count(*)::int AS n FROM mail_outbox'))[0].n).toBe(sent.length);
   });
 });
 
@@ -224,7 +226,7 @@ describe('new computer / key e-mails', () => {
 
     const rows = await asOwner(`SELECT recipients, missing_recipients, status, subject, body, last_error FROM mail_outbox WHERE kind = 'new_objects'`);
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ recipients: [], status: 'no_recipient', subject: `[BitLocker] Sync ${makeRunRef(runId, new Date())}: 1 máy mới, 1 key mới` });
+    expect(rows[0]).toMatchObject({ recipients: [], status: 'no_recipient', subject: `[BitLocker] Sync ${makeRunRef(runId, new Date())}: 1 new computer(s), 1 new key(s)` }); // nobody to read it: the default language
     expect(rows[0].missing_recipients).toEqual(['admin.hq', 'it.hn']); // it.hcm does not see HN computers
     expect(rows[0].body).toContain('HN-PC-2');
     expect(rows[0].body).not.toContain(PWD(2));

@@ -1,4 +1,5 @@
 import { withAllBranches } from '../db/scoped.js';
+import { tk, translate } from '../i18n/index.js';
 import { loadThresholds } from '../modules/sync/anomaly.js';
 import {
   abortStaleRuns,
@@ -125,22 +126,22 @@ export async function runSyncWatchdog({ pool, alerts, settings }) {
 
   // ---- One mail per group, at most once a day while it lasts ----
   if (workerOffline && (await settings.alertEnabled('worker_silent'))) {
-    await alerts.raise('worker_offline', 'high', {
+    await alerts.raise('worker_offline', 'high', (lang) => ({
       worker: hb?.worker_id ?? '—',
-      lastHeartbeatAt: hb ? when(hb.at) : 'chưa bao giờ',
+      lastHeartbeatAt: hb ? when(hb.at) : translate(lang, tk('chưa bao giờ')),
       minutesAgo: hb ? Math.round(hbAge) : '—',
       maxMinutes: heartbeatMax,
       checkedAt: when(new Date()),
-    }, {}, { daily: true });
+    }), {}, { daily: true });
   } else {
     await quiet('worker_offline');
   }
   if (problems.length) {
-    await alerts.raise('sync_problem', problems.some((p) => p.severity === 'high') ? 'high' : 'medium', {
+    await alerts.raise('sync_problem', problems.some((p) => p.severity === 'high') ? 'high' : 'medium', (lang) => ({
       count: problems.length,
-      conditions: problems.map((p) => `- ${p.subject}`).join('\n'),
+      conditions: problems.map((p) => `- ${p.subject[lang]}`).join('\n'),
       checkedAt: when(new Date()),
-    }, { conditions: problems.map((p) => p.type) }, { daily: true });
+    }), { conditions: problems.map((p) => p.type) }, { daily: true });
   } else {
     await quiet('sync_problem');
   }

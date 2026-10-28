@@ -14,7 +14,7 @@ import {
   markRevealed,
   readRecoveryPassword,
 } from './keys.repo.js';
-import { tk } from '../../i18n/index.js';
+import { tk, translate } from '../../i18n/index.js';
 
 export const REVEAL_SECONDS = 60;
 const KEY_EXPORT_MAX = 50_000;
@@ -131,15 +131,21 @@ export class KeysService {
       return keys;
     });
 
-    const mail = this.templates.render('key_export', {
-      user: scope.upn,
-      count: rows.length,
-      reason: input.reason,
-      reasonLabel: REASON_LABELS[input.reason] ?? input.reason,
-      note: input.reasonNote ?? '—',
-      ticket: input.ticketNo ?? '—',
-    }, { severity: 'high' });
-    await this.notifier.send({ type: 'key_export', severity: 'high', subject: mail.subject, text: mail.body });
+    await this.notifier.send({
+      type: 'key_export',
+      severity: 'high',
+      render: (lang) => {
+        const mail = this.templates.render('key_export', {
+          user: scope.upn,
+          count: rows.length,
+          reason: input.reason,
+          reasonLabel: REASON_LABELS[input.reason] ? translate(lang, REASON_LABELS[input.reason]) : input.reason,
+          note: input.reasonNote ?? '—',
+          ticket: input.ticketNo ?? '—',
+        }, { severity: 'high', lang });
+        return { subject: mail.subject, text: mail.body };
+      },
+    });
     const csv = toCsv(
       ['computer', 'computer_object_guid', 'branch', 'distinguished_name', 'in_scope', 'key_id', 'volume_guid', 'device_serial', 'owner_email',
         'status', 'key_created_utc', 'key_recorded_utc', 'recovery_password'],
@@ -196,8 +202,14 @@ export class KeysService {
     if (!(await this.settings.feature('feature.reveal_alerts'))) return;
     const hours = await this.settings.get('reveal.working_hours', null);
     if (!hours || isWithinWorkingHours(this.now(), hours)) return;
-    const mail = this.templates.render('reveal_out_of_hours',
-      { user: scope.upn, computer: key.computer_name, branch: key.branch_code ?? 'N/A' }, { severity: 'high' });
-    await this.notifier.send({ type: 'reveal_out_of_hours', severity: 'high', subject: mail.subject, text: mail.body });
+    await this.notifier.send({
+      type: 'reveal_out_of_hours',
+      severity: 'high',
+      render: (lang) => {
+        const mail = this.templates.render('reveal_out_of_hours',
+          { user: scope.upn, computer: key.computer_name, branch: key.branch_code ?? 'N/A' }, { severity: 'high', lang });
+        return { subject: mail.subject, text: mail.body };
+      },
+    });
   }
 }

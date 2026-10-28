@@ -77,6 +77,9 @@ export function makeHelpers(language) {
     errorText: (err) => errorText(err, t),
     fieldText: (message) => fieldText(message, t),
     anomalyText: (a) => anomalyText(a, t),
+    /** Subject and text of a stored alert in the viewer's language (older alerts only have the Vietnamese one). */
+    alertSubject: (detail) => (lang === 'en' ? detail?.subject_en ?? detail?.subject : detail?.subject),
+    alertText: (detail) => (lang === 'en' ? detail?.text_en ?? detail?.text : detail?.text),
     /** The password rules in words (settings page). */
     passwordPolicy: (policy) => describePasswordPolicy(policy, t),
     /** Readable number of a sync run: 20261018-0042 (the day it started + its sequence number). */

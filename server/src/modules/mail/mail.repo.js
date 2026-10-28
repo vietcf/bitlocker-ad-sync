@@ -100,6 +100,15 @@ export async function mailCounts(db) {
 
 // ---- recipients ---------------------------------------------------------------------------
 
+/** Active Admin HQ users with an e-mail: [{ email, language }]. */
+export async function adminRecipients(db) {
+  const { rows } = await db.query(
+    `SELECT DISTINCT u.email, u.language FROM app_user u JOIN user_grant g ON g.user_id = u.id
+      WHERE u.is_active AND u.email IS NOT NULL AND g.role = 'admin'`,
+  );
+  return rows;
+}
+
 /** E-mails of active Admin HQ users. */
 export async function adminEmails(db) {
   const { rows } = await db.query(
@@ -131,7 +140,7 @@ export async function adminsWithoutEmail(db) {
 /** Active IT / lead users with an e-mail and the branches they hold (branch_id null = all branches). */
 export async function branchStaff(db) {
   const { rows } = await db.query(
-    `SELECT DISTINCT u.email, g.branch_id FROM app_user u JOIN user_grant g ON g.user_id = u.id
+    `SELECT DISTINCT u.email, u.language, g.branch_id FROM app_user u JOIN user_grant g ON g.user_id = u.id
       WHERE u.is_active AND u.email IS NOT NULL AND g.role IN ('it', 'lead')`,
   );
   return rows;

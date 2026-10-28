@@ -1,6 +1,6 @@
 import { withAllBranches } from '../../db/scoped.js';
 import { runRef } from '../sync/run-ref.js';
-import { adminEmails, branchStaff, grantsWithoutEmail } from './mail.repo.js';
+import { adminRecipients, branchStaff, grantsWithoutEmail } from './mail.repo.js';
 
 export const NEW_OBJECTS_DEFAULTS = {
   computers: false, // mail when a sync finds computers not seen before
@@ -72,8 +72,8 @@ export class NewObjectsNotifier {
         if (p.scope !== 'all') p.scope = branchId === null ? 'all' : p.scope.add(branchId);
         people.set(key, p);
       };
-      if (o.admins) for (const e of await adminEmails(tx)) widen(`e:${e}`, { email: e, username: null }, null);
-      if (o.branchUsers) for (const s of await branchStaff(tx)) widen(`e:${s.email}`, { email: s.email, username: null }, s.branch_id);
+      if (o.admins) for (const r of await adminRecipients(tx)) widen(`e:${r.email}`, { email: r.email, language: r.language, username: null }, null);
+      if (o.branchUsers) for (const s of await branchStaff(tx)) widen(`e:${s.email}`, { email: s.email, language: s.language, username: null }, s.branch_id);
       const roles = [...(o.admins ? ['admin'] : []), ...(o.branchUsers ? ['it', 'lead'] : [])];
       for (const g of await grantsWithoutEmail(tx, roles)) {
         widen(`u:${g.username}`, { email: null, username: g.username }, g.role === 'admin' ? null : g.branch_id);
@@ -90,7 +90,7 @@ export class NewObjectsNotifier {
         if (!myComputers.length && !myKeys.length) continue;
         const id = [...myComputers.map((c) => `c${c.id}`), ...myKeys.map((k) => `k${k.id}:${k.key_id_prefix}`)].join(',');
         const g = groups.get(id) ?? { to: [], missing: [], computers: myComputers, keys: myKeys };
-        if (p.email) g.to.push(p.email);
+        if (p.email) g.to.push({ email: p.email, language: p.language });
         else g.missing.push(p.username);
         groups.set(id, g);
       }
@@ -98,19 +98,19 @@ export class NewObjectsNotifier {
       if (!groups.size) {
         // Nobody covers these computers (e.g. computers in no branch while Admin HQ is not notified).
         const who = [o.admins && 'Admin HQ', o.branchUsers && 'IT / lead of the branch'].filter(Boolean).join(' or ');
-        await this.mail.enqueue({
-          kind: 'new_objects', to: [],
+        await this.mail.enqueueLocalized({
+          kind: 'new_objects', recipients: [],
           reason: `No recipient: no ${who} user covers these computers.`,
-          ...compose(this.templates, run, computers, keys, o.maxItems, appUrl),
+          build: (lang) => compose(this.templates, run, computers, keys, o.maxItems, appUrl, lang),
         }, tx);
         return 0;
       }
       let queued = 0;
       for (const g of groups.values()) {
-        const res = await this.mail.enqueue({
-          kind: 'new_objects', to: g.to, missing: g.missing,
-          reason: `Not sent: no e-mail address for ${g.missing.join(', ')} (Quan tri > Nguoi dung).`,
-          ...compose(this.templates, run, g.computers, g.keys, o.maxItems, appUrl),
+        const res = await this.mail.enqueueLocalized({
+          kind: 'new_objects', recipients: g.to, missing: g.missing,
+          reason: `Not sent: no e-mail address for ${g.missing.join(', ')} (Admin > Users).`,
+          build: (lang) => compose(this.templates, run, g.computers, g.keys, o.maxItems, appUrl, lang),
         }, tx);
         if (res?.queued) queued++;
       }
@@ -122,8 +122,8 @@ export class NewObjectsNotifier {
 const branchLabel = (code) => code ?? 'N/A';
 
 /** One mail (people who see the same computers / keys): template new_objects and its parts (templates/mail-templates.yaml). */
-function compose(templates, run, computers, keys, maxItems, appUrl) {
-  const part = (piece, vars) => templates.part('new_objects', piece, vars);
+function compose(templates, run, computers, keys, maxItems, appUrl, lang) {
+  const part = (piece, vars) => templates.part('new_objects', piece, vars, lang);
   const parts = [];
   if (computers.length) parts.push(part('summary_computers', { count: computers.length }));
   if (keys.length) parts.push(part('summary_keys', { count: keys.length }));
@@ -146,5 +146,5 @@ function compose(templates, run, computers, keys, maxItems, appUrl) {
       part('computer_line', { name: c.name, branch: branchLabel(c.branch_code), link: link(c) })),
     keys: section('keys_title', keys, (k) =>
       part('key_line', { name: k.name, branch: branchLabel(k.branch_code), keyId: k.key_id.toUpperCase(), keyIdPrefix: k.key_id_prefix, link: link(k) })),
-  });
+  }, { lang });
 }

@@ -13,6 +13,22 @@ server khởi động (README mục 3.7). Mục **Khi nâng cấp** của mỗi 
 
 ## [Chưa phát hành]
 
+## [2.25.0] - 2026-10-28
+
+### Thêm
+
+- **Giao diện song ngữ English / Tiếng Việt, mặc định tiếng Anh.** Mỗi người chọn bằng nút **EN | VI** (lưu theo tài khoản; người chưa đăng nhập dùng cookie `lang`). Mọi trang, thông báo lỗi và flash đều dịch. Bản dịch nằm ở `server/src/i18n/en/*.js` (khóa là câu tiếng Việt trong code); `test/unit/i18n.test.js` bắt thiếu bản dịch, sai `{tham số}` hoặc thẻ HTML, và `test/integration/i18n-pages.test.js` kiểm tra mọi trang tiếng Anh không còn chữ Việt.
+- **Email, báo cáo hằng ngày, email máy / key mới, email khôi phục và file Excel theo ngôn ngữ của người nhận.** Mỗi mẫu trong `templates/mail-templates.yaml` có khối `en:`. Một sự kiện có người nhận ở hai ngôn ngữ thì gửi hai email. Địa chỉ không gắn với người dùng nào (địa chỉ thêm, `NOTIFY_TO`) nhận tiếng Anh. Cảnh báo lưu cả hai ngôn ngữ (`detail.subject_en`).
+- Quản trị > Người dùng: ô **Ngôn ngữ** khi tạo / sửa (API: `language`). README trong file sao lưu có cả hai ngôn ngữ.
+
+### Đổi
+
+- Quy ước code: comment và log bằng tiếng Anh.
+
+### Khi nâng cấp
+
+- Migration 041 thêm cột `app_user.language` (mặc định `en`): **mọi người dùng hiện có chuyển sang tiếng Anh** cho tới khi bấm **VI** (nhớ theo tài khoản). Muốn đặt sẵn tiếng Việt cho cả hệ thống: `UPDATE app_user SET language = 'vi';`.
+
 ### Đổi
 
 - Worker (Go và .NET): hướng dẫn và script triển khai lưu **mật khẩu AD và API key thẳng trong file cấu hình** (quyền file bị khóa), bỏ systemd credential và DPAPI khỏi luồng chính. Worker Go lên 1.3.0 (xem `worker-go/CHANGELOG.md`; máy đang dùng `cred:` phải sửa `config.json` sau khi cập nhật).

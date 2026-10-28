@@ -244,7 +244,7 @@ export class SettingsAdminService {
     if (!smtp.host) throw badRequest('smtp_not_configured', 'Save the SMTP server settings first.');
     let error = null;
     try {
-      await this.mail.sendTest(to, smtp);
+      await this.mail.sendTest(to, smtp, scope.language);
     } catch (err) {
       error = String(err.message ?? err).slice(0, 300);
     }

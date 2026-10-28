@@ -1,5 +1,5 @@
 
-import { tk } from '../../i18n/index.js';
+import { DEFAULT_LANG, tk } from '../../i18n/index.js';
 export const ALERT_MAIL_DEFAULTS = {
   enabled: true, // mail this group of alerts at all
   admins: true, // to every Admin HQ user with an e-mail
@@ -61,20 +61,26 @@ export async function loadAlertOptions(settings) {
  * Messages never contain a recovery password or lists of computers.
  */
 export class Notifier {
-  constructor({ config, logger, mail, settings, adminEmails, adminsWithoutEmail = async () => [] }) {
+  constructor({ config, logger, mail, settings, adminRecipients, adminsWithoutEmail = async () => [] }) {
     this.logger = logger;
     this.to = config.NOTIFY_TO;
     this.teamsUrl = config.TEAMS_WEBHOOK_URL;
     this.mail = mail;
     this.settings = settings;
-    this.adminEmails = adminEmails; // () => Promise<string[]>
+    this.adminRecipients = adminRecipients; // () => Promise<{ email, language }[]>
     this.adminsWithoutEmail = adminsWithoutEmail; // () => Promise<string[]> (usernames, for the mail log)
   }
 
-  /** type: alert type (for the log); severity: 'high' | 'medium' | 'info'; subject/text: rendered from the mail templates. */
-  async send({ type, severity, subject, text }) {
+  /**
+   * type: alert type (for the log); severity: 'high' | 'medium' | 'info';
+   * render(lang): { subject, text } rendered from the mail templates in that language (each recipient gets their own);
+   * or a ready-made subject + text, sent as is.
+   */
+  async send({ type, severity, render: renderFn, subject, text: plainText }) {
+    const render = renderFn ?? (() => ({ subject, text: plainText })); // a ready-made message is the same in every language
     this.logger.warn({ alert: { type, severity } }, `alert: ${type} (${severity})`);
-    const jobs = [this.#queueMail(subject, text, alertGroupOf(type))];
+    const teams = render(DEFAULT_LANG); // Teams has one channel: the default language
+    const jobs = [this.#queueMail(render, alertGroupOf(type))];
     if (this.teamsUrl) {
       jobs.push(
         fetch(this.teamsUrl, {
@@ -92,13 +98,17 @@ export class Notifier {
     }
   }
 
-  async #queueMail(subject, body, group) {
+  async #queueMail(render, group) {
     const o = (await loadAlertOptions(this.settings))[group];
     if (!o.enabled) return;
-    const to = [...this.to, ...o.extra, ...(o.admins ? await this.adminEmails() : [])];
+    const recipients = [...this.to, ...o.extra, ...(o.admins ? await this.adminRecipients() : [])];
     // Nobody to mail: still stored (status no_recipient) so the mail log shows the alert.
-    await this.mail.enqueue({
-      kind: 'alert', to, subject, body,
+    await this.mail.enqueueLocalized({
+      kind: 'alert', recipients,
+      build: (lang) => {
+        const m = render(lang);
+        return { subject: m.subject, body: m.text };
+      },
       missing: o.admins ? await this.adminsWithoutEmail() : [],
       reason: 'No recipient: no Admin HQ user with an e-mail address, no extra address (Quan tri > Thong bao) and no NOTIFY_TO.',
     });

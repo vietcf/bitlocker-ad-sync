@@ -998,6 +998,7 @@ Trang hiện key tự ẩn sau 60 giây; **Sao chép key** chép cả key kèm d
 - **Khóa khi đăng nhập sai** (Quản trị > Bảo mật): mặc định 5 lần sai thì khóa 15 phút; mở khóa ở Người dùng hoặc CLI `unlock`.
 - **Mật khẩu nội bộ:** tối thiểu 12 ký tự, không chứa tên đăng nhập. Tài khoản AD theo chính sách AD.
 - **Phiên:** tự đăng xuất sau 15 phút không hoạt động, tối đa 8 giờ; chỉnh ở Bảo mật.
+- **Ngôn ngữ (English / Tiếng Việt):** giao diện mặc định tiếng Anh. Mỗi người tự đổi bằng nút **EN | VI** ở góc trên (lưu theo tài khoản, đăng nhập lần sau vẫn giữ); Admin HQ đặt sẵn ngôn ngữ khi tạo hoặc sửa người dùng. Email (cảnh báo, máy / key mới, báo cáo hằng ngày) và file Excel theo ngôn ngữ của **người nhận**; địa chỉ không gắn với người dùng nào (địa chỉ thêm, `NOTIFY_TO`) nhận tiếng Anh. Một sự kiện có người nhận ở hai ngôn ngữ thì gửi hai email, mỗi email một ngôn ngữ. Log ứng dụng và API luôn tiếng Anh. Sửa câu chữ email tiếng Anh ở khối `en:` của từng mẫu trong `server/templates/mail-templates.yaml` (mục 6.6).
 - **Admin gốc** (`admin`, nhãn Superadmin): admin khác không đổi được nó, và nó không tự bỏ quyền hay tự khóa mình. Web hỏng hoặc mất mật khẩu: dùng CLI (mục 6.9).
 
 ### 6.15. Log ra stdout cho hệ thống thu log (SIEM...)

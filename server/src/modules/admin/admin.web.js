@@ -7,7 +7,7 @@ import { ROLES } from './admin.service.js';
 /** Form fields -> service input (checkbox groups arrive as a string or an array). */
 const branchBody = (b) => ({ code: b.code, name: b.name, isActive: b.isActive, ous: b.ous ?? '' });
 const userBody = (b) => ({
-  username: b.username, displayName: b.displayName, email: b.email, authSource: b.authSource, isActive: b.isActive, grants: b.grants,
+  username: b.username, displayName: b.displayName, email: b.email, language: b.language, authSource: b.authSource, isActive: b.isActive, grants: b.grants,
   totpRequired: b.totpRequired ?? 'off', mustChangePassword: b.mustChangePassword ?? 'off',
 });
 
@@ -77,6 +77,7 @@ export function adminWeb({ admin }) {
         username: u.username,
         displayName: u.display_name,
         email: u.email,
+        language: u.language,
         authSource: u.auth_source,
         adObjectGuid: u.ad_object_guid,
         adLinkedAt: u.ad_linked_at,
@@ -92,6 +93,7 @@ export function adminWeb({ admin }) {
       const grants = req.body?.grants ?? [];
       form = {
         authSource: 'ldap',
+        language: 'en',
         ...req.body,
         isActive: req.method === 'GET' ? true : req.body.isActive === 'on',
         totpRequired: req.method === 'GET' ? false : req.body.totpRequired === 'on',

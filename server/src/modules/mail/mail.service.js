@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import { DEFAULT_LANG, normalizeLang } from '../../i18n/index.js';
 import { decryptSecret } from './secret.js';
 import { EventLog } from '../audit/event-log.js';
 import { dueMails, insertMail, markAttemptFailed, markSent, markWaiting, purgeMails } from './mail.repo.js';
@@ -113,6 +114,31 @@ export class MailService {
     return { id, queued: true };
   }
 
+  /**
+   * Queues one mail per language: `recipients` are e-mail strings (they get the default language) or
+   * { email, language } (users carry their own; the user's language wins when an address appears twice).
+   * `build(lang)` returns { subject, body, html? }. With nobody to send to, one no_recipient row is stored
+   * in the default language. Returns { id, queued } of the first mail.
+   */
+  async enqueueLocalized({ kind, recipients = [], build, reason = null, missing = [] }, db = this.pool) {
+    const byEmail = new Map();
+    for (const r of recipients) {
+      const email = String(typeof r === 'string' ? r : r?.email ?? '').trim().toLowerCase();
+      if (!email) continue;
+      const language = typeof r === 'string' ? null : normalizeLang(r.language);
+      if (!byEmail.has(email) || (language && byEmail.get(email) === DEFAULT_LANG)) byEmail.set(email, language ?? byEmail.get(email) ?? DEFAULT_LANG);
+    }
+    const groups = new Map();
+    for (const [email, language] of byEmail) groups.set(language, [...(groups.get(language) ?? []), email]);
+    if (!groups.size) return this.enqueue({ kind, to: [], reason, missing, ...build(DEFAULT_LANG) }, db);
+    let first = null;
+    for (const [language, to] of groups) {
+      const res = await this.enqueue({ kind, to, reason, missing: first ? [] : missing, ...build(language) }, db);
+      first ??= res;
+    }
+    return first;
+  }
+
   /** Sends what is due. Called every minute by the mail-outbox job. */
   async processOutbox() {
     const due = await dueMails(this.pool, BATCH);
@@ -153,10 +179,10 @@ export class MailService {
   }
 
   /** Sends one test mail right away (not through the outbox) with the given settings. Throws on failure. */
-  async sendTest(to, smtp) {
+  async sendTest(to, smtp, lang = DEFAULT_LANG) {
     const s = { ...SMTP_DEFAULTS, ...smtp };
     const transport = this.createTransport(smtpOptions(s, decryptSecret(this.secretKey, s.password)));
-    const mail = this.templates.render('smtp_test');
+    const mail = this.templates.render('smtp_test', {}, { lang });
     await transport.sendMail({ from: s.from, to, subject: mail.subject, text: mail.body });
   }
 }
