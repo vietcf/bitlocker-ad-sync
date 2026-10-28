@@ -2,9 +2,9 @@
 <figure class="chart">
   <svg viewBox="0 0 <%= chart.width %> <%= chart.height %>" role="img" aria-label="<%= label %>" class="<%= cls %>">
     <g class="grid">
-      <% chart.ticks.forEach((t) => { %>
-        <line x1="<%= chart.plot.left %>" x2="<%= chart.plot.right %>" y1="<%= t.y %>" y2="<%= t.y %>"></line>
-        <text x="<%= chart.plot.left - 8 %>" y="<%= t.y + 4 %>" text-anchor="end"><%= h.number(t.value) %></text>
+      <% chart.ticks.forEach((tick) => { %>
+        <line x1="<%= chart.plot.left %>" x2="<%= chart.plot.right %>" y1="<%= tick.y %>" y2="<%= tick.y %>"></line>
+        <text x="<%= chart.plot.left - 8 %>" y="<%= tick.y + 4 %>" text-anchor="end"><%= h.number(tick.value) %></text>
       <% }) %>
     </g>
     <path class="series-line" d="<%= chart.line %>"></path>

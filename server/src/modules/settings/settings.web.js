@@ -19,36 +19,36 @@ export function settingsWeb({ settingsAdmin }) {
   r.get('/settings/mail-server', (req, res) => renderSmtp(req, res, null));
   r.post('/settings/mail-server', formAction(async (req, res) => {
     await settingsAdmin.saveSmtp(req.scope, { ...req.body, rejectUnauthorized: req.body.rejectUnauthorized ?? 'off' }, clientInfo(req));
-    flash(req, 'success', 'Đã lưu cấu hình mail server.');
+    flash(req, 'success', req.t('Đã lưu cấu hình mail server.'));
     res.redirect('/admin/settings/mail-server');
   }, renderSmtp));
   r.post('/settings/mail-server/test', formAction(async (req, res) => {
     const result = await settingsAdmin.testSmtp(req.scope, req.body, clientInfo(req));
     flash(req, result.ok ? 'success' : 'error',
-      result.ok ? `Đã gửi email thử tới ${req.body.to}. Kiểm tra hộp thư.` : `Gửi thử thất bại: ${result.error}`);
+      result.ok ? req.t('Đã gửi email thử tới {to}. Kiểm tra hộp thư.', { to: req.body.to }) : req.t('Gửi thử thất bại: {error}', { error: result.error }));
     res.redirect('/admin/settings/mail-server');
   }, renderSmtp));
 
   // ---- notifications ------------------------------------------------------------------
   const renderNotify = async (req, res, error) => {
     const n = await settingsAdmin.notifications(req.scope);
-    res.render('admin/settings-notifications', { title: 'Thông báo', n, error });
+    res.render('admin/settings-notifications', { title: req.t('Thông báo'), n, error });
   };
   r.get('/settings/notifications', (req, res) => renderNotify(req, res, null));
   r.post('/settings/notifications', formAction(async (req, res) => {
     await settingsAdmin.saveNotifications(req.scope, req.body, clientInfo(req));
-    flash(req, 'success', 'Đã lưu cấu hình thông báo.');
+    flash(req, 'success', req.t('Đã lưu cấu hình thông báo.'));
     res.redirect('/admin/settings/notifications');
   }, renderNotify));
 
   // ---- features -----------------------------------------------------------------------
   const renderFeatures = async (req, res, error) => {
-    res.render('admin/settings-features', { title: 'Tính năng', pageSizes: PAGE_SIZES, pageSizeLimits: PAGE_SIZE_LIMITS, values: await settingsAdmin.features(req.scope), error });
+    res.render('admin/settings-features', { title: req.t('Tính năng'), pageSizes: PAGE_SIZES, pageSizeLimits: PAGE_SIZE_LIMITS, values: await settingsAdmin.features(req.scope), error });
   };
   r.get('/settings/features', (req, res) => renderFeatures(req, res, null));
   r.post('/settings/features', formAction(async (req, res) => {
     await settingsAdmin.saveFeatures(req.scope, req.body, clientInfo(req));
-    flash(req, 'success', 'Đã lưu. Thay đổi có hiệu lực trong vòng 30 giây.');
+    flash(req, 'success', req.t('Đã lưu. Thay đổi có hiệu lực trong vòng 30 giây.'));
     res.redirect('/admin/settings/features');
   }, renderFeatures));
 
@@ -58,12 +58,12 @@ export function settingsWeb({ settingsAdmin }) {
     const values = error ? { ...Object.fromEntries(list.map((t) => [t.key, t.value])), ...req.body } : Object.fromEntries(list.map((t) => [t.key, t.value]));
     const alerts = await settingsAdmin.alertSwitches(req.scope);
     const checks = await settingsAdmin.checkSwitches(req.scope);
-    res.render('admin/settings-thresholds', { title: 'Cảnh báo sync', list, alerts, checks, values, error });
+    res.render('admin/settings-thresholds', { title: req.t('Cảnh báo sync'), list, alerts, checks, values, error });
   };
   r.get('/settings/thresholds', (req, res) => renderThresholds(req, res, null));
   r.post('/settings/thresholds', formAction(async (req, res) => {
     await settingsAdmin.saveThresholds(req.scope, req.body, clientInfo(req));
-    flash(req, 'success', 'Đã lưu cấu hình cảnh báo sync. Thay đổi có hiệu lực trong vòng 30 giây (lượt sync / lần watchdog kế tiếp).');
+    flash(req, 'success', req.t('Đã lưu cấu hình cảnh báo sync. Thay đổi có hiệu lực trong vòng 30 giây (lượt sync / lần watchdog kế tiếp).'));
     res.redirect('/admin/settings/thresholds');
   }, renderThresholds));
 
@@ -74,12 +74,12 @@ export function settingsWeb({ settingsAdmin }) {
     const form = error
       ? { ...saved, ...b, lockout: { enabled: b.lockEnabled === 'on', maxAttempts: b.lockAttempts, lockMinutes: b.lockMinutes, applyToAdmin: b.lockAdmin === 'on' }, password: { minLength: b.pwMinLength, upper: b.pwUpper === 'on', lower: b.pwLower === 'on', digit: b.pwDigit === 'on', special: b.pwSpecial === 'on' } }
       : saved;
-    res.render('admin/settings-security', { title: 'Bảo mật', form, error });
+    res.render('admin/settings-security', { title: req.t('Bảo mật'), form, error });
   };
   r.get('/settings/security', (req, res) => renderSecurity(req, res, null));
   r.post('/settings/security', formAction(async (req, res) => {
     await settingsAdmin.saveSecurity(req.scope, req.body, clientInfo(req));
-    flash(req, 'success', 'Đã lưu. Áp dụng cho mọi phiên đăng nhập trong vòng 30 giây.');
+    flash(req, 'success', req.t('Đã lưu. Áp dụng cho mọi phiên đăng nhập trong vòng 30 giây.'));
     res.redirect('/admin/settings/security');
   }, renderSecurity));
 
@@ -89,25 +89,25 @@ export function settingsWeb({ settingsAdmin }) {
     const form = error
       ? { ...saved, ...req.body, keepAccessLog: req.body.keepAccessLog === 'on' }
       : { ...saved, keepAccessLog: saved.accessLogDays === null };
-    res.render('admin/settings-retention', { title: 'Lưu trữ', form, lastPurge: saved.lastPurge, error });
+    res.render('admin/settings-retention', { title: req.t('Lưu trữ'), form, lastPurge: saved.lastPurge, error });
   };
   r.get('/settings/retention', (req, res) => renderRetention(req, res, null));
   r.post('/settings/retention', formAction(async (req, res) => {
     await settingsAdmin.saveRetention(req.scope, req.body, clientInfo(req));
-    flash(req, 'success', 'Đã lưu thời gian lưu trữ. Job dọn dẹp chạy lúc 03:00 hằng ngày.');
+    flash(req, 'success', req.t('Đã lưu thời gian lưu trữ. Job dọn dẹp chạy lúc 03:00 hằng ngày.'));
     res.redirect('/admin/settings/retention');
   }, renderRetention));
   r.post('/settings/retention/run', async (req, res) => {
     const done = await settingsAdmin.runRetention(req.scope, clientInfo(req));
-    flash(req, 'success', `Đã dọn dẹp: ${done.mail} email, ${done.syncRuns} lượt sync, ${done.alerts} cảnh báo đã đóng, ${done.accessLog} dòng nhật ký.`);
+    flash(req, 'success', req.t('Đã dọn dẹp: {mail} email, {syncRuns} lượt sync, {alerts} cảnh báo đã đóng, {accessLog} dòng nhật ký.', { mail: done.mail, syncRuns: done.syncRuns, alerts: done.alerts, accessLog: done.accessLog }));
     res.redirect('/admin/settings/retention');
   });
 
   r.post('/settings/notifications/daily-report/send', async (req, res) => {
     const r2 = await settingsAdmin.sendDailyReportNow(req.scope, clientInfo(req));
     flash(req, r2.queued ? 'success' : 'error', r2.queued
-      ? `Đã đưa báo cáo hằng ngày vào hàng đợi gửi (${r2.recipients} người nhận). Xem ở Log email.`
-      : 'Không có người nhận: chưa Admin HQ nào có email và chưa nhập địa chỉ thêm. Báo cáo vẫn được lưu ở Log email.');
+      ? req.t('Đã đưa báo cáo hằng ngày vào hàng đợi gửi ({recipients} người nhận). Xem ở Log email.', { recipients: r2.recipients })
+      : req.t('Không có người nhận: chưa Admin HQ nào có email và chưa nhập địa chỉ thêm. Báo cáo vẫn được lưu ở Log email.'));
     res.redirect(`/admin/mail/${r2.id}`);
   });
 
@@ -118,7 +118,7 @@ export function settingsWeb({ settingsAdmin }) {
   };
   r.get('/mail', (req, res) => renderMailLog(req, res, null));
   r.get('/mail/:id', async (req, res) => {
-    res.render('admin/mail-show', { title: 'Chi tiết email', m: await settingsAdmin.mailDetail(req.scope, req.params.id) });
+    res.render('admin/mail-show', { title: req.t('Chi tiết email'), m: await settingsAdmin.mailDetail(req.scope, req.params.id) });
   });
   // HTML version of a mail (daily report), shown sandboxed: no script, no same-origin access.
   r.get('/mail/:id/html', async (req, res) => {
@@ -130,7 +130,7 @@ export function settingsWeb({ settingsAdmin }) {
   });
   r.post('/mail/:id/retry', async (req, res) => {
     await settingsAdmin.retryMail(req.scope, req.params.id, clientInfo(req));
-    flash(req, 'success', 'Đã đưa mail vào hàng đợi gửi lại.');
+    flash(req, 'success', req.t('Đã đưa mail vào hàng đợi gửi lại.'));
     res.redirect(`/admin/mail/${req.params.id}`);
   });
 

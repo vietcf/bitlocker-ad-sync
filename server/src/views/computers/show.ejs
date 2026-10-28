@@ -1,29 +1,29 @@
 <%- include('../partials/head') %>
-<p class="crumbs"><a href="/">← Tìm máy</a></p>
+<p class="crumbs"><%- th('<a href="/">← Tìm máy</a>') %></p>
 <section class="card">
   <div class="title-row">
     <h1><%= computer.name %></h1>
     <% if (computer.deleted_in_ad_at) { %>
-      <span class="badge badge-muted" title="Máy này không còn nằm trong phạm vi worker giám sát (bị xóa trên AD, chuyển ra ngoài các OU đã cấu hình, hoặc lượt đồng bộ đầy đủ không thấy). Dữ liệu và key vẫn được giữ; máy xuất hiện lại thì tự bỏ nhãn.">Không còn trong phạm vi giám sát từ <%= h.date(computer.deleted_in_ad_at) %></span>
+      <span class="badge badge-muted" title="<%= t('Máy này không còn nằm trong phạm vi worker giám sát (bị xóa trên AD, chuyển ra ngoài các OU đã cấu hình, hoặc lượt đồng bộ đầy đủ không thấy). Dữ liệu và key vẫn được giữ; máy xuất hiện lại thì tự bỏ nhãn.') %>"><%= t('Không còn trong phạm vi giám sát từ {deletedInAdAt}', { deletedInAdAt: h.date(computer.deleted_in_ad_at) }) %></span>
     <% } else { %>
-      <span class="badge badge-good">Đang được giám sát</span>
+      <span class="badge badge-good"><%= t('Đang được giám sát') %></span>
     <% } %>
   </div>
   <dl class="facts">
-    <dt>GUID trên AD</dt><dd><code class="wrap"><%= computer.object_guid %></code> <span class="muted small">(objectGUID: định danh duy nhất của máy trong phạm vi giám sát, không đổi khi đổi tên hay chuyển OU)</span></dd>
-    <dt>Chi nhánh</dt><dd><%= computer.branch_code ? `${computer.branch_code} · ${computer.branch_name}` : 'N/A (chưa thuộc chi nhánh nào)' %></dd>
+    <dt><%= t('GUID trên AD') %></dt><dd><%- th('<code class="wrap">{objectGuid}</code> <span class="muted small">(objectGUID: định danh duy nhất của máy trong phạm vi giám sát, không đổi khi đổi tên hay chuyển OU)</span>', { objectGuid: computer.object_guid }) %></dd>
+    <dt><%= t('Chi nhánh') %></dt><dd><%= computer.branch_code ? `${computer.branch_code} · ${computer.branch_name}` : t('N/A (chưa thuộc chi nhánh nào)') %></dd>
     <dt>OU</dt><dd><code class="wrap"><%= computer.distinguished_name %></code></dd>
     <dt>DNS</dt><dd><%= computer.dns_name ?? '—' %></dd>
-    <dt>Hệ điều hành</dt><dd><%= computer.os ?? '—' %></dd>
-    <dt>Tạo trên AD</dt><dd><%= h.dateTime(computer.ad_created_at) %></dd>
-    <dt title="<%= activityTip %>"><span class="has-tip">Đăng nhập AD gần nhất</span></dt><dd title="<%= activityTip %>"><%= h.dateTime(computer.last_logon_at) %> <% const act = h.activity(computer.last_logon_at, activityMonths); %><span class="badge <%= act.cls %>" title="<%= activityTip %>"><%= act.label %></span></dd>
-    <dt>Ghi nhận trên hệ thống</dt><dd><%= h.dateTime(computer.first_seen_at) %></dd>
-    <dt>Serial máy</dt><dd><% if (computer.device_serial) { %><code><%= computer.device_serial %></code><% } else { %>—<% } %></dd>
-    <dt>Email người dùng</dt><dd><%= computer.owner_email ?? '—' %></dd>
+    <dt><%= t('Hệ điều hành') %></dt><dd><%= computer.os ?? '—' %></dd>
+    <dt><%= t('Tạo trên AD') %></dt><dd><%= h.dateTime(computer.ad_created_at) %></dd>
+    <dt title="<%= activityTip %>"><%- th('<span class="has-tip">Đăng nhập AD gần nhất</span>') %></dt><dd title="<%= activityTip %>"><%= h.dateTime(computer.last_logon_at) %> <% const act = h.activity(computer.last_logon_at, activityMonths); %><span class="badge <%= act.cls %>" title="<%= activityTip %>"><%= act.label %></span></dd>
+    <dt><%= t('Ghi nhận trên hệ thống') %></dt><dd><%= h.dateTime(computer.first_seen_at) %></dd>
+    <dt><%= t('Serial máy') %></dt><dd><% if (computer.device_serial) { %><code><%= computer.device_serial %></code><% } else { %>—<% } %></dd>
+    <dt><%= t('Email người dùng') %></dt><dd><%= computer.owner_email ?? '—' %></dd>
   </dl>
   <p class="actions">
-    <a class="button secondary small" href="/computers/<%= computer.id %>/edit">Sửa thông tin</a>
-    <% if (computer.info_updated_at) { %><span class="muted small">Sửa gần nhất <%= h.dateTime(computer.info_updated_at) %> (<%= computer.info_updated_by %>)</span><% } %>
+    <a class="button secondary small" href="/computers/<%= computer.id %>/edit"><%= t('Sửa thông tin') %></a>
+    <% if (computer.info_updated_at) { %><span class="muted small"><%= t('Sửa gần nhất {infoUpdatedAt} ({infoUpdatedBy})', { infoUpdatedAt: h.dateTime(computer.info_updated_at), infoUpdatedBy: computer.info_updated_by }) %></span><% } %>
   </p>
 </section>
 
@@ -34,53 +34,54 @@
     const moves = keyHistory?.moves ?? [];
     const dups = keyHistory?.duplicates ?? [];
   %>
+  <%
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+    // link to another computer (HTML, escaped); a computer outside the viewer's branches has no name
+    const compLink = (id, name, guid) => (name
+      ? `<a href="/computers/${esc(id)}">${esc(name)}</a>${guid ? ` <span class="guid">${esc(guid)}</span>` : ''}`
+      : esc(t('một máy ở chi nhánh khác')));
+  %>
   <% moves.forEach((m) => { const isFrom = String(m.from_computer_id) === String(computer.id); %>
     <div class="notice notice-info">
       <% if (isFrom) { %>
-        Key <code><%= kid(m.key_id) %>…</code> đã chuyển sang máy <% if (m.to_name) { %><a href="/computers/<%= m.to_computer_id %>"><%= m.to_name %></a> <span class="guid"><%= m.to_guid %></span><% } else { %>một máy ở chi nhánh khác<% } %>
-        lúc <%= h.dateTime(m.at) %>: máy được unjoin rồi join lại AD (computer object mới) và key được đẩy lên lại.
+        <%- th('Key <code>{kid}…</code> đã chuyển sang máy {comp} lúc {at}: máy được unjoin rồi join lại AD (computer object mới) và key được đẩy lên lại.', { kid: kid(m.key_id), comp: html(compLink(m.to_computer_id, m.to_name, m.to_guid)), at: h.dateTime(m.at) }) %>
       <% } else { %>
-        Key <code><%= kid(m.key_id) %>…</code> chuyển từ máy cũ <% if (m.from_name) { %><a href="/computers/<%= m.from_computer_id %>"><%= m.from_name %></a> <span class="guid"><%= m.from_guid %></span><% } else { %>một máy ở chi nhánh khác<% } %>
-        lúc <%= h.dateTime(m.at) %> (máy unjoin rồi join lại AD; cùng Key ID, cùng mật khẩu).
+        <%- th('Key <code>{kid}…</code> chuyển từ máy cũ {comp} lúc {at} (máy unjoin rồi join lại AD; cùng Key ID, cùng mật khẩu).', { kid: kid(m.key_id), comp: html(compLink(m.from_computer_id, m.from_name, m.from_guid)), at: h.dateTime(m.at) }) %>
       <% } %>
     </div>
   <% }) %>
   <% dups.forEach((d) => { const isOwner = String(d.owner_id) === String(computer.id); %>
     <% if (d.resolution === 'shared') { %>
     <div class="notice notice-info">
-      Key ID <code><%= kid(d.key_id) %>…</code> được đánh dấu <strong>dùng chung</strong> giữa máy
-      <% if (d.owner_name) { %><a href="/computers/<%= d.owner_id %>"><%= d.owner_name %></a><% } else { %>một máy ở chi nhánh khác<% } %> (máy đang giữ key) và máy
-      <% if (d.other_name) { %><a href="/computers/<%= d.other_id %>"><%= d.other_name %></a><% } else { %>một máy ở chi nhánh khác<% } %>.
-      Key chỉ lưu ở máy <%= d.owner_name ?? 'đang giữ' %>; máy còn lại dùng chung key này.
+      <%- th('Key ID <code>{kid}…</code> được đánh dấu <strong>dùng chung</strong> giữa máy {owner} (máy đang giữ key) và máy {other}. Key chỉ lưu ở máy {holder}; máy còn lại dùng chung key này.', { kid: kid(d.key_id), owner: html(compLink(d.owner_id, d.owner_name)), other: html(compLink(d.other_id, d.other_name)), holder: d.owner_name ?? t('đang giữ') }) %>
     </div>
     <% } else { %>
     <div class="notice notice-warn">
-      Key ID <code><%= kid(d.key_id) %>…</code>
-      <% if (isOwner) { %>cũng nằm dưới máy <% if (d.other_name) { %><a href="/computers/<%= d.other_id %>"><%= d.other_name %></a> <span class="guid"><%= d.other_guid %></span><% } else { %>một máy ở chi nhánh khác<% } %><% } else { %>của máy <% if (d.owner_name) { %><a href="/computers/<%= d.owner_id %>"><%= d.owner_name %></a> <span class="guid"><%= d.owner_guid %></span><% } else { %>một máy ở chi nhánh khác<% } %> cũng nằm dưới máy này<% } %>
-      (cả hai còn trong phạm vi giám sát<%= d.same_password ? '' : ', mật khẩu khác nhau' %>). Key vẫn giữ ở máy <%= d.owner_name ?? 'đang giữ' %>; xem Quản trị > Sync AD.
+      <% if (isOwner) { %>
+        <%- th('Key ID <code>{kid}…</code> cũng nằm dưới máy {other} (cả hai còn trong phạm vi giám sát{pw}). Key vẫn giữ ở máy {holder}; xem Quản trị > Sync AD.', { kid: kid(d.key_id), other: html(compLink(d.other_id, d.other_name, d.other_guid)), pw: d.same_password ? '' : t(', mật khẩu khác nhau'), holder: d.owner_name ?? t('đang giữ') }) %>
+      <% } else { %>
+        <%- th('Key ID <code>{kid}…</code> của máy {owner} cũng nằm dưới máy này (cả hai còn trong phạm vi giám sát{pw}). Key vẫn giữ ở máy {holder}; xem Quản trị > Sync AD.', { kid: kid(d.key_id), owner: html(compLink(d.owner_id, d.owner_name, d.owner_guid)), pw: d.same_password ? '' : t(', mật khẩu khác nhau'), holder: d.owner_name ?? t('đang giữ') }) %>
+      <% } %>
     </div>
     <% } %>
   <% }) %>
   <% if (keys.length === 0) { %>
-    <p>Máy này chưa có key nào trên AD (BitLocker chưa bật hoặc chưa lưu key lên AD).</p>
+    <p><%= t('Máy này chưa có key nào trên AD (BitLocker chưa bật hoặc chưa lưu key lên AD).') %></p>
   <% } else { %>
-    <p class="muted">So 8 ký tự đầu Key ID với số người dùng đọc trên màn hình recovery trước khi hiện key.
-      Một máy có thể có nhiều ổ được mã hóa, mỗi ổ một hoặc nhiều key; "Có key mới hơn" chỉ so trong cùng một ổ.</p>
+    <p class="muted"><%= t('So 8 ký tự đầu Key ID với số người dùng đọc trên màn hình recovery trước khi hiện key. Một máy có thể có nhiều ổ được mã hóa, mỗi ổ một hoặc nhiều key; "Có key mới hơn" chỉ so trong cùng một ổ.') %></p>
     <table>
-      <thead><tr><th>Ổ đĩa</th><th>Key ID</th><th>Tạo trên AD</th><th>Ghi nhận</th><th>Trạng thái</th><th>Hiện gần nhất</th><th></th></tr></thead>
+      <thead><tr><th><%= t('Ổ đĩa') %></th><th>Key ID</th><th><%= t('Tạo trên AD') %></th><th><%= t('Ghi nhận') %></th><th><%= t('Trạng thái') %></th><th><%= t('Hiện gần nhất') %></th><th></th></tr></thead>
       <tbody>
       <% const volumes = [...new Set(keys.map((k) => k.volume_guid).filter(Boolean))]; %>
       <% keys.forEach((k) => { const st = h.keyStatus(k.status); const hl = highlight && highlight.toLowerCase() === k.key_id; %>
         <tr class="<%= hl ? 'highlight' : '' %>">
-          <td title="<%= k.volume_guid ? `Volume GUID ${k.volume_guid}` : 'Chưa có thông tin ổ (có ở lần full sync tới)' %>"><%= k.volume_guid ? `Ổ ${volumes.indexOf(k.volume_guid) + 1}` : '—' %></td>
+          <td title="<%= k.volume_guid ? `Volume GUID ${k.volume_guid}` : t('Chưa có thông tin ổ (có ở lần full sync tới)') %>"><%= k.volume_guid ? t('Ổ {n}', { n: volumes.indexOf(k.volume_guid) + 1 }) : '—' %></td>
           <td><code><strong><%= k.key_id_prefix %></strong><%= k.key_id.toUpperCase().slice(8) %></code></td>
           <td><%= h.dateTime(k.ad_created_at) %></td>
           <td><%= h.dateTime(k.first_synced_at) %></td>
-          <td><span class="badge badge-<%= st.tone %>"><%= st.label %></span><% if (computer.deleted_in_ad_at) { %> <span class="badge badge-muted" title="Máy này hiện không nằm trong phạm vi worker giám sát. Key vẫn được lưu.">Máy ngoài phạm vi</span><% } %></td>
+          <td><span class="badge badge-<%= st.tone %>"><%= st.label %></span><% if (computer.deleted_in_ad_at) { %> <span class="badge badge-muted" title="<%= t('Máy này hiện không nằm trong phạm vi worker giám sát. Key vẫn được lưu.') %>"><%= t('Máy ngoài phạm vi') %></span><% } %></td>
           <td><%= k.last_revealed_at ? h.dateTime(k.last_revealed_at) : '—' %></td>
-          <td class="row-actions">
-            <a class="button small" href="/computers/<%= computer.id %>/keys/<%= k.key_id %>/reveal">Hiện key</a>
-          </td>
+          <td class="row-actions"> <%- th('<a class="button small" href="/computers/{id}/keys/{keyId}/reveal">Hiện key</a>', { id: computer.id, keyId: k.key_id }) %> </td>
         </tr>
       <% }) %>
       </tbody>

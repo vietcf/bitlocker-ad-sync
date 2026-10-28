@@ -2,7 +2,7 @@ import { can } from '../domain/scope.js';
 import { APP_VERSION } from '../version.js';
 import { csrfToken } from '../http/csrf.js';
 import { AppError } from '../http/errors.js';
-import { helpers } from './helpers.js';
+import { translator } from '../i18n/index.js';
 import { errorText } from './messages.js';
 
 /** One-shot message shown on the next page (after a redirect). */
@@ -10,15 +10,15 @@ export function flash(req, type, text) {
   req.session.flash = { type, text };
 }
 
-/** Values every template can use: me, can(), csrf token, flash, helpers, current path. */
+/** Values every template can use: me, can(), csrf token, flash, current path (language, t and h come from languageContext). */
 export function templateLocals(req, res, next) {
   const scope = req.scope;
   res.locals.me = scope;
   res.locals.can = (capability) => !!scope && can(scope, capability);
   res.locals.csrfToken = csrfToken(req);
-  res.locals.h = helpers;
   res.locals.appVersion = APP_VERSION;
   res.locals.path = req.path;
+  res.locals.currentUrl = req.originalUrl;
   res.locals.flash = req.session.flash ?? null;
   delete req.session.flash;
   next();
@@ -49,9 +49,10 @@ export function formAction(handler, renderForm, statuses = [400, 409]) {
  */
 // eslint-disable-next-line no-unused-vars
 export function webErrorHandler(err, req, res, next) {
+  const t = req.t ?? translator('en').t;
   if (err instanceof AppError && err.status === 401) {
     const nextUrl = req.method === 'GET' ? `?next=${encodeURIComponent(req.originalUrl)}` : '';
-    if (err.code === 'session_expired') flash(req, 'info', errorText(err));
+    if (err.code === 'session_expired') flash(req, 'info', errorText(err, t));
     return res.redirect(`/login${nextUrl}`);
   }
   if (err instanceof AppError && err.code === 'password_change_required') return res.redirect('/change-password');
@@ -59,9 +60,9 @@ export function webErrorHandler(err, req, res, next) {
   const known = err instanceof AppError;
   if (!known) req.log.error({ err }, 'unhandled web error');
   res.status(known ? err.status : 500).render('error', {
-    title: 'Có lỗi',
+    title: t('Có lỗi'),
     status: known ? err.status : 500,
-    message: known ? errorText(err) : 'Có lỗi không mong muốn. Vui lòng thử lại; nếu vẫn lỗi, báo Admin HQ kèm mã bên dưới.',
+    message: known ? errorText(err, t) : t('Có lỗi không mong muốn. Vui lòng thử lại; nếu vẫn lỗi, báo Admin HQ kèm mã bên dưới.'),
     requestId: known ? null : req.id,
   });
 }

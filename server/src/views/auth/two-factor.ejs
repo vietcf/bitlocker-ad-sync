@@ -1,33 +1,30 @@
 <%- include('../partials/head') %>
 <section class="card narrow">
   <h1><%= title %></h1>
-  <p class="muted">Tài khoản <strong><%= username %></strong></p>
+  <p class="muted"><%- th('Tài khoản <strong>{username}</strong>', { username: username }) %></p>
   <%- include('../partials/error-box', { error }) %>
   <% if (setup) { %>
     <ol class="steps">
-      <li>Cài app xác thực trên điện thoại: <strong>Microsoft Authenticator</strong> hoặc <strong>Google Authenticator</strong>.</li>
-      <li>Trong app, chọn thêm tài khoản và quét mã QR này:
-        <div class="qr" aria-label="Mã QR để thêm tài khoản vào app xác thực"><%- setup.qrSvg %></div>
-        Không quét được thì nhập khóa sau vào app (loại "dựa trên thời gian"):
+      <li><%- th('Cài app xác thực trên điện thoại: <strong>Microsoft Authenticator</strong> hoặc <strong>Google Authenticator</strong>.') %></li>
+      <li><%= t('Trong app, chọn thêm tài khoản và quét mã QR này:') %> <div class="qr" aria-label="<%= t('Mã QR để thêm tài khoản vào app xác thực') %>"><%- setup.qrSvg %></div>
+        <%= t('Không quét được thì nhập khóa sau vào app (loại "dựa trên thời gian"):') %>
         <code class="totp-secret"><%= setup.secret %></code></li>
-      <li>Nhập mã 6 số app đang hiện để hoàn tất.</li>
+      <li><%= t('Nhập mã 6 số app đang hiện để hoàn tất.') %></li>
     </ol>
   <% } else { %>
-    <p>Mở app xác thực (Microsoft / Google Authenticator) trên điện thoại và nhập mã 6 số đang hiện cho <strong>BitLocker Keys</strong>.</p>
+    <p><%- th('Mở app xác thực (Microsoft / Google Authenticator) trên điện thoại và nhập mã 6 số đang hiện cho <strong>BitLocker Keys</strong>.') %></p>
   <% } %>
   <form method="post" action="/login/2fa" class="form">
     <%- include('../partials/csrf') %>
-    <label>Mã xác thực
-      <input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9 ]{6,7}" maxlength="7" required autofocus
+    <label><%= t('Mã xác thực') %> <input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9 ]{6,7}" maxlength="7" required autofocus
              class="totp-code" placeholder="123456">
     </label>
-    <button type="submit"><%= setup ? 'Xác nhận và đăng nhập' : 'Đăng nhập' %></button>
+    <button type="submit"><%= setup ? t('Xác nhận và đăng nhập') : t('Đăng nhập') %></button>
   </form>
-  <p class="muted small">Mã đổi mỗi 30 giây và mỗi mã chỉ dùng được một lần. Mất điện thoại hoặc đổi máy: nhờ Admin HQ
-    "Đặt lại xác thực 2 bước" rồi thiết lập lại. Trang này hết hạn sau 5 phút.</p>
+  <p class="muted small"><%= t('Mã đổi mỗi 30 giây và mỗi mã chỉ dùng được một lần. Mất điện thoại hoặc đổi máy: nhờ Admin HQ "Đặt lại xác thực 2 bước" rồi thiết lập lại. Trang này hết hạn sau 5 phút.') %></p>
   <form method="post" action="/logout" class="inline">
     <%- include('../partials/csrf') %>
-    <button type="submit" class="link">← Đăng nhập bằng tài khoản khác</button>
+    <button type="submit" class="link"><%= t('← Đăng nhập bằng tài khoản khác') %></button>
   </form>
 </section>
 <%- include('../partials/foot') %>

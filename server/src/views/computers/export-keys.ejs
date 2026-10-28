@@ -1,20 +1,16 @@
 <%- include('../partials/head') %>
-<p class="crumbs"><a href="/<%= h.query(query, {}) %>">← Quay lại danh sách máy</a></p>
+<p class="crumbs"><%- th('<a href="/{query}">← Quay lại danh sách máy</a>', { query: h.query(query, {}) }) %></p>
 <section class="card narrow wide-ish">
-  <h1>Xuất kèm recovery key</h1>
-  <div class="notice notice-warn">
-    File CSV sẽ chứa <strong>mật khẩu recovery</strong> của <strong><%= h.number(preview.keys) %> key</strong>
-    trên <strong><%= h.number(preview.computers) %> máy</strong> theo bộ lọc đang chọn, trong phạm vi chi nhánh của bạn.
-  </div>
-  <p class="muted">Mỗi key xuất ra được ghi vào nhật ký như một lần hiện key (người xuất, thời điểm, lý do), và Admin HQ
-    nhận cảnh báo. Lưu file ở nơi an toàn và xóa ngay khi dùng xong.</p>
+  <h1><%= t('Xuất kèm recovery key') %></h1>
+  <div class="notice notice-warn"> <%- th('File CSV sẽ chứa <strong>mật khẩu recovery</strong> của <strong>{keys} key</strong> trên <strong>{computers} máy</strong> theo bộ lọc đang chọn, trong phạm vi chi nhánh của bạn.', { keys: h.number(preview.keys), computers: h.number(preview.computers) }) %> </div>
+  <p class="muted"><%= t('Mỗi key xuất ra được ghi vào nhật ký như một lần hiện key (người xuất, thời điểm, lý do), và Admin HQ nhận cảnh báo. Lưu file ở nơi an toàn và xóa ngay khi dùng xong.') %></p>
   <dl class="facts">
-    <dt>Chi nhánh</dt><dd><%= filters.branchId === 'na' ? 'N/A (chưa thuộc chi nhánh nào)' : filters.branchId ? (branchName ?? filters.branchId) : 'Tất cả trong phạm vi của bạn' %></dd>
-    <dt>Tình trạng</dt><dd><%= filters.status === 'no_key' ? 'Chưa có key' : filters.status === 'has_key' ? 'Đã có key' : 'Tất cả' %></dd>
-    <dt>Máy không còn trong phạm vi giám sát</dt><dd><%= filters.includeDeleted ? 'Có' : 'Không' %></dd>
+    <dt><%= t('Chi nhánh') %></dt><dd><%= filters.branchId === 'na' ? t('N/A (chưa thuộc chi nhánh nào)') : filters.branchId ? (branchName ?? filters.branchId) : t('Tất cả trong phạm vi của bạn') %></dd>
+    <dt><%= t('Tình trạng') %></dt><dd><%= filters.status === 'no_key' ? t('Chưa có key') : filters.status === 'has_key' ? t('Đã có key') : t('Tất cả') %></dd>
+    <dt><%= t('Máy không còn trong phạm vi giám sát') %></dt><dd><%= filters.includeDeleted ? t('Có') : t('Không') %></dd>
     <% if (filters.from || filters.to) { %>
-      <dt><%= filters.dateField === 'ad' ? 'Tạo trên AD' : 'Ghi nhận trên hệ thống' %></dt>
-      <dd><%= filters.from ? `từ ${filters.from}` : '' %> <%= filters.to ? `đến ${filters.to}` : '' %></dd>
+      <dt><%= filters.dateField === 'ad' ? t('Tạo trên AD') : t('Ghi nhận trên hệ thống') %></dt>
+      <dd><%= filters.from ? t('từ {d}', { d: filters.from }) : '' %> <%= filters.to ? t('đến {d}', { d: filters.to }) : '' %></dd>
     <% } %>
   </dl>
   <%- include('../partials/error-box', { error }) %>
@@ -29,27 +25,26 @@
     <% if (filters.noLogon) { %><input type="hidden" name="noLogon" value="<%= filters.noLogon %>"><% } %>
     <% if (filters.from) { %><input type="hidden" name="from" value="<%= filters.from %>"><% } %>
     <% if (filters.to) { %><input type="hidden" name="to" value="<%= filters.to %>"><% } %>
-    <label>Lý do
-      <select name="reason" required>
-        <option value="">— Chọn lý do —</option>
+    <label><%= t('Lý do') %> <select name="reason" required>
+        <option value=""><%= t('— Chọn lý do —') %></option>
         <% reasons.forEach((r) => { %>
-          <option value="<%= r.value %>" <%= form.reason === r.value ? 'selected' : '' %>><%= r.label %></option>
+          <option value="<%= r.value %>" <%= form.reason === r.value ? 'selected' : '' %>><%= t(r.label) %></option>
         <% }) %>
       </select>
     </label>
-    <label>Ghi chú <span class="muted">(bắt buộc nếu chọn “Lý do khác”)</span>
+    <label><%= t('Ghi chú') %> <span class="muted"><%= t('(bắt buộc nếu chọn “Lý do khác”)') %></span>
       <textarea name="reasonNote" maxlength="500" rows="3"><%= form.reasonNote ?? '' %></textarea>
     </label>
-    <label>Số ticket <% if (!ticketRequired) { %><span class="muted">(nếu có)</span><% } %>
+    <label><%= t('Số ticket') %> <% if (!ticketRequired) { %><span class="muted"><%= t('(nếu có)') %></span><% } %>
       <input name="ticketNo" maxlength="64" value="<%= form.ticketNo ?? '' %>" <%= ticketRequired ? 'required' : '' %>>
     </label>
     <div class="actions">
-      <button type="submit">Tải file CSV</button>
-      <a class="button secondary" href="/<%= h.query(query, {}) %>">Hủy</a>
+      <button type="submit"><%= t('Tải file CSV') %></button>
+      <a class="button secondary" href="/<%= h.query(query, {}) %>"><%= t('Hủy') %></a>
     </div>
   </form>
   <% } else { %>
-    <p>Không có key nào theo bộ lọc này.</p>
+    <p><%= t('Không có key nào theo bộ lọc này.') %></p>
   <% } %>
 </section>
 <%- include('../partials/foot') %>

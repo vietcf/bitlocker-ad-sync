@@ -1,16 +1,15 @@
 <%- include('../partials/head') %>
 <%- include('_tabs') %>
 <% const items = [
-  ['feature.manual_sync', 'Yêu cầu sync từ web', 'Admin HQ bấm "Delta" / "Full" trên trang Sync AD để worker chạy ở lần heartbeat kế tiếp.'],
-  ['feature.audit_export', 'Xuất CSV nhật ký', 'Nút "Xuất CSV" trên trang Nhật ký và API ?format=csv. Mỗi lần xuất đều được ghi lại.'],
-  ['feature.computer_export', 'Xuất CSV danh sách máy', 'Nút "Xuất CSV" trên trang Tìm máy, xuất theo bộ lọc đang chọn (không có key). Mỗi lần xuất đều được ghi lại.'],
-  ['feature.reveal_alerts', 'Cảnh báo khi xem key ngoài giờ', 'Gửi cảnh báo cho Admin HQ khi có người xem key ngoài giờ làm việc.'],
-  ['reveal.ticket_required', 'Bắt buộc số ticket khi hiện key', 'Người hiện key phải nhập số ticket hỗ trợ, ngoài lý do.'],
+  ['feature.manual_sync', t('Yêu cầu sync từ web'), t('Admin HQ bấm "Delta" / "Full" trên trang Sync AD để worker chạy ở lần heartbeat kế tiếp.')],
+  ['feature.audit_export', t('Xuất CSV nhật ký'), t('Nút "Xuất CSV" trên trang Nhật ký và API ?format=csv. Mỗi lần xuất đều được ghi lại.')],
+  ['feature.computer_export', t('Xuất CSV danh sách máy'), t('Nút "Xuất CSV" trên trang Tìm máy, xuất theo bộ lọc đang chọn (không có key). Mỗi lần xuất đều được ghi lại.')],
+  ['feature.reveal_alerts', t('Cảnh báo khi xem key ngoài giờ'), t('Gửi cảnh báo cho Admin HQ khi có người xem key ngoài giờ làm việc.')],
+  ['reveal.ticket_required', t('Bắt buộc số ticket khi hiện key'), t('Người hiện key phải nhập số ticket hỗ trợ, ngoài lý do.')],
 ]; %>
 <section class="card">
-  <h2>Tính năng</h2>
-  <p class="muted">Bật hoặc tắt từng tính năng. Thay đổi có hiệu lực trong vòng 30 giây và được ghi vào nhật ký.
-    Đăng nhập AD / local cấu hình trong file <code>.env</code> (<code>LDAP_SERVERS</code>, <code>LOCAL_LOGIN_ENABLED</code>).</p>
+  <h2><%= t('Tính năng') %></h2>
+  <p class="muted"><%- th('Bật hoặc tắt từng tính năng. Thay đổi có hiệu lực trong vòng 30 giây và được ghi vào nhật ký. Đăng nhập AD / local cấu hình trong file <code>.env</code> (<code>LDAP_SERVERS</code>, <code>LOCAL_LOGIN_ENABLED</code>).') %></p>
   <%- include('../partials/error-box', { error }) %>
   <form method="post" action="/admin/settings/features" class="form">
     <%- include('../partials/csrf') %>
@@ -19,29 +18,27 @@
         <span><strong><%= label %></strong><span class="muted hint"><%= help %></span></span></label>
     <% }) %>
     <fieldset>
-      <legend>Xuất kèm recovery key</legend>
-      <p class="muted small">Nút "Xuất kèm key" trên trang Tìm máy: tải file CSV có <strong>mật khẩu recovery</strong> của các máy
-        theo bộ lọc, trong phạm vi chi nhánh của người xuất. Phải chọn lý do như khi hiện key; mỗi key xuất ra được ghi
-        nhật ký như một lần hiện key, và Admin HQ nhận cảnh báo.</p>
-      <% [['off', 'Tắt'], ['admin', 'Chỉ Admin HQ'], ['all', 'IT, Trưởng IT và Admin HQ (mỗi người trong phạm vi chi nhánh của mình)']].forEach(([v, label]) => { %>
+      <legend><%= t('Xuất kèm recovery key') %></legend>
+      <p class="muted small"><%- th('Nút "Xuất kèm key" trên trang Tìm máy: tải file CSV có <strong>mật khẩu recovery</strong> của các máy theo bộ lọc, trong phạm vi chi nhánh của người xuất. Phải chọn lý do như khi hiện key; mỗi key xuất ra được ghi nhật ký như một lần hiện key, và Admin HQ nhận cảnh báo.') %></p>
+      <% [['off', t('Tắt')], ['admin', t('Chỉ Admin HQ')], ['all', t('IT, Trưởng IT và Admin HQ (mỗi người trong phạm vi chi nhánh của mình)')]].forEach(([v, label]) => { %>
         <label class="check"><input type="radio" name="export.keys" value="<%= v %>" <%= values['export.keys'] === v ? 'checked' : '' %>> <span><%= label %></span></label>
       <% }) %>
     </fieldset>
     <fieldset>
-      <legend>Hiển thị: số dòng mỗi trang</legend>
-      <p class="muted small">Số bản ghi hiện trên một trang của từng danh sách, từ <%= pageSizeLimits[0] %> đến <%= pageSizeLimits[1] %>. Áp dụng ngay.</p>
+      <legend><%= t('Hiển thị: số dòng mỗi trang') %></legend>
+      <p class="muted small"><%= t('Số bản ghi hiện trên một trang của từng danh sách, từ {pageSizeLimits} đến {pageSizeLimits2}. Áp dụng ngay.', { pageSizeLimits: pageSizeLimits[0], pageSizeLimits2: pageSizeLimits[1] }) %></p>
       <div class="thr-list">
-        <div class="thr-row thr-head"><span>Danh sách</span><span>Số dòng mỗi trang</span><span>Mặc định</span></div>
+        <div class="thr-row thr-head"><%- th('<span>Danh sách</span><span>Số dòng mỗi trang</span><span>Mặc định</span>') %></div>
         <% Object.values(pageSizes).forEach((p) => { %>
           <div class="thr-row">
-            <label for="<%= p.key %>"><%= p.label %></label>
-            <span class="nowrap"><input id="<%= p.key %>" name="<%= p.key %>" value="<%= values[p.key] %>" type="number" min="<%= pageSizeLimits[0] %>" max="<%= pageSizeLimits[1] %>" required class="thr-input"> dòng</span>
-            <span class="muted"><%= p.default %> dòng</span>
+            <label for="<%= p.key %>"><%= t(p.label) %></label>
+            <span class="nowrap"><input id="<%= p.key %>" name="<%= p.key %>" value="<%= values[p.key] %>" type="number" min="<%= pageSizeLimits[0] %>" max="<%= pageSizeLimits[1] %>" required class="thr-input"> <%= t('dòng') %></span>
+            <span class="muted"><%= t('{default} dòng', { default: p.default }) %></span>
           </div>
         <% }) %>
       </div>
     </fieldset>
-    <div class="actions"><button type="submit">Lưu</button></div>
+    <div class="actions"><button type="submit"><%= t('Lưu') %></button></div>
   </form>
 </section>
 <%- include('../partials/foot') %>

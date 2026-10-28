@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { appPool, asOwner, resetDatabase } from './db.js';
-import { PASSWORD, addUser, apiLogin, buildApp, csrfFrom, webLogin } from './app.js';
+import { PASSWORD, addUser, apiLogin, buildApp, csrfFrom, webLogin, chooseVietnamese } from './app.js';
 import { codeAt, stepAt } from '../../src/modules/auth/totp.js';
 
 let pool;
@@ -81,6 +81,7 @@ describe('two-step sign-in (TOTP)', () => {
   it('web: password, then the QR code page, then the code', async () => {
     await turnOn2fa();
     const agent = request.agent(app);
+    await chooseVietnamese(agent);
     const page = await agent.get('/login');
     const login = await agent.post('/login').type('form').send({ _csrf: csrfFrom(page.text), username: 'it.hn', password: PASSWORD });
     expect(login.headers.location).toBe('/login/2fa');

@@ -1,0 +1,8 @@
+<%# English / Vietnamese switch: saved on the user's account when signed in, in a cookie otherwise. %>
+<form method="post" action="/language" class="lang-switch inline" aria-label="Language">
+  <%- include('csrf') %>
+  <input type="hidden" name="next" value="<%= currentUrl %>">
+  <button type="submit" name="lang" value="en" class="link<%= lang === 'en' ? ' is-active' : '' %>"<%- lang === 'en' ? ' aria-current="true"' : '' %>>EN</button>
+  <span aria-hidden="true">|</span>
+  <button type="submit" name="lang" value="vi" class="link<%= lang === 'vi' ? ' is-active' : '' %>"<%- lang === 'vi' ? ' aria-current="true"' : '' %>>VI</button>
+</form>

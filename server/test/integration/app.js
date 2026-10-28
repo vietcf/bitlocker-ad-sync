@@ -91,12 +91,13 @@ export async function addUser(pool, username, grants, { mustChange = false } = {
     passwordHash: await hashPassword(PASSWORD),
     mustChange,
     grants,
+    language: 'vi', // the existing page tests read the Vietnamese texts; English is covered by i18n-pages.test.js
   });
 }
 
 /** Creates an AD user (no password stored here) with grants. */
 export function addAdUser(pool, username, grants) {
-  return createUser(pool, { username, displayName: username.toUpperCase(), authSource: 'ldap', grants });
+  return createUser(pool, { username, displayName: username.toUpperCase(), authSource: 'ldap', grants, language: 'vi' });
 }
 
 /** API sign-in with a cookie-keeping agent. Returns { agent, csrf }. */
@@ -109,6 +110,12 @@ export async function apiLogin(app, username, password = PASSWORD) {
 
 /** Pulls the CSRF token out of a rendered page. */
 export const csrfFrom = (html) => /name="_csrf" value="([^"]+)"/.exec(html)?.[1];
+
+/** A visitor who is not signed in picks the Vietnamese UI (the `lang` cookie), through the real language switch. */
+export async function chooseVietnamese(agent, next = '/login') {
+  const page = await agent.get('/login');
+  await agent.post('/language').type('form').send({ _csrf: csrfFrom(page.text), lang: 'vi', next });
+}
 
 /** Web (form) sign-in. Returns { agent, csrf } where csrf is the post-login token. */
 export async function webLogin(app, username, password = PASSWORD) {

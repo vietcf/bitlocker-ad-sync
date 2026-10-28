@@ -401,3 +401,9 @@ button:disabled { cursor: not-allowed; }
 
 /* Chu co giai thich khi re chuot: gach chan cham + con tro dau hoi (thay icon) */
 .has-tip { border-bottom: 1px dotted var(--muted); cursor: help; }
+
+/* Language switch (EN | VI) */
+.lang-switch { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted, #62646c); }
+.lang-switch button.link { text-decoration: none; }
+.lang-switch button.is-active { font-weight: 700; color: inherit; text-decoration: underline; }
+.lang-corner { display: flex; justify-content: flex-end; padding: 8px 16px 0; }

@@ -9,7 +9,7 @@ import { NEW_OBJECTS_DEFAULTS } from '../mail/new-objects.js';
 import { DAILY_REPORT_DEFAULTS } from '../reports/daily-report.js';
 import { JOB_SCHEDULE, TIME_OF_DAY, jobMinutes, jobTime } from '../../jobs/job-schedule.js';
 import { LOCKOUT_DEFAULTS, LOCKOUT_LIMITS, loadLockoutPolicy } from '../auth/lockout.js';
-import { PASSWORD_LENGTH_LIMITS, describePasswordPolicy, loadPasswordPolicy } from '../auth/password.js';
+import { PASSWORD_LENGTH_LIMITS, loadPasswordPolicy } from '../auth/password.js';
 import { encryptSecret } from '../mail/secret.js';
 import { ALERT_SWITCHES, CHECK_SWITCHES, FEATURES } from './settings.service.js';
 import { KEY_EXPORT_MODES } from '../keys/keys.service.js';
@@ -160,7 +160,7 @@ export class SettingsAdminService {
       lockout: await loadLockoutPolicy(this.settings),
       lockoutLimits: LOCKOUT_LIMITS,
       password: await loadPasswordPolicy(this.settings),
-      passwordText: describePasswordPolicy(await loadPasswordPolicy(this.settings)),
+      
     };
   }
 

@@ -2,27 +2,24 @@
 <%- include('_tabs') %>
 <section class="card">
   <div class="title-row">
-    <h2>Chi nhánh</h2>
-    <a class="button small" href="/admin/branches/new">Thêm chi nhánh</a>
+    <h2><%= t('Chi nhánh') %></h2>
+    <a class="button small" href="/admin/branches/new"><%= t('Thêm chi nhánh') %></a>
   </div>
-  <p class="muted">Máy thuộc chi nhánh theo OU: máy nằm trong OU gốc (hoặc OU con) của chi nhánh nào thì thuộc chi nhánh đó.
-    OU gốc dài nhất khớp được ưu tiên. Thêm hoặc sửa chi nhánh thì hệ thống quét lại toàn bộ máy theo OU ngay khi lưu;
-    xóa chi nhánh thì máy của chi nhánh đó chuyển về N/A.</p>
+  <p class="muted"><%= t('Máy thuộc chi nhánh theo OU: máy nằm trong OU gốc (hoặc OU con) của chi nhánh nào thì thuộc chi nhánh đó. OU gốc dài nhất khớp được ưu tiên. Thêm hoặc sửa chi nhánh thì hệ thống quét lại toàn bộ máy theo OU ngay khi lưu; xóa chi nhánh thì máy của chi nhánh đó chuyển về N/A.') %></p>
   <% if (unmapped > 0) { %>
-    <div class="notice notice-warn"><%= unmapped %> máy chưa thuộc chi nhánh nào, hiển thị là N/A (chỉ Admin HQ thấy).
-      <a href="/?branchId=na">Xem danh sách</a>, rồi thêm OU của chúng vào chi nhánh tương ứng.</div>
+    <div class="notice notice-warn"><%- th('{unmapped} máy chưa thuộc chi nhánh nào, hiển thị là N/A (chỉ Admin HQ thấy). <a href="/?branchId=na">Xem danh sách</a>, rồi thêm OU của chúng vào chi nhánh tương ứng.', { unmapped: unmapped }) %></div>
   <% } %>
   <table>
-    <thead><tr><th>Mã</th><th>Tên</th><th>OU gốc</th><th class="num">Máy</th><th>Trạng thái</th><th></th></tr></thead>
+    <thead><tr><th><%= t('Mã') %></th><th><%= t('Tên') %></th><th><%= t('OU gốc') %></th><th class="num"><%= t('Máy') %></th><th><%= t('Trạng thái') %></th><th></th></tr></thead>
     <tbody>
     <% branches.forEach((b) => { %>
       <tr>
         <td><strong><%= b.code %></strong></td>
         <td><%= b.name %></td>
-        <td><% b.ous.forEach((ou) => { %><code class="wrap block"><%= ou %></code><% }) %><% if (!b.ous.length) { %><span class="muted">Chưa có</span><% } %></td>
+        <td><% b.ous.forEach((ou) => { %><code class="wrap block"><%= ou %></code><% }) %><% if (!b.ous.length) { %><span class="muted"><%= t('Chưa có') %></span><% } %></td>
         <td class="num"><%= h.number(b.computers) %></td>
-        <td><%= b.is_active ? 'Hoạt động' : 'Ngừng' %></td>
-        <td class="row-actions"><a href="/admin/branches/<%= b.id %>/edit">Sửa</a> · <a class="danger-link" href="/admin/branches/<%= b.id %>/delete">Xóa</a></td>
+        <td><%= b.is_active ? t('Hoạt động') : t('Ngừng') %></td>
+        <td class="row-actions"><%- th('<a href="/admin/branches/{id}/edit">Sửa</a> · <a class="danger-link" href="/admin/branches/{id2}/delete">Xóa</a>', { id: b.id, id2: b.id }) %></td>
       </tr>
     <% }) %>
     </tbody>

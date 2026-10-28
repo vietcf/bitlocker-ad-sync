@@ -127,7 +127,7 @@ const GRANTS_JSON = `coalesce(json_agg(json_build_object('branchId', g.branch_id
 /** Active user + grants (inactive branches dropped), or null if missing/disabled. */
 export async function loadPrincipal(db, id) {
   const { rows } = await db.query(
-    `SELECT u.id, u.username, u.display_name, u.email, u.auth_source, u.must_change_password,
+    `SELECT u.id, u.username, u.display_name, u.email, u.auth_source, u.must_change_password, u.language,
             coalesce(json_agg(json_build_object('branchId', g.branch_id, 'role', g.role))
                        FILTER (WHERE g.role IS NOT NULL AND (g.branch_id IS NULL OR b.is_active)), '[]') AS grants
        FROM app_user u
@@ -138,6 +138,11 @@ export async function loadPrincipal(db, id) {
     [id],
   );
   return rows[0] ?? null;
+}
+
+/** Sets the UI / e-mail language of a user ('en' | 'vi'). */
+export async function setUserLanguage(db, id, language) {
+  await db.query('UPDATE app_user SET language = $2 WHERE id = $1', [id, language]);
 }
 
 export async function getPasswordHash(db, id) {
@@ -159,11 +164,11 @@ export async function setPassword(db, id, passwordHash, { mustChange }) {
  * Creates a user with grants [{ branchId, role }]. Returns the new id.
  * LDAP users have no password here and never a forced password change.
  */
-export async function createUser(db, { username, displayName, email = null, authSource = 'local', passwordHash = null, mustChange = true, totpRequired = false, grants = [], isRoot = false }) {
+export async function createUser(db, { username, displayName, email = null, authSource = 'local', passwordHash = null, mustChange = true, totpRequired = false, grants = [], isRoot = false, language = 'en' }) {
   const { rows } = await db.query(
-    `INSERT INTO app_user (username, display_name, email, auth_source, password_hash, must_change_password, totp_required, is_root)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-    [username, displayName, email, authSource, authSource === 'ldap' ? null : passwordHash, authSource === 'ldap' ? false : mustChange, totpRequired, isRoot],
+    `INSERT INTO app_user (username, display_name, email, auth_source, password_hash, must_change_password, totp_required, is_root, language)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+    [username, displayName, email, authSource, authSource === 'ldap' ? null : passwordHash, authSource === 'ldap' ? false : mustChange, totpRequired, isRoot, language],
   );
   await replaceGrants(db, rows[0].id, grants);
   return rows[0].id;

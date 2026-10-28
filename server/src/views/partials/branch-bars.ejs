@@ -16,18 +16,18 @@
 <ul class="hbars" role="list">
 <% [...rows.map((b) => [b, bar(b, false)]), ...(total ? [[total, bar(total, true)]] : [])].forEach(([b, v]) => { %>
   <li class="hbar-row<%= v.isTotal ? ' hbar-total' : '' %>">
-    <span class="hbar-label" title="<%= v.isTotal ? 'Tất cả chi nhánh' : (b.branch_name ?? 'Máy chưa thuộc chi nhánh nào') %>">
-      <strong><%= v.isTotal ? 'Tổng' : h.branchCode(b.branch_code) %></strong><% if (!v.isTotal && b.branch_name) { %> <span class="muted">· <%= b.branch_name %></span><% } %>
+    <span class="hbar-label" title="<%= v.isTotal ? t('Tất cả chi nhánh') : (b.branch_name ?? t('Máy chưa thuộc chi nhánh nào')) %>">
+      <strong><%= v.isTotal ? t('Tổng') : h.branchCode(b.branch_code) %></strong><% if (!v.isTotal && b.branch_name) { %> <span class="muted">· <%= b.branch_name %></span><% } %>
     </span>
-    <span class="hbar" aria-label="<%= `${h.number(b.computers)} máy: ${fmt(v.ok)} có key, ${fmt(v.bad)} chưa có key` %>">
-      <% if (!b.computers) { %><span class="hbar-empty">Chưa có máy</span><% } %>
+    <span class="hbar" aria-label="<%= t('{n} máy: {ok} có key, {bad} chưa có key', { n: h.number(b.computers), ok: fmt(v.ok), bad: fmt(v.bad) }) %>">
+      <% if (!b.computers) { %><span class="hbar-empty"><%= t('Chưa có máy') %></span><% } %>
       <% if (v.ok > 0) { %><span class="hbar-seg hbar-ok pct-<%= v.wOk %>"
-        title="Có key: <%= fmt(v.ok) %> (<%= h.number(b.with_key) %>/<%= h.number(b.computers) %> máy)"><% if (v.ok >= 12) { %><%= fmt(v.ok) %><% } %></span><% } %>
+        title="<%= t('Có key: {ok} ({withKey}/{computers} máy)', { ok: fmt(v.ok), withKey: h.number(b.with_key), computers: h.number(b.computers) }) %>"><% if (v.ok >= 12) { %><%= fmt(v.ok) %><% } %></span><% } %>
       <% if (v.bad > 0) { %><a class="hbar-seg hbar-bad pct-<%= v.wBad %>"
         href="/?<%= v.isTotal ? '' : `branchId=${b.branch_id ?? 'na'}&` %>status=no_key"
-        title="Chưa có key: <%= fmt(v.bad) %> (<%= h.number(b.no_key) %>/<%= h.number(b.computers) %> máy), bấm để xem danh sách"><% if (v.bad >= 12) { %><%= fmt(v.bad) %><% } %></a><% } %>
+        title="<%= t('Chưa có key: {bad} ({noKey}/{computers} máy), bấm để xem danh sách', { bad: fmt(v.bad), noKey: h.number(b.no_key), computers: h.number(b.computers) }) %>"><% if (v.bad >= 12) { %><%= fmt(v.bad) %><% } %></a><% } %>
     </span>
-    <span class="hbar-count"><%= h.number(b.computers) %> máy<% if (v.ok > 0 && v.ok < 12) { %><br><span class="muted small">có key <%= fmt(v.ok) %></span><% } %><% if (v.bad > 0 && v.bad < 12) { %><br><span class="muted small">chưa có key <%= fmt(v.bad) %></span><% } %></span>
+    <span class="hbar-count"><%= t('{n} máy', { n: h.number(b.computers) }) %><% if (v.ok > 0 && v.ok < 12) { %><br><span class="muted small"><%= t('có key {ok}', { ok: fmt(v.ok) }) %></span><% } %><% if (v.bad > 0 && v.bad < 12) { %><br><span class="muted small"><%= t('chưa có key {bad}', { bad: fmt(v.bad) }) %></span><% } %></span>
   </li>
 <% }) %>
 </ul>

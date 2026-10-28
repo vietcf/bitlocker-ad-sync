@@ -1,3 +1,4 @@
+import { translate } from '../../i18n/index.js';
 import { randomBytes, randomInt, scrypt, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 
@@ -95,10 +96,13 @@ export function generatePassword(policy = PASSWORD_POLICY_DEFAULTS) {
   }
 }
 
-/** The rules in words (Vietnamese), for the change-password page and the settings. */
-export function describePasswordPolicy(policy) {
+/** The rules in words, in the language of `t` (default Vietnamese), for the change-password page. */
+export function describePasswordPolicy(policy, t = (key, params) => translate('vi', key, params)) {
   const p = { ...PASSWORD_POLICY_DEFAULTS, ...policy };
-  const need = [['upper', 'chữ hoa'], ['lower', 'chữ thường'], ['digit', 'chữ số'], ['special', 'ký tự đặc biệt (ví dụ - _ ! @ # hoặc dấu cách)']]
+  const need = [['upper', t('chữ hoa')], ['lower', t('chữ thường')], ['digit', t('chữ số')], ['special', t('ký tự đặc biệt (ví dụ - _ ! @ # hoặc dấu cách)')]]
     .filter(([k]) => p[k]).map(([, v]) => v);
-  return `Tối thiểu ${p.minLength} ký tự${need.length ? `, có ít nhất một ${need.join(', một ')}` : ''}; không chứa tên đăng nhập và khác mật khẩu hiện tại.`;
+  return t('Tối thiểu {min} ký tự{extra}; không chứa tên đăng nhập và khác mật khẩu hiện tại.', {
+    min: p.minLength,
+    extra: need.length ? t(', có ít nhất một {list}', { list: need.join(t(', một ')) }) : '',
+  });
 }

@@ -304,7 +304,7 @@ export class DailyReportService {
     ].map(([k, v]) => `<tr><td width="34%" style="${cell}${muted}">${esc(k)}</td><td style="${cell}">${v}</td></tr>`).join('');
     const branchRows = d.byBranch.map((b) => `<tr><td style="${cell}"><strong>${esc(b.code ?? 'N/A')}</strong> <span style="${muted}">${esc(b.name ?? 'chưa thuộc chi nhánh')}</span></td>
       <td align="right" style="${cell}">+${esc(num(b.new_computers))}</td><td align="right" style="${cell}">−${esc(num(b.left_computers))}</td><td align="right" style="${cell}">+${esc(num(b.new_keys))}</td></tr>`).join('');
-    const th = (s, align = 'left') => `<th align="${align}" style="${font}font-size:12px;${muted}font-weight:600;padding:6px 8px;border-bottom:2px solid #dcdee4;">${esc(s)}</th>`;
+    const thCell = (s, align = 'left') => `<th align="${align}" style="${font}font-size:12px;${muted}font-weight:600;padding:6px 8px;border-bottom:2px solid #dcdee4;">${esc(s)}</th>`;
     const link = d.appUrl ? `<p style="${font}font-size:14px;margin:20px 0 0;"><a href="${esc(d.appUrl.replace(/\/$/, ''))}/dashboard" style="color:#1f5fbf;">Mở trang Tổng quan →</a></p>` : '';
 
     const html = `<!doctype html>
@@ -329,7 +329,7 @@ export class DailyReportService {
   ${d.byBranch.length ? `
   <h3 style="font-size:15px;margin:22px 0 6px;color:#1c1d21;">Chi nhánh có thay đổi</h3>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-    <tr>${th('Chi nhánh')}${th('Máy mới', 'right')}${th('Rời phạm vi', 'right')}${th('Key mới', 'right')}</tr>${branchRows}
+    <tr>${thCell('Chi nhánh')}${thCell('Máy mới', 'right')}${thCell('Rời phạm vi', 'right')}${thCell('Key mới', 'right')}</tr>${branchRows}
   </table>` : ''}
   ${chart(`Số máy, ${CHART_DAYS} ngày gần nhất`, 'computers', 'dComputers', '#2a78d6')}
   ${chart(`Số key, ${CHART_DAYS} ngày gần nhất`, 'keys', 'dKeys', '#eb6834')}

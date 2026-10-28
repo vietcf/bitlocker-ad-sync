@@ -1,13 +1,13 @@
 <%# Computers found by the search box. Locals: rows (with matched_on: name | serial | email). %>
-<% const MATCHED = { serial: 'khớp serial', email: 'khớp email' }; %>
+<% const MATCHED = { serial: t('khớp serial'), email: t('khớp email') }; %>
 <table>
-  <thead><tr><th>Máy</th><th>Chi nhánh</th><th>Serial</th><th>Email người dùng</th><th>Hệ điều hành</th><th>Số key</th><th>Tạo trên AD</th><th>Ghi nhận</th><th>Trạng thái AD</th></tr></thead>
+  <thead><tr><th><%= t('Máy') %></th><th><%= t('Chi nhánh') %></th><th>Serial</th><th><%= t('Email người dùng') %></th><th><%= t('Hệ điều hành') %></th><th><%= t('Số key') %></th><th><%= t('Tạo trên AD') %></th><th><%= t('Ghi nhận') %></th><th><%= t('Trạng thái AD') %></th></tr></thead>
   <tbody>
   <% rows.forEach((c) => { %>
     <tr>
       <td><a href="/computers/<%= c.id %>"><%= c.name %></a>
         <% if (MATCHED[c.matched_on]) { %><span class="badge badge-muted"><%= MATCHED[c.matched_on] %></span><% } %>
-        <span class="guid" title="objectGUID trên AD"><%= c.object_guid %></span></td>
+        <span class="guid" title="<%= t('objectGUID trên AD') %>"><%= c.object_guid %></span></td>
       <td><%= h.branchCode(c.branch_code) %></td>
       <td><%= c.device_serial ?? '—' %></td>
       <td><%= c.owner_email ?? '—' %></td>
@@ -15,7 +15,7 @@
       <td><%= c.key_count %></td>
       <td><%= h.date(c.ad_created_at) %></td>
       <td><%= h.date(c.first_seen_at) %></td>
-      <td><% if (c.deleted_in_ad_at) { %><span class="badge badge-muted" title="Máy này không còn nằm trong phạm vi worker giám sát (bị xóa trên AD, chuyển ra ngoài các OU đã cấu hình, hoặc lượt đồng bộ đầy đủ không thấy). Dữ liệu và key vẫn được giữ; máy xuất hiện lại thì tự bỏ nhãn.">Không còn trong phạm vi giám sát</span><% } else { %>Đang được giám sát<% } %></td>
+      <td><% if (c.deleted_in_ad_at) { %><span class="badge badge-muted" title="<%= t('Máy này không còn nằm trong phạm vi worker giám sát (bị xóa trên AD, chuyển ra ngoài các OU đã cấu hình, hoặc lượt đồng bộ đầy đủ không thấy). Dữ liệu và key vẫn được giữ; máy xuất hiện lại thì tự bỏ nhãn.') %>"><%= t('Không còn trong phạm vi giám sát') %></span><% } else { %><%= t('Đang được giám sát') %><% } %></td>
     </tr>
   <% }) %>
   </tbody>

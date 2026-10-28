@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { appPool, asOwner, PWD, resetDatabase, seedTwoBranches } from './db.js';
-import { addUser, buildApp, csrfFrom, PASSWORD, webLogin } from './app.js';
+import { addUser, buildApp, csrfFrom, PASSWORD, webLogin, chooseVietnamese } from './app.js';
 
 const KEY_HN = 'aaaaaaaa-0000-0000-0000-000000000001';
 
@@ -30,6 +30,7 @@ describe('web pages', () => {
 
   it('shows the login form again with a message on a wrong password', async () => {
     const agent = request.agent(app);
+    await chooseVietnamese(agent);
     const page = await agent.get('/login');
     const res = await agent.post('/login').type('form').send({ _csrf: csrfFrom(page.text), username: 'it.hn', password: 'nope' });
     expect(res.status).toBe(401);

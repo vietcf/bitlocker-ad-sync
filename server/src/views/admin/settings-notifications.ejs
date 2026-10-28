@@ -1,82 +1,75 @@
 <%- include('../partials/head') %>
 <%- include('_tabs') %>
 <section class="card">
-  <h2>Thông báo qua email</h2>
-  <p class="muted">Email không bao giờ chứa recovery key. Chỉ người dùng có email
-    (<a href="/admin/users">Người dùng</a>) và đang hoạt động mới nhận được.</p>
+  <h2><%= t('Thông báo qua email') %></h2>
+  <p class="muted"><%- th('Email không bao giờ chứa recovery key. Chỉ người dùng có email (<a href="/admin/users">Người dùng</a>) và đang hoạt động mới nhận được.') %></p>
   <%- include('../partials/error-box', { error }) %>
   <form method="post" action="/admin/settings/notifications" class="form">
     <%- include('../partials/csrf') %>
 
-    <h3>Cảnh báo hệ thống</h3>
-    <p class="muted small">Chọn riêng cho từng nhóm: bật hay tắt, gửi cho ai. Các địa chỉ trong <code>NOTIFY_TO</code> (file .env) luôn nhận mọi nhóm đang bật.</p>
+    <h3><%= t('Cảnh báo hệ thống') %></h3>
+    <p class="muted small"><%- th('Chọn riêng cho từng nhóm: bật hay tắt, gửi cho ai. Các địa chỉ trong <code>NOTIFY_TO</code> (file .env) luôn nhận mọi nhóm đang bật.') %></p>
     <% [['agent', 'Agent'], ['ad', 'Ad'], ['key', 'Key'], ['backup', 'Backup']].forEach(([k, K]) => { const g = n.alerts[k]; const meta = n.alertGroups[k]; %>
     <fieldset>
-      <legend><%= meta.label %></legend>
-      <p class="muted small"><%= meta.help %></p>
+      <legend><%= t(meta.label) %></legend>
+      <p class="muted small"><%= t(meta.help) %></p>
       <label class="check"><input type="checkbox" name="alerts<%= K %>Enabled" <%= g.enabled ? 'checked' : '' %>>
-        <span><strong>Gửi email cảnh báo nhóm này</strong></span></label>
+        <span><%- th('<strong>Gửi email cảnh báo nhóm này</strong>') %></span></label>
       <label class="check"><input type="checkbox" name="alerts<%= K %>Admins" <%= g.admins ? 'checked' : '' %>>
-        <span>Gửi cho mọi Admin HQ</span></label>
-      <label>Gửi thêm cho các địa chỉ
-        <textarea name="alerts<%= K %>Extra" rows="2" placeholder="security@corp.local&#10;it-hq@corp.local"><%= g.extra.join('\n') %></textarea>
-        <span class="muted hint">Mỗi dòng một địa chỉ.</span>
+        <span><%= t('Gửi cho mọi Admin HQ') %></span></label>
+      <label><%= t('Gửi thêm cho các địa chỉ') %> <textarea name="alerts<%= K %>Extra" rows="2" placeholder="security@corp.local&#10;it-hq@corp.local"><%= g.extra.join('\n') %></textarea>
+        <span class="muted hint"><%= t('Mỗi dòng một địa chỉ.') %></span>
       </label>
     </fieldset>
     <% }) %>
 
     <fieldset>
-      <legend>Máy mới, key mới</legend>
-      <p class="muted small">Sau mỗi lượt sync, mỗi người nhận một email gom các máy/key mới trong phạm vi của họ.</p>
+      <legend><%= t('Máy mới, key mới') %></legend>
+      <p class="muted small"><%= t('Sau mỗi lượt sync, mỗi người nhận một email gom các máy/key mới trong phạm vi của họ.') %></p>
       <label class="check"><input type="checkbox" name="newComputers" <%= n.newObjects.computers ? 'checked' : '' %>>
-        <span><strong>Khi có máy mới</strong> trong phạm vi giám sát</span></label>
+        <span><%- th('<strong>Khi có máy mới</strong> trong phạm vi giám sát') %></span></label>
       <label class="check"><input type="checkbox" name="newKeys" <%= n.newObjects.keys ? 'checked' : '' %>>
-        <span><strong>Khi có recovery key mới</strong> (email ghi tên máy và Key ID đầy đủ; recovery password đã lưu trong hệ thống nhưng không bao giờ gửi qua email)</span></label>
-      <p><strong>Gửi cho</strong></p>
+        <span><%- th('<strong>Khi có recovery key mới</strong> (email ghi tên máy và Key ID đầy đủ; recovery password đã lưu trong hệ thống nhưng không bao giờ gửi qua email)') %></span></label>
+      <p><%- th('<strong>Gửi cho</strong>') %></p>
       <label class="check"><input type="checkbox" name="newBranchUsers" <%= n.newObjects.branchUsers ? 'checked' : '' %>>
-        <span>Người dùng của chi nhánh (vai trò IT, Trưởng IT) có máy nằm trong OU của chi nhánh</span></label>
+        <span><%= t('Người dùng của chi nhánh (vai trò IT, Trưởng IT) có máy nằm trong OU của chi nhánh') %></span></label>
       <label class="check"><input type="checkbox" name="newAdmins" <%= n.newObjects.admins ? 'checked' : '' %>>
-        <span>Mọi Admin HQ (nhận tất cả, kể cả máy N/A chưa thuộc chi nhánh nào)</span></label>
+        <span><%= t('Mọi Admin HQ (nhận tất cả, kể cả máy N/A chưa thuộc chi nhánh nào)') %></span></label>
       <label class="check"><input type="checkbox" name="skipFirstFull" <%= n.newObjects.skipFirstFull ? 'checked' : '' %>>
-        <span>Không gửi cho lượt full sync đầu tiên <span class="muted">(lượt này thấy mọi máy là "mới")</span></span></label>
-      <label>Số máy / key tối đa liệt kê trong một email
-        <input type="number" name="maxItems" value="<%= n.newObjects.maxItems %>" min="10" max="1000" class="mw-140">
-        <span class="muted hint">Ví dụ đặt 100 mà lượt sync có 300 máy mới: email liệt kê 100 máy đầu, rồi ghi "... and 200 more". Danh sách đầy đủ xem trên web.</span>
+        <span><%- th('Không gửi cho lượt full sync đầu tiên <span class="muted">(lượt này thấy mọi máy là "mới")</span>') %></span></label>
+      <label><%= t('Số máy / key tối đa liệt kê trong một email') %> <input type="number" name="maxItems" value="<%= n.newObjects.maxItems %>" min="10" max="1000" class="mw-140">
+        <span class="muted hint"><%= t('Ví dụ đặt 100 mà lượt sync có 300 máy mới: email liệt kê 100 máy đầu, rồi ghi "... and 200 more". Danh sách đầy đủ xem trên web.') %></span>
       </label>
     </fieldset>
     <fieldset>
-      <legend>Báo cáo hằng ngày</legend>
-      <p class="muted small">Mỗi ngày một email cho Admin HQ: trạng thái đồng bộ AD (worker, lượt sync, cảnh báo), số máy và key tăng / giảm trong ngày,
-        chi nhánh có thay đổi, biểu đồ số máy và số key 10 ngày gần nhất. Không có recovery key.</p>
+      <legend><%= t('Báo cáo hằng ngày') %></legend>
+      <p class="muted small"><%= t('Mỗi ngày một email cho Admin HQ: trạng thái đồng bộ AD (worker, lượt sync, cảnh báo), số máy và key tăng / giảm trong ngày, chi nhánh có thay đổi, biểu đồ số máy và số key 10 ngày gần nhất. Không có recovery key.') %></p>
       <label class="check"><input type="checkbox" name="reportEnabled" <%= n.dailyReport.enabled ? 'checked' : '' %>>
-        <span><strong>Gửi báo cáo hằng ngày</strong></span></label>
+        <span><%- th('<strong>Gửi báo cáo hằng ngày</strong>') %></span></label>
       <div class="inline-fields">
-        <label>Giờ gửi
-          <input type="time" name="reportTime" value="<%= n.dailyReport.time %>" required class="input-time">
+        <label><%= t('Giờ gửi') %> <input type="time" name="reportTime" value="<%= n.dailyReport.time %>" required class="input-time">
         </label>
-        <label>Số liệu của
-          <select name="reportPeriod">
-            <option value="yesterday" <%= n.dailyReport.period === 'yesterday' ? 'selected' : '' %>>Hôm qua (cả ngày), hợp với gửi buổi sáng</option>
-            <option value="today" <%= n.dailyReport.period === 'today' ? 'selected' : '' %>>Hôm nay, tính đến giờ gửi (hợp với gửi cuối ngày)</option>
+        <label><%= t('Số liệu của') %> <select name="reportPeriod">
+            <option value="yesterday" <%= n.dailyReport.period === 'yesterday' ? 'selected' : '' %>><%= t('Hôm qua (cả ngày), hợp với gửi buổi sáng') %></option>
+            <option value="today" <%= n.dailyReport.period === 'today' ? 'selected' : '' %>><%= t('Hôm nay, tính đến giờ gửi (hợp với gửi cuối ngày)') %></option>
           </select>
         </label>
       </div>
-      <span class="muted hint">Giờ theo múi giờ của ứng dụng (APP_TZ). Bật sau giờ gửi của hôm nay thì báo cáo đầu tiên gửi vào ngày mai.
-        <% if (n.dailyReport.lastDay) { %>Lần gửi theo lịch gần nhất: <%= n.dailyReport.lastDay.split('-').reverse().join('/') %>.<% } %></span>
-      <p><strong>Gửi cho</strong></p>
+      <span class="muted hint"><%= t('Giờ theo múi giờ của ứng dụng (APP_TZ). Bật sau giờ gửi của hôm nay thì báo cáo đầu tiên gửi vào ngày mai.') %>
+        <% if (n.dailyReport.lastDay) { %><%= t('Lần gửi theo lịch gần nhất: {day}.', { day: n.dailyReport.lastDay.split('-').reverse().join('/') }) %><% } %></span>
+      <p><%- th('<strong>Gửi cho</strong>') %></p>
       <label class="check"><input type="checkbox" name="reportAdmins" <%= n.dailyReport.admins ? 'checked' : '' %>>
-        <span>Mọi Admin HQ có email</span></label>
-      <label>Gửi thêm cho các địa chỉ
-        <textarea name="reportExtra" rows="2" placeholder="it-manager@corp.local"><%= n.dailyReport.extra.join('\n') %></textarea>
-        <span class="muted hint">Mỗi dòng một địa chỉ.</span>
+        <span><%= t('Mọi Admin HQ có email') %></span></label>
+      <label><%= t('Gửi thêm cho các địa chỉ') %> <textarea name="reportExtra" rows="2" placeholder="it-manager@corp.local"><%= n.dailyReport.extra.join('\n') %></textarea>
+        <span class="muted hint"><%= t('Mỗi dòng một địa chỉ.') %></span>
       </label>
     </fieldset>
-    <div class="actions"><button type="submit">Lưu</button></div>
+    <div class="actions"><button type="submit"><%= t('Lưu') %></button></div>
   </form>
   <form method="post" action="/admin/settings/notifications/daily-report/send" class="inline-form">
     <%- include('../partials/csrf') %>
-    <button type="submit" class="secondary small" title="Tạo báo cáo với cấu hình đã lưu và gửi ngay (không tính là báo cáo theo lịch của hôm nay)">Gửi thử báo cáo ngay</button>
-    <span class="muted small">Dùng cấu hình đã lưu; xem kết quả ở Log email (có nút xem bản HTML).</span>
+    <button type="submit" class="secondary small" title="<%= t('Tạo báo cáo với cấu hình đã lưu và gửi ngay (không tính là báo cáo theo lịch của hôm nay)') %>"><%= t('Gửi thử báo cáo ngay') %></button>
+    <span class="muted small"><%= t('Dùng cấu hình đã lưu; xem kết quả ở Log email (có nút xem bản HTML).') %></span>
   </form>
 </section>
 <%- include('../partials/foot') %>

@@ -1,6 +1,7 @@
 // Checks that run when a sync reports success but its data may be wrong
 // (design doc: "Phat hien du lieu bat thuong khi sync van bao thanh cong").
 // Pure functions: metrics in, list of findings out.
+import { translate } from '../../i18n/index.js';
 import { CHECK_SWITCHES } from '../settings/settings.service.js';
 
 /** Median of a list of numbers (null for an empty list). */
@@ -81,21 +82,21 @@ export function checkRun(metrics, baseline, t) {
 
 const pct = (x) => `${(x * 100).toFixed(1)}%`;
 
-/** Vietnamese text of a finding for the web UI and alert e-mails (falls back to the English message). */
-export function anomalyText(a) {
+/** Text of a finding for the web UI and alert e-mails, in the language of `t` (default Vietnamese); falls back to the English message. */
+export function anomalyText(a, t = (key, params) => translate('vi', key, params)) {
   const d = a.detail ?? {};
-  const limit = d.threshold === undefined ? '' : `, ngưỡng ${pct(d.threshold)}`;
+  const limit = d.threshold === undefined ? '' : t(', ngưỡng {threshold}', { threshold: pct(d.threshold) });
   switch (a.code) {
     case 'key_attr_unreadable':
-      return `${d.keysEmptyPwd} key đọc được nhưng mật khẩu rỗng: tài khoản sync có thể đã mất quyền đọc thuộc tính confidential.`;
+      return t('{count} key đọc được nhưng mật khẩu rỗng: tài khoản sync có thể đã mất quyền đọc thuộc tính confidential.', { count: d.keysEmptyPwd });
     case 'computers_drop':
-      return `Lượt full chỉ thấy ${d.seen}/${d.inDb} máy (${pct(d.seen / d.inDb)}${limit}).`;
+      return t('Lượt full chỉ thấy {seen}/{inDb} máy ({ratio}{limit}).', { seen: d.seen, inDb: d.inDb, ratio: pct(d.seen / d.inDb), limit });
     case 'keys_drop':
-      return `Lượt full chỉ thấy ${d.seen}/${d.expected} key (${pct(d.seen / d.expected)}${limit}).`;
+      return t('Lượt full chỉ thấy {seen}/{expected} key ({ratio}{limit}).', { seen: d.seen, expected: d.expected, ratio: pct(d.seen / d.expected), limit });
     case 'branch_drop':
-      return `Chi nhánh ${d.branch}: thấy ${d.seen} máy, mức bình thường ${d.baseline}.`;
+      return t('Chi nhánh {branch}: thấy {seen} máy, mức bình thường {baseline}.', { branch: d.branch, seen: d.seen, baseline: d.baseline });
     case 'mass_delete':
-      return `Lượt full không thấy ${d.planned}/${d.live} máy trong phạm vi giám sát (${pct(d.planned / d.live)}${limit}); nếu chấp nhận, các máy này được gắn nhãn "Không còn trong phạm vi giám sát" (không xóa dữ liệu, key vẫn giữ).`;
+      return t('Lượt full không thấy {planned}/{live} máy trong phạm vi giám sát ({ratio}{limit}); nếu chấp nhận, các máy này được gắn nhãn "Không còn trong phạm vi giám sát" (không xóa dữ liệu, key vẫn giữ).', { planned: d.planned, live: d.live, ratio: pct(d.planned / d.live), limit });
     default:
       return a.message;
   }

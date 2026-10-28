@@ -2,30 +2,30 @@
 <%- include('_tabs') %>
 <section class="card">
   <div class="title-row">
-    <h2>Người dùng</h2>
-    <a class="button small" href="/admin/users/new">Thêm người dùng</a>
+    <h2><%= t('Người dùng') %></h2>
+    <a class="button small" href="/admin/users/new"><%= t('Thêm người dùng') %></a>
   </div>
   <table>
-    <thead><tr><th>Tên đăng nhập</th><th>Họ tên</th><th>Email</th><th>Đăng nhập bằng</th><th>Quyền</th><th>2 bước</th><th>Trạng thái</th><th>Đăng nhập gần nhất</th><th></th></tr></thead>
+    <thead><tr><th><%= t('Tên đăng nhập') %></th><th><%= t('Họ tên') %></th><th>Email</th><th><%= t('Đăng nhập bằng') %></th><th><%= t('Quyền') %></th><th><%= t('2 bước') %></th><th><%= t('Trạng thái') %></th><th><%= t('Đăng nhập gần nhất') %></th><th></th></tr></thead>
     <tbody>
     <% users.forEach((u) => { %>
       <tr>
-        <td><strong><%= u.username %></strong><% if (u.is_root) { %> <span class="badge badge-info" title="Admin gốc: tài khoản tạo lúc khởi tạo, không admin nào khác sửa được">Superadmin</span><% } %></td>
+        <td><strong><%= u.username %></strong><% if (u.is_root) { %> <span class="badge badge-info" title="<%= t('Admin gốc: tài khoản tạo lúc khởi tạo, không admin nào khác sửa được') %>">Superadmin</span><% } %></td>
         <td><%= u.display_name || u.username %></td>
-        <td><%= u.email ?? '' %><% if (!u.email) { %><span class="badge badge-warn">Chưa có email</span><% } %></td>
-        <td><%= u.auth_source === 'ldap' ? 'Tài khoản AD' : 'Nội bộ' %></td>
-        <td><% u.grants.forEach((g) => { %><span class="badge badge-muted"><%= h.grant(g) %></span> <% }) %><% if (!u.grants.length) { %><span class="muted">Chưa cấp quyền</span><% } %></td>
-        <td><% if (!u.totp_required) { %><span class="muted">Tắt</span>
-          <% } else if (u.totp_enrolled_at) { %><span class="badge badge-good">Bật</span>
-          <% } else { %><span class="badge badge-info" title="Lần đăng nhập tới sẽ quét mã QR">Chờ thiết lập</span><% } %></td>
+        <td><%= u.email ?? '' %><% if (!u.email) { %><span class="badge badge-warn"><%= t('Chưa có email') %></span><% } %></td>
+        <td><%= u.auth_source === 'ldap' ? t('Tài khoản AD') : t('Nội bộ') %></td>
+        <td><% u.grants.forEach((g) => { %><span class="badge badge-muted"><%= h.grant(g) %></span> <% }) %><% if (!u.grants.length) { %><span class="muted"><%= t('Chưa cấp quyền') %></span><% } %></td>
+        <td><% if (!u.totp_required) { %><span class="muted"><%= t('Tắt') %></span>
+          <% } else if (u.totp_enrolled_at) { %><span class="badge badge-good"><%= t('Bật') %></span>
+          <% } else { %><span class="badge badge-info" title="<%= t('Lần đăng nhập tới sẽ quét mã QR') %>"><%= t('Chờ thiết lập') %></span><% } %></td>
         <td>
-          <% if (!u.is_active) { %><span class="badge badge-bad">Đã khóa</span>
-          <% } else if (u.is_locked) { %><span class="badge badge-warn"><%= u.lock_permanent ? 'Khóa (sai mật khẩu)' : 'Tạm khóa (sai mật khẩu)' %></span>
-          <% } else if (u.auth_source === 'local' && u.must_change_password) { %><span class="badge badge-info">Chờ đổi mật khẩu</span>
-          <% } else { %><span class="badge badge-good">Hoạt động</span><% } %>
+          <% if (!u.is_active) { %><span class="badge badge-bad"><%= t('Đã khóa') %></span>
+          <% } else if (u.is_locked) { %><span class="badge badge-warn"><%= u.lock_permanent ? t('Khóa (sai mật khẩu)') : t('Tạm khóa (sai mật khẩu)') %></span>
+          <% } else if (u.auth_source === 'local' && u.must_change_password) { %><span class="badge badge-info"><%= t('Chờ đổi mật khẩu') %></span>
+          <% } else { %><span class="badge badge-good"><%= t('Hoạt động') %></span><% } %>
         </td>
         <td><%= h.dateTime(u.last_login_at) %></td>
-        <td><a href="/admin/users/<%= u.id %>/edit">Sửa</a></td>
+        <td><%- th('<a href="/admin/users/{id}/edit">Sửa</a>', { id: u.id }) %></td>
       </tr>
     <% }) %>
     </tbody>

@@ -1,31 +1,29 @@
 <%- include('../partials/head') %>
 <%- include('_tabs') %>
-<p class="crumbs"><a href="/admin/branches">← Chi nhánh</a></p>
+<p class="crumbs"><%- th('<a href="/admin/branches">← Chi nhánh</a>') %></p>
 <section class="card narrow wide-ish">
-  <h2>Xóa chi nhánh <%= branch.code %> · <%= branch.name %></h2>
+  <h2><%= t('Xóa chi nhánh {code} · {name}', { code: branch.code, name: branch.name }) %></h2>
   <%- include('../partials/error-box', { error }) %>
   <div class="notice notice-error">
-    <strong>Thao tác này không hoàn tác được.</strong> Khi xóa chi nhánh:
+    <%- th('<strong>Thao tác này không hoàn tác được.</strong> Khi xóa chi nhánh:') %>
     <ul>
-      <li><strong><%= h.number(impact.computers) %></strong> máy đang được giám sát<% if (impact.computers_gone) { %> (và <%= h.number(impact.computers_gone) %> máy đã không còn trong phạm vi giám sát)<% } %>
-        chuyển về <strong>N/A</strong> (chỉ Admin HQ thấy). Máy nằm trong OU của chi nhánh khác sẽ chuyển sang chi nhánh đó.</li>
-      <li>Các OU gốc của chi nhánh bị gỡ:
-        <% if (branch.ous.length) { %><% branch.ous.forEach((ou) => { %><code class="wrap block"><%= ou %></code><% }) %><% } else { %><span class="muted">không có</span><% } %></li>
-      <li><strong><%= h.number(impact.grants) %></strong> quyền người dùng trên chi nhánh này bị gỡ.
+      <li><%- th('<strong>{n}</strong> máy đang được giám sát{gone} chuyển về <strong>N/A</strong> (chỉ Admin HQ thấy). Máy nằm trong OU của chi nhánh khác sẽ chuyển sang chi nhánh đó.', { n: h.number(impact.computers), gone: impact.computers_gone ? t(' (và {n} máy đã không còn trong phạm vi giám sát)', { n: h.number(impact.computers_gone) }) : '' }) %></li>
+      <li><%= t('Các OU gốc của chi nhánh bị gỡ:') %> <% if (branch.ous.length) { %><% branch.ous.forEach((ou) => { %><code class="wrap block"><%= ou %></code><% }) %><% } else { %><span class="muted"><%= t('không có') %></span><% } %></li>
+      <li><%- th('<strong>{n}</strong> quyền người dùng trên chi nhánh này bị gỡ.', { n: h.number(impact.grants) }) %>
         <% if (impact.users_left_without_role.length) { %>
-          Những người sau sẽ không còn quyền nào: <strong><%= impact.users_left_without_role.join(', ') %></strong>.
+          <%- th('Những người sau sẽ không còn quyền nào: <strong>{users}</strong>.', { users: impact.users_left_without_role.join(', ') }) %>
         <% } %></li>
-      <li>Key và nhật ký truy cập được giữ nguyên.</li>
+      <li><%= t('Key và nhật ký truy cập được giữ nguyên.') %></li>
     </ul>
   </div>
-  <form method="post" action="/admin/branches/<%= branch.id %>/delete" class="form" data-confirm="Xóa chi nhánh <%= branch.code %>? Thao tác này không hoàn tác được.">
+  <form method="post" action="/admin/branches/<%= branch.id %>/delete" class="form" data-confirm="<%= t('Xóa chi nhánh {code}? Thao tác này không hoàn tác được.', { code: branch.code }) %>">
     <%- include('../partials/csrf') %>
-    <label>Gõ mã chi nhánh <code><%= branch.code %></code> để xác nhận
+    <label><%- th('Gõ mã chi nhánh <code>{code}</code> để xác nhận', { code: branch.code }) %>
       <input name="confirmCode" autocomplete="off" required maxlength="16" placeholder="<%= branch.code %>">
     </label>
     <div class="actions">
-      <button type="submit" class="danger">Xóa chi nhánh</button>
-      <a class="button secondary" href="/admin/branches">Hủy</a>
+      <button type="submit" class="danger"><%= t('Xóa chi nhánh') %></button>
+      <a class="button secondary" href="/admin/branches"><%= t('Hủy') %></a>
     </div>
   </form>
 </section>

@@ -1,26 +1,23 @@
 <%- include('../partials/head') %>
 <p class="crumbs"><a href="/computers/<%= computer.id %>">← <%= computer.name %></a></p>
 <section class="card narrow wide-ish">
-  <h1>Sửa thông tin máy</h1>
+  <h1><%= t('Sửa thông tin máy') %></h1>
   <dl class="facts">
-    <dt>Máy</dt><dd><%= computer.name %> · <%= h.branchCode(computer.branch_code) %></dd>
+    <dt><%= t('Máy') %></dt><dd><%= computer.name %> · <%= h.branchCode(computer.branch_code) %></dd>
     <dt>OU</dt><dd><code class="wrap"><%= computer.distinguished_name %></code></dd>
-    <% if (computer.info_updated_at) { %><dt>Sửa gần nhất</dt><dd><%= h.dateTime(computer.info_updated_at) %> (<%= computer.info_updated_by %>)</dd><% } %>
+    <% if (computer.info_updated_at) { %><dt><%= t('Sửa gần nhất') %></dt><dd><%= h.dateTime(computer.info_updated_at) %> (<%= computer.info_updated_by %>)</dd><% } %>
   </dl>
-  <p class="muted mt-14">Các trường này do người dùng nhập, không lấy từ AD và sync không bao giờ ghi đè.
-    Để trống một ô để xóa giá trị. Mỗi lần lưu được ghi vào nhật ký.</p>
+  <p class="muted mt-14"><%= t('Các trường này do người dùng nhập, không lấy từ AD và sync không bao giờ ghi đè. Để trống một ô để xóa giá trị. Mỗi lần lưu được ghi vào nhật ký.') %></p>
   <%- include('../partials/error-box', { error }) %>
   <form method="post" action="/computers/<%= computer.id %>/edit" class="form">
     <%- include('../partials/csrf') %>
-    <label>Serial máy
-      <input name="deviceSerial" value="<%= form.deviceSerial ?? '' %>" maxlength="64" placeholder="Ví dụ: 5CG1234XYZ" spellcheck="false">
+    <label><%= t('Serial máy') %> <input name="deviceSerial" value="<%= form.deviceSerial ?? '' %>" maxlength="64" placeholder="<%= t('Ví dụ: 5CG1234XYZ') %>" spellcheck="false">
     </label>
-    <label>Email người dùng
-      <input type="email" name="ownerEmail" value="<%= form.ownerEmail ?? '' %>" maxlength="254" placeholder="nguyenvana@corp.local" spellcheck="false">
+    <label><%= t('Email người dùng') %> <input type="email" name="ownerEmail" value="<%= form.ownerEmail ?? '' %>" maxlength="254" placeholder="nguyenvana@corp.local" spellcheck="false">
     </label>
     <div class="actions">
-      <button type="submit">Lưu</button>
-      <a class="button secondary" href="/computers/<%= computer.id %>">Hủy</a>
+      <button type="submit"><%= t('Lưu') %></button>
+      <a class="button secondary" href="/computers/<%= computer.id %>"><%= t('Hủy') %></a>
     </div>
   </form>
 </section>

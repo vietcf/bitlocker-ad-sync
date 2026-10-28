@@ -1,70 +1,67 @@
 <%- include('partials/head') %>
 <section class="search-hero">
-  <h1>Tìm máy</h1>
+  <h1><%= t('Tìm máy') %></h1>
   <form method="get" action="/" class="search" role="search">
-    <input name="q" value="<%= q %>" placeholder="Key ID, tên máy, serial, email hoặc GUID máy" aria-label="Key ID, tên máy, serial, email hoặc GUID máy" autofocus autocomplete="off" spellcheck="false">
-    <button type="submit">Tìm</button>
+    <input name="q" value="<%= q %>" placeholder="<%= t('Key ID, tên máy, serial, email hoặc GUID máy') %>" aria-label="<%= t('Key ID, tên máy, serial, email hoặc GUID máy') %>" autofocus autocomplete="off" spellcheck="false">
+    <button type="submit"><%= t('Tìm') %></button>
   </form>
-  <p class="muted small search-help">
-    <strong>Key ID:</strong> từ 4 ký tự đầu trên màn hình BitLocker, ví dụ <code>1A2B</code>, có hay không có dấu gạch đều được.
-    <strong>Tên máy, serial, email:</strong> một phần bất kỳ từ 3 ký tự, không cần đúng dấu gạch, ví dụ <code>0231</code> hoặc <code>lt0231</code> tìm ra <code>HN-LT-0231</code>.
-  </p>
+  <p class="muted small search-help"> <%- th('<strong>Key ID:</strong> từ 4 ký tự đầu trên màn hình BitLocker, ví dụ <code>1A2B</code>, có hay không có dấu gạch đều được. <strong>Tên máy, serial, email:</strong> một phần bất kỳ từ 3 ký tự, không cần đúng dấu gạch, ví dụ <code>0231</code> hoặc <code>lt0231</code> tìm ra <code>HN-LT-0231</code>.') %> </p>
 </section>
 
 <% if (result) { %>
 <section class="card">
   <% if (result.rows.length === 0) { %>
-    <p>Không tìm thấy <%= result.kind === 'key' ? 'key' : 'máy' %> nào khớp với <strong><%= result.query %></strong> trong phạm vi của bạn.</p>
+    <p><%- th('Không tìm thấy {y} nào khớp với <strong>{query}</strong> trong phạm vi của bạn.', { y: result.kind === 'key' ? 'key' : t('máy'), query: result.query }) %></p>
     <% if (result.kind === 'key') { %>
-      <p class="muted">Kiểm tra lại các ký tự đầu của Key ID. Nếu máy mới được mã hóa, key có thể chưa được sync (tối đa 15 phút).</p>
+      <p class="muted"><%= t('Kiểm tra lại các ký tự đầu của Key ID. Nếu máy mới được mã hóa, key có thể chưa được sync (tối đa 15 phút).') %></p>
     <% } %>
   <% } else if (result.kind === 'key') { %>
-    <h2>Key khớp với <code><%= result.query.toUpperCase() %></code></h2>
+    <h2><%- th('Key khớp với <code>{toUpperCase}</code>', { toUpperCase: result.query.toUpperCase() }) %></h2>
     <table>
-      <thead><tr><th>Máy</th><th>Chi nhánh</th><th>Key ID</th><th>Tạo trên AD</th><th>Ghi nhận</th><th>Trạng thái</th><th></th></tr></thead>
+      <thead><tr><th><%= t('Máy') %></th><th><%= t('Chi nhánh') %></th><th>Key ID</th><th><%= t('Tạo trên AD') %></th><th><%= t('Ghi nhận') %></th><th><%= t('Trạng thái') %></th><th></th></tr></thead>
       <tbody>
       <% result.rows.forEach((r) => { const st = h.keyStatus(r.key_status); %>
         <tr>
           <td><a href="/computers/<%= r.id %>?key=<%= r.key_id %>"><%= r.name %></a>
-            <span class="guid" title="objectGUID trên AD"><%= r.object_guid %></span>
-            <% if (r.deleted_in_ad_at) { %><span class="badge badge-muted" title="Máy này không còn nằm trong phạm vi worker giám sát (bị xóa trên AD, chuyển ra ngoài các OU đã cấu hình, hoặc lượt đồng bộ đầy đủ không thấy). Dữ liệu và key vẫn được giữ; máy xuất hiện lại thì tự bỏ nhãn.">Không còn trong phạm vi giám sát</span><% } %></td>
+            <span class="guid" title="<%= t('objectGUID trên AD') %>"><%= r.object_guid %></span>
+            <% if (r.deleted_in_ad_at) { %><span class="badge badge-muted" title="<%= t('Máy này không còn nằm trong phạm vi worker giám sát (bị xóa trên AD, chuyển ra ngoài các OU đã cấu hình, hoặc lượt đồng bộ đầy đủ không thấy). Dữ liệu và key vẫn được giữ; máy xuất hiện lại thì tự bỏ nhãn.') %>"><%= t('Không còn trong phạm vi giám sát') %></span><% } %></td>
           <td><%= h.branchCode(r.branch_code) %></td>
           <td><code><%= r.key_id.toUpperCase() %></code></td>
           <td><%= h.date(r.key_created_at) %></td>
           <td><%= h.date(r.key_first_synced_at) %></td>
-          <td><span class="badge badge-<%= st.tone %>"><%= st.label %></span><% if (r.deleted_in_ad_at) { %> <span class="badge badge-muted" title="Máy chứa key này hiện không nằm trong phạm vi worker giám sát. Key vẫn được lưu.">Máy ngoài phạm vi</span><% } %></td>
-          <td><a class="button small" href="/computers/<%= r.id %>/keys/<%= r.key_id %>/reveal">Hiện key</a></td>
+          <td><span class="badge badge-<%= st.tone %>"><%= st.label %></span><% if (r.deleted_in_ad_at) { %> <span class="badge badge-muted" title="<%= t('Máy chứa key này hiện không nằm trong phạm vi worker giám sát. Key vẫn được lưu.') %>"><%= t('Máy ngoài phạm vi') %></span><% } %></td>
+          <td><%- th('<a class="button small" href="/computers/{id}/keys/{keyId}/reveal">Hiện key</a>', { id: r.id, keyId: r.key_id }) %></td>
         </tr>
       <% }) %>
       </tbody>
     </table>
     <% if (result.computers && result.computers.rows.length) { %>
-      <h2>Máy có tên, serial hoặc email chứa “<%= result.query %>”</h2>
+      <h2><%= t('Máy có tên, serial hoặc email chứa “{query}”', { query: result.query }) %></h2>
       <%- include('partials/computer-results', { rows: result.computers.rows }) %>
-      <% if (result.computers.total > result.computers.rows.length) { %><p class="muted small">Còn <%= h.number(result.computers.total - result.computers.rows.length) %> máy nữa: gõ thêm ký tự để thu hẹp.</p><% } %>
+      <% if (result.computers.total > result.computers.rows.length) { %><p class="muted small"><%= t('Còn {length} máy nữa: gõ thêm ký tự để thu hẹp.', { length: h.number(result.computers.total - result.computers.rows.length) }) %></p><% } %>
     <% } %>
   <% } else { %>
-    <h2><%= h.number(result.total) %> máy có tên, serial hoặc email chứa “<%= result.query %>”</h2>
+    <h2><%= t('{total} máy có tên, serial hoặc email chứa “{query}”', { total: h.number(result.total), query: result.query }) %></h2>
     <%- include('partials/computer-results', { rows: result.rows }) %>
-    <%- include('partials/pager', { page: result.page, pages: result.pages, query: { q }, total: result.total, pageSize: result.pageSize, unit: 'máy' }) %>
+    <%- include('partials/pager', { page: result.page, pages: result.pages, query: { q }, total: result.total, pageSize: result.pageSize, unit: t('máy') }) %>
   <% } %>
-  <p><a href="/">← Xem tất cả máy</a></p>
+  <p><%- th('<a href="/">← Xem tất cả máy</a>') %></p>
 </section>
 <% } %>
 
 <% if (list) { %>
 <section class="card">
   <div class="title-row">
-    <h2>Máy trong phạm vi của bạn</h2>
+    <h2><%= t('Máy trong phạm vi của bạn') %></h2>
     <% if (features['feature.computer_export'] || canExportKeys) { %>
     <div class="button-group">
       <% if (features['feature.computer_export']) { %>
         <a class="button secondary small" href="/computers/export.csv<%= h.query(query, { page: undefined, q: undefined }) %>"
-           title="Xuất toàn bộ danh sách theo bộ lọc đang chọn (không có key)">Xuất CSV</a>
+           title="<%= t('Xuất toàn bộ danh sách theo bộ lọc đang chọn (không có key)') %>"><%= t('Xuất CSV') %></a>
       <% } %>
       <% if (canExportKeys) { %>
         <a class="button sensitive small" href="/computers/export-keys<%= h.query(query, { page: undefined, q: undefined }) %>"
-           title="Xuất danh sách kèm mật khẩu recovery (cần lý do, được ghi nhật ký)">🔑 Xuất kèm key</a>
+           title="<%= t('Xuất danh sách kèm mật khẩu recovery (cần lý do, được ghi nhật ký)') %>"><%= t('🔑 Xuất kèm key') %></a>
       <% } %>
     </div>
     <% } %>
@@ -72,68 +69,66 @@
   <form method="get" action="/" class="filter-bar" data-autosubmit>
     <div class="filter-fields">
     <% if (list.branches.length > 1 || list.seesUnmapped) { %>
-    <label>Chi nhánh
-      <select name="branchId">
-        <option value="">Tất cả</option>
+    <label><%= t('Chi nhánh') %> <select name="branchId">
+        <option value=""><%= t('Tất cả') %></option>
         <% list.branches.forEach((b) => { %><option value="<%= b.id %>" <%= filters.branchId === b.id ? 'selected' : '' %>><%= b.code %> · <%= b.name %></option><% }) %>
-        <% if (list.seesUnmapped) { %><option value="na" <%= filters.branchId === 'na' ? 'selected' : '' %>>N/A · Chưa thuộc chi nhánh nào</option><% } %>
+        <% if (list.seesUnmapped) { %><option value="na" <%= filters.branchId === 'na' ? 'selected' : '' %>><%= t('N/A · Chưa thuộc chi nhánh nào') %></option><% } %>
       </select>
     </label>
     <% } %>
-    <label>Tình trạng
-      <select name="status">
-        <option value="all" <%= filters.status === 'all' ? 'selected' : '' %>>Tất cả</option>
-        <option value="has_key" <%= filters.status === 'has_key' ? 'selected' : '' %>>Đã có key</option>
-        <option value="no_key" <%= filters.status === 'no_key' ? 'selected' : '' %>>Chưa có key</option>
+    <label><%= t('Tình trạng') %> <select name="status">
+        <option value="all" <%= filters.status === 'all' ? 'selected' : '' %>><%= t('Tất cả') %></option>
+        <option value="has_key" <%= filters.status === 'has_key' ? 'selected' : '' %>><%= t('Đã có key') %></option>
+        <option value="no_key" <%= filters.status === 'no_key' ? 'selected' : '' %>><%= t('Chưa có key') %></option>
       </select>
     </label>
     <%- include('partials/logon-filter', { filters, newRow: false }) %>
     <fieldset class="date-range">
-      <legend>Ngày xuất hiện</legend>
-      <select name="dateField" aria-label="Lọc theo ngày">
-        <option value="seen" <%= filters.dateField === 'seen' ? 'selected' : '' %>>Ghi nhận trên hệ thống</option>
-        <option value="ad" <%= filters.dateField === 'ad' ? 'selected' : '' %>>Tạo trên AD</option>
+      <legend><%= t('Ngày xuất hiện') %></legend>
+      <select name="dateField" aria-label="<%= t('Lọc theo ngày') %>">
+        <option value="seen" <%= filters.dateField === 'seen' ? 'selected' : '' %>><%= t('Ghi nhận trên hệ thống') %></option>
+        <option value="ad" <%= filters.dateField === 'ad' ? 'selected' : '' %>><%= t('Tạo trên AD') %></option>
       </select>
-      <input type="date" name="from" value="<%= filters.from ?? '' %>" aria-label="Từ ngày" title="Từ ngày">
+      <input type="date" name="from" value="<%= filters.from ?? '' %>" aria-label="<%= t('Từ ngày') %>" title="<%= t('Từ ngày') %>">
       <span class="muted">–</span>
-      <input type="date" name="to" value="<%= filters.to ?? '' %>" aria-label="Đến ngày" title="Đến ngày">
+      <input type="date" name="to" value="<%= filters.to ?? '' %>" aria-label="<%= t('Đến ngày') %>" title="<%= t('Đến ngày') %>">
     </fieldset>
     </div>
     <div class="filter-actions">
-      <label class="check"><input type="checkbox" name="includeDeleted" <%= filters.includeDeleted ? 'checked' : '' %>> Hiện cả máy không còn trong phạm vi giám sát</label>
+      <label class="check"><input type="checkbox" name="includeDeleted" <%= filters.includeDeleted ? 'checked' : '' %>> <%= t('Hiện cả máy không còn trong phạm vi giám sát') %></label>
       <span class="spacer"></span>
-      <a href="/" class="small">Xóa lọc</a>
-      <button type="submit" class="small">Lọc</button>
+      <a href="/" class="small"><%= t('Xóa lọc') %></a>
+      <button type="submit" class="small"><%= t('Lọc') %></button>
     </div>
   </form>
 
   <% if (list.rows.length === 0) { %>
-    <p class="muted">Không có máy nào khớp bộ lọc.</p>
+    <p class="muted"><%= t('Không có máy nào khớp bộ lọc.') %></p>
   <% } else { %>
   <table>
-    <thead><tr><th>Máy</th><th>Chi nhánh</th><th>Hệ điều hành</th><th class="num">Số key</th><th>Key mới nhất</th><th>Tạo trên AD</th><th>Ghi nhận</th><th title="<%= activityTip %>"><span class="has-tip">Đăng nhập AD gần nhất</span></th><th>Tình trạng</th></tr></thead>
+    <thead><tr><th><%= t('Máy') %></th><th><%= t('Chi nhánh') %></th><th><%= t('Hệ điều hành') %></th><th class="num"><%= t('Số key') %></th><th><%= t('Key mới nhất') %></th><th><%= t('Tạo trên AD') %></th><th><%= t('Ghi nhận') %></th><th title="<%= activityTip %>"><%- th('<span class="has-tip">Đăng nhập AD gần nhất</span>') %></th><th><%= t('Tình trạng') %></th></tr></thead>
     <tbody>
     <% list.rows.forEach((c) => { %>
       <tr>
-        <td><a href="/computers/<%= c.id %>"><%= c.name %></a><span class="guid" title="objectGUID trên AD"><%= c.object_guid %></span></td>
-        <td title="<%= c.branch_name ?? 'Chưa thuộc chi nhánh nào' %>"><%= h.branchCode(c.branch_code) %></td>
+        <td><a href="/computers/<%= c.id %>"><%= c.name %></a><span class="guid" title="<%= t('objectGUID trên AD') %>"><%= c.object_guid %></span></td>
+        <td title="<%= c.branch_name ?? t('Chưa thuộc chi nhánh nào') %>"><%= h.branchCode(c.branch_code) %></td>
         <td><%= c.os ?? '—' %></td>
         <td class="num"><%= c.key_count %></td>
         <td><%= h.date(c.latest_key_at) %></td>
         <td><%= h.date(c.ad_created_at) %></td>
-        <td title="Lần đầu hệ thống ghi nhận máy này (qua đồng bộ AD)"><%= h.date(c.first_seen_at) %></td>
+        <td title="<%= t('Lần đầu hệ thống ghi nhận máy này (qua đồng bộ AD)') %>"><%= h.date(c.first_seen_at) %></td>
         <td title="<%= h.activity(c.last_logon_at, activityMonths).label %>"><%= h.date(c.last_logon_at) %></td>
         <td>
-          <% if (c.deleted_in_ad_at) { %><span class="badge badge-muted" title="Máy này không còn nằm trong phạm vi worker giám sát (bị xóa trên AD, chuyển ra ngoài các OU đã cấu hình, hoặc lượt đồng bộ đầy đủ không thấy). Dữ liệu và key vẫn được giữ; máy xuất hiện lại thì tự bỏ nhãn.">Không còn trong phạm vi giám sát</span>
-          <% } else if (c.key_count === 0) { %><span class="badge badge-bad">Chưa có key</span>
-          <% } else { %><span class="badge badge-good">Có key</span><% } %>
+          <% if (c.deleted_in_ad_at) { %><span class="badge badge-muted" title="<%= t('Máy này không còn nằm trong phạm vi worker giám sát (bị xóa trên AD, chuyển ra ngoài các OU đã cấu hình, hoặc lượt đồng bộ đầy đủ không thấy). Dữ liệu và key vẫn được giữ; máy xuất hiện lại thì tự bỏ nhãn.') %>"><%= t('Không còn trong phạm vi giám sát') %></span>
+          <% } else if (c.key_count === 0) { %><span class="badge badge-bad"><%= t('Chưa có key') %></span>
+          <% } else { %><span class="badge badge-good"><%= t('Có key') %></span><% } %>
         </td>
       </tr>
     <% }) %>
     </tbody>
   </table>
   <% } %>
-  <%- include('partials/pager', { page: list.page, pages: list.pages, query, total: list.total, pageSize: list.pageSize, unit: 'máy' }) %>
+  <%- include('partials/pager', { page: list.page, pages: list.pages, query, total: list.total, pageSize: list.pageSize, unit: t('máy') }) %>
 </section>
 <% } %>
 <%- include('partials/foot') %>

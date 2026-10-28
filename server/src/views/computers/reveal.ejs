@@ -6,12 +6,11 @@
   <div class="recovery-key" data-key aria-live="polite">
     <% result.recoveryPassword.split('-').forEach((group, i) => { %><span class="group"><span class="index"><%= i + 1 %></span><%= group %></span><% }) %>
   </div>
-  <p class="countdown">Tự ẩn sau <strong data-countdown><%= result.expiresInSec %></strong> giây.</p>
+  <p class="countdown"><%- th('Tự ẩn sau <strong data-countdown>{expiresInSec}</strong> giây.', { expiresInSec: result.expiresInSec }) %></p>
   <p class="actions">
-    <button type="button" data-copy-key>Sao chép key</button>
-    <a class="button secondary" href="/computers/<%= result.computerId %>" data-hide-now>Ẩn key và quay lại</a>
+    <button type="button" data-copy-key><%= t('Sao chép key') %></button>
+    <a class="button secondary" href="/computers/<%= result.computerId %>" data-hide-now><%= t('Ẩn key và quay lại') %></a>
   </p>
-  <p class="muted small" data-copy-note>Key được sao chép kèm dấu gạch ngang, dán thẳng vào màn hình BitLocker được.
-    Khi key tự ẩn, trang cố xóa clipboard; nếu trình duyệt không cho, hãy tự xóa (copy một nội dung khác) sau khi dùng xong.</p>
+  <p class="muted small" data-copy-note><%= t('Key được sao chép kèm dấu gạch ngang, dán thẳng vào màn hình BitLocker được. Khi key tự ẩn, trang cố xóa clipboard; nếu trình duyệt không cho, hãy tự xóa (copy một nội dung khác) sau khi dùng xong.') %></p>
 </section>
 <%- include('../partials/foot') %>

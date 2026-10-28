@@ -1,6 +1,6 @@
 <%- include('../partials/head') %>
 <%- include('_tabs') %>
-<h2>Tình trạng sync AD</h2>
+<h2><%= t('Tình trạng sync AD') %></h2>
 
 <% const SUMMARY = ['worker_offline', 'sync_problem', 'sync_offline'];
    const workerOff = openAlerts.find((a) => a.type === 'worker_offline');
@@ -13,79 +13,78 @@
 <div class="status-pair">
   <div class="status-box <%= workerOff ? 'is-bad' : 'is-ok' %>">
     <div class="status-title">Worker (agent)</div>
-    <% if (workerOff) { %><span class="badge badge-bad">● Offline</span> từ <%= h.dateTime(workerOff.opened_at) %>
-      <div class="muted small">Không có heartbeat quá <%= heartbeatMax %> phút. Mail nhắc tối đa 1 lần mỗi ngày<% if (workerOff.last_notified_at) { %> (gần nhất <%= h.dateTime(workerOff.last_notified_at) %>)<% } %>.</div>
+    <% if (workerOff) { %><span class="badge badge-bad">● Offline</span> <%= t('từ {at}', { at: h.dateTime(workerOff.opened_at) }) %>
+      <div class="muted small"><%= t('Không có heartbeat quá {min} phút. Mail nhắc tối đa 1 lần mỗi ngày{last}.', { min: heartbeatMax, last: workerOff.last_notified_at ? t(' (gần nhất {at})', { at: h.dateTime(workerOff.last_notified_at) }) : '' }) %></div>
     <% } else { %><span class="badge badge-good">● Online</span>
-      <div class="muted small">Có heartbeat trong <%= heartbeatMax %> phút gần nhất.</div><% } %>
+      <div class="muted small"><%= t('Có heartbeat trong {heartbeatMax} phút gần nhất.', { heartbeatMax: heartbeatMax }) %></div><% } %>
   </div>
   <div class="status-box <%= workerOff ? 'is-unknown' : (sysAlerts.length ? 'is-bad' : (dataAlerts.length ? 'is-warn' : 'is-ok')) %>">
-    <div class="status-title">Đồng bộ AD</div>
-    <% if (workerOff) { %><span class="badge badge-muted">Chưa xác định</span>
-      <div class="muted small">Worker đang Offline nên chưa kiểm tra được AD.</div>
+    <div class="status-title"><%= t('Đồng bộ AD') %></div>
+    <% if (workerOff) { %><span class="badge badge-muted"><%= t('Chưa xác định') %></span>
+      <div class="muted small"><%= t('Worker đang Offline nên chưa kiểm tra được AD.') %></div>
     <% } else { %>
-      <div class="status-row"><span class="status-label">Sự cố hệ thống</span>
-        <% if (sysAlerts.length) { %><span class="badge badge-bad">● Có sự cố</span><span class="muted small"><%= sysAlerts.map((x) => x.detail.subject).join('; ') %></span>
+      <div class="status-row"><span class="status-label"><%= t('Sự cố hệ thống') %></span>
+        <% if (sysAlerts.length) { %><span class="badge badge-bad"><%= t('● Có sự cố') %></span><span class="muted small"><%= sysAlerts.map((x) => x.detail.subject).join('; ') %></span>
         <% } else { %><span class="badge badge-good">● OK</span><% } %>
       </div>
-      <div class="status-row"><span class="status-label">Cảnh báo dữ liệu</span>
-        <% if (dataAlerts.length) { %><span class="badge badge-warn">● Có cảnh báo nhẹ</span><span class="muted small"><%= dataAlerts.map((x) => x.detail.subject).join('; ') %></span>
-        <% } else { %><span class="badge badge-good">● OK</span><% if (nSilenced) { %><span class="muted small">(<%= nSilenced %> đã xử lý / bỏ qua)</span><% } %><% } %>
-        <% if (alertsOff.length) { %><span class="muted small">Đã tắt <%= alertsOff.length %> loại cảnh báo (Đồng bộ AD > Cảnh báo sync).</span><% } %>
+      <div class="status-row"><span class="status-label"><%= t('Cảnh báo dữ liệu') %></span>
+        <% if (dataAlerts.length) { %><span class="badge badge-warn"><%= t('● Có cảnh báo nhẹ') %></span><span class="muted small"><%= dataAlerts.map((x) => x.detail.subject).join('; ') %></span>
+        <% } else { %><span class="badge badge-good">● OK</span><% if (nSilenced) { %><span class="muted small"><%= t('({nSilenced} đã xử lý / bỏ qua)', { nSilenced: nSilenced }) %></span><% } %><% } %>
+        <% if (alertsOff.length) { %><span class="muted small"><%= t('Đã tắt {length} loại cảnh báo (Đồng bộ AD > Cảnh báo sync).', { length: alertsOff.length }) %></span><% } %>
       </div>
     <% } %>
   </div>
 </div>
 <% if (openAlerts.some((a) => !SUMMARY.includes(a.type))) { %>
 <section class="card">
-  <h2>Cảnh báo đang mở</h2>
+  <h2><%= t('Cảnh báo đang mở') %></h2>
   <% openAlerts.filter((a) => !SUMMARY.includes(a.type)).forEach((a) => { const data = ['escrow_broken', 'no_key_rising', 'full_stale', 'dc_cert_expiring'].includes(a.type); %>
     <div class="notice notice-<%= a.silenced ? 'info' : (a.severity === 'high' ? 'error' : 'warn') %>">
-      <strong><%= a.detail.subject %></strong> <span class="muted">· từ <%= h.dateTime(a.opened_at) %></span>
-      <% if (a.silenced) { %><span class="badge badge-muted"><%= a.acked_at ? 'Đã xử lý, báo lại sau ' : 'Bỏ qua đến ' %><%= h.dateTime(a.snoozed_until) %></span><% } %>
+      <strong><%= a.detail.subject %></strong> <span class="muted"><%= t('· từ {openedAt}', { openedAt: h.dateTime(a.opened_at) }) %></span>
+      <% if (a.silenced) { %><span class="badge badge-muted"><%= a.acked_at ? t('Đã xử lý, báo lại sau ') : t('Bỏ qua đến ') %><%= h.dateTime(a.snoozed_until) %></span><% } %>
       <div class="pre"><%= a.detail.text %></div>
-      <% if (data && a.acked_by && a.silenced) { %><div class="muted small">Đã <%= a.acked_at ? 'xử lý' : 'bỏ qua' %> bởi <%= a.acked_by %><% if (a.acked_at) { %> lúc <%= h.dateTime(a.acked_at) %><% } %><% if (a.ack_note) { %>: <%= a.ack_note %><% } %></div><% } %>
+      <% if (data && a.acked_by && a.silenced) { %><div class="muted small"><%= t('Đã {action} bởi {by}', { action: a.acked_at ? t('xử lý') : t('bỏ qua'), by: a.acked_by }) %><% if (a.acked_at) { %> <%= t('lúc {at}', { at: h.dateTime(a.acked_at) }) %><% } %><% if (a.ack_note) { %>: <%= a.ack_note %><% } %></div><% } %>
       <% if (data && !a.silenced) { %>
       <form method="post" class="alert-form">
         <%- include('../partials/csrf') %>
-        <input type="text" name="note" maxlength="300" placeholder="Ghi chú (tùy chọn)" aria-label="Ghi chú">
+        <input type="text" name="note" maxlength="300" placeholder="<%= t('Ghi chú (tùy chọn)') %>" aria-label="<%= t('Ghi chú') %>">
         <div class="alert-form-actions">
-          <button type="submit" formaction="/admin/sync/alerts/<%= a.id %>/ack" class="small" title="Đã sửa nguyên nhân: đóng cảnh báo ngay, theo dõi lại sau <%= fixGraceHours %> giờ">Đã xử lý</button>
-          <span class="alert-form-or">hoặc</span>
+          <button type="submit" formaction="/admin/sync/alerts/<%= a.id %>/ack" class="small" title="<%= t('Đã sửa nguyên nhân: đóng cảnh báo ngay, theo dõi lại sau {fixGraceHours} giờ', { fixGraceHours: fixGraceHours }) %>"><%= t('Đã xử lý') %></button>
+          <span class="alert-form-or"><%= t('hoặc') %></span>
           <span class="alert-form-snooze">
-            <select name="days" aria-label="Số ngày bỏ qua"><option value="1">1 ngày</option><option value="7" selected>7 ngày</option><option value="30">30 ngày</option></select>
-            <button type="submit" formaction="/admin/sync/alerts/<%= a.id %>/snooze" class="small secondary" title="Im lặng trong thời gian chọn; hết hạn mà điều kiện còn thì báo lại">Bỏ qua</button>
+            <select name="days" aria-label="<%= t('Số ngày bỏ qua') %>"><option value="1"><%= t('1 ngày') %></option><option value="7" selected><%= t('7 ngày') %></option><option value="30"><%= t('30 ngày') %></option></select>
+            <button type="submit" formaction="/admin/sync/alerts/<%= a.id %>/snooze" class="small secondary" title="<%= t('Im lặng trong thời gian chọn; hết hạn mà điều kiện còn thì báo lại') %>"><%= t('Bỏ qua') %></button>
           </span>
         </div>
       </form>
       <% } %>
     </div>
   <% }) %>
-  <% if (dataAlerts.length) { %><p class="muted small"><strong>Đã xử lý</strong>: đóng ngay, theo dõi lại sau <%= fixGraceHours %> giờ. <strong>Bỏ qua</strong>: giữ cảnh báo nhưng im lặng đến hết hạn.</p><% } %>
+  <% if (dataAlerts.length) { %><p class="muted small"><%- th('<strong>Đã xử lý</strong>: đóng ngay, theo dõi lại sau {fixGraceHours} giờ. <strong>Bỏ qua</strong>: giữ cảnh báo nhưng im lặng đến hết hạn.', { fixGraceHours: fixGraceHours }) %></p><% } %>
 </section>
 <% } %>
 
 <% if (duplicates.length) { %>
 <section class="card">
-  <h2>Key ID trùng giữa nhiều máy (<%= duplicates.length %>)</h2>
-  <p class="muted small">Cùng một Key ID nằm dưới 2 máy đều còn trong phạm vi giám sát (ví dụ máy clone từ image đã bật BitLocker), hoặc cùng Key ID nhưng mật khẩu khác.
-    Key vẫn giữ ở máy đang giữ, không bị ghi đè. Không ảnh hưởng trạng thái Online / Offline. Tự đóng khi một trong hai máy rời phạm vi giám sát.</p>
+  <h2><%= t('Key ID trùng giữa nhiều máy ({length})', { length: duplicates.length }) %></h2>
+  <p class="muted small"><%= t('Cùng một Key ID nằm dưới 2 máy đều còn trong phạm vi giám sát (ví dụ máy clone từ image đã bật BitLocker), hoặc cùng Key ID nhưng mật khẩu khác. Key vẫn giữ ở máy đang giữ, không bị ghi đè. Không ảnh hưởng trạng thái Online / Offline. Tự đóng khi một trong hai máy rời phạm vi giám sát.') %></p>
   <div class="table-scroll">
   <table class="dense">
-    <thead><tr><th>Key ID</th><th>Máy đang giữ key</th><th>Máy cũng có Key ID này</th><th>Mật khẩu</th><th>Ngày tạo trên AD</th><th>Phát hiện</th><th></th></tr></thead>
+    <thead><tr><th>Key ID</th><th><%= t('Máy đang giữ key') %></th><th><%= t('Máy cũng có Key ID này') %></th><th><%= t('Mật khẩu') %></th><th><%= t('Ngày tạo trên AD') %></th><th><%= t('Phát hiện') %></th><th></th></tr></thead>
     <tbody>
     <% duplicates.forEach((d) => { %>
       <tr>
         <td><code><%= d.key_id.slice(0, 8).toUpperCase() %>…</code></td>
         <td><a href="/computers/<%= d.owner_id %>"><%= d.owner_name %></a><br><span class="guid"><%= d.owner_guid %></span></td>
         <td><a href="/computers/<%= d.other_id %>"><%= d.other_name %></a><br><span class="guid"><%= d.other_guid %></span></td>
-        <td><% if (d.same_password) { %>giống nhau<% } else { %><span class="badge badge-bad">khác nhau</span><% } %></td>
-        <td class="small"><%= d.owner_name %>: <%= d.owner_created ? h.dateTime(d.owner_created) : "không rõ" %><br><%= d.other_name %>: <%= d.other_created ? h.dateTime(d.other_created) : "không rõ" %></td>
-        <td><%= h.dateTime(d.detected_at) %><% if (d.notified_at) { %><br><span class="muted small">đã gửi mail</span><% } %></td>
+        <td><% if (d.same_password) { %><%= t('giống nhau') %><% } else { %><span class="badge badge-bad"><%= t('khác nhau') %></span><% } %></td>
+        <td class="small"><%= d.owner_name %>: <%= d.owner_created ? h.dateTime(d.owner_created) : t('không rõ') %><br><%= d.other_name %>: <%= d.other_created ? h.dateTime(d.other_created) : t('không rõ') %></td>
+        <td><%= h.dateTime(d.detected_at) %><% if (d.notified_at) { %><br><span class="muted small"><%= t('đã gửi mail') %></span><% } %></td>
         <td>
           <form method="post" action="/admin/sync/key-duplicates/<%= d.id %>/review" class="inline-actions">
             <%- include('../partials/csrf') %>
-            <button type="submit" name="action" value="assign" class="small" title="So ngày tạo trên AD: key được gán cho máy tạo sau (cần mật khẩu giống nhau)">Gán cho máy mới hơn</button>
-            <button type="submit" name="action" value="share" class="small secondary" title="Key giữ nguyên ở máy đang giữ; trang của cả 2 máy hiện ghi chú dùng chung">Dùng chung 2 máy</button>
+            <button type="submit" name="action" value="assign" class="small" title="<%= t('So ngày tạo trên AD: key được gán cho máy tạo sau (cần mật khẩu giống nhau)') %>"><%= t('Gán cho máy mới hơn') %></button>
+            <button type="submit" name="action" value="share" class="small secondary" title="<%= t('Key giữ nguyên ở máy đang giữ; trang của cả 2 máy hiện ghi chú dùng chung') %>"><%= t('Dùng chung 2 máy') %></button>
           </form>
         </td>
       </tr>
@@ -93,9 +92,7 @@
     </tbody>
   </table>
   </div>
-  <p class="muted small"><strong>Gán cho máy mới hơn:</strong> so ngày tạo (whenCreated) của 2 máy trên AD. Máy tạo sau là máy hiện tại (thường do unjoin rồi join lại, hoặc cài lại Windows), key được gán sang máy đó; máy cũ không bị xóa và vẫn xem được lịch sử chuyển key. Không thực hiện (cặp vẫn mở) nếu mật khẩu 2 máy khác nhau, thiếu ngày tạo, hoặc máy đang giữ key đã là máy mới hơn.<br>
-    <strong>Dùng chung 2 máy:</strong> key giữ nguyên ở máy đang giữ, không đổi quyền xem; trang của cả 2 máy hiện ghi chú "Key ID dùng chung với máy X". Dùng khi 2 máy cố ý dùng chung key (ví dụ clone image).<br>
-    Cả hai lựa chọn đóng cảnh báo cho cặp này và được ghi vào nhật ký truy cập.</p>
+  <p class="muted small"><%- th('<strong>Gán cho máy mới hơn:</strong> so ngày tạo (whenCreated) của 2 máy trên AD. Máy tạo sau là máy hiện tại (thường do unjoin rồi join lại, hoặc cài lại Windows), key được gán sang máy đó; máy cũ không bị xóa và vẫn xem được lịch sử chuyển key. Không thực hiện (cặp vẫn mở) nếu mật khẩu 2 máy khác nhau, thiếu ngày tạo, hoặc máy đang giữ key đã là máy mới hơn.<br> <strong>Dùng chung 2 máy:</strong> key giữ nguyên ở máy đang giữ, không đổi quyền xem; trang của cả 2 máy hiện ghi chú "Key ID dùng chung với máy X". Dùng khi 2 máy cố ý dùng chung key (ví dụ clone image).<br> Cả hai lựa chọn đóng cảnh báo cho cặp này và được ghi vào nhật ký truy cập.') %></p>
 </section>
 <% } %>
 
@@ -103,26 +100,25 @@
   <div>
     <h2>Worker</h2>
     <% if (!heartbeats.length) { %>
-      <p class="muted">Chưa nhận heartbeat nào từ sync worker.</p>
+      <p class="muted"><%= t('Chưa nhận heartbeat nào từ sync worker.') %></p>
     <% } %>
     <% heartbeats.forEach((hb) => { %>
       <dl class="facts">
         <dt>Worker</dt><dd><%= hb.worker_id %> <span class="muted">v<%= hb.version ?? '?' %></span>
-          <% if (hb.online) { %><span class="badge badge-good" title="Có heartbeat trong <%= heartbeatMax %> phút gần nhất">● Online</span>
-          <% } else { %><span class="badge badge-bad" title="Không có heartbeat quá <%= heartbeatMax %> phút">● Offline</span><% } %></dd>
-        <dt>Heartbeat</dt><dd><%= h.dateTime(hb.at) %> <span class="muted">(<%= hb.minutesAgo < 1 ? 'vừa xong' : `${h.number(hb.minutesAgo)} phút trước` %>)</span></dd>
+          <% if (hb.online) { %><span class="badge badge-good" title="<%= t('Có heartbeat trong {heartbeatMax} phút gần nhất', { heartbeatMax: heartbeatMax }) %>">● Online</span>
+          <% } else { %><span class="badge badge-bad" title="<%= t('Không có heartbeat quá {heartbeatMax} phút', { heartbeatMax: heartbeatMax }) %>">● Offline</span><% } %></dd>
+        <dt>Heartbeat</dt><dd><%= h.dateTime(hb.at) %> <span class="muted">(<%= hb.minutesAgo < 1 ? t('vừa xong') : t('{n} phút trước', { n: h.number(hb.minutesAgo) }) %>)</span></dd>
         <dt>DC</dt><dd><%= hb.dc_name ?? '—' %></dd>
-        <dt>LDAP</dt><dd><%= hb.ldap_ok === false ? `Lỗi: ${hb.last_error_code ?? ''}` : hb.ldap_ok ? 'OK' : '—' %></dd>
-        <dt>Hàng đợi</dt><dd><%= hb.queue_len ?? '—' %></dd>
-        <dt>Cert DC hết hạn</dt><dd><%= h.date(hb.dc_cert_expires_at) %></dd>
+        <dt>LDAP</dt><dd><%= hb.ldap_ok === false ? t('Lỗi: {code}', { code: hb.last_error_code ?? '' }) : hb.ldap_ok ? 'OK' : '—' %></dd>
+        <dt><%= t('Hàng đợi') %></dt><dd><%= hb.queue_len ?? '—' %></dd>
+        <dt><%= t('Cert DC hết hạn') %></dt><dd><%= h.date(hb.dc_cert_expires_at) %></dd>
         <dt>Canary</dt><dd><%= h.dateTime(hb.canary_value) %></dd>
       </dl>
     <% }) %>
   </div>
   <div>
-    <h2>Chạy sync ngay</h2>
-    <p class="muted">Worker nhận yêu cầu ở lần heartbeat tới (tối đa ~5 phút).
-      <% if (requested) { %><br>Đang chờ: <strong><%= requested.mode %></strong> (<%= requested.by %>, <%= h.dateTime(requested.at) %>)<% } %></p>
+    <h2><%= t('Chạy sync ngay') %></h2>
+    <p class="muted"><%= t('Worker nhận yêu cầu ở lần heartbeat tới (tối đa ~5 phút).') %> <% if (requested) { %><br><%- th('Đang chờ: <strong>{mode}</strong> ({by}, {at})', { mode: requested.mode, by: requested.by, at: h.dateTime(requested.at) }) %><% } %></p>
     <% if (features['feature.manual_sync']) { %>
     <form method="post" action="/admin/sync/request" class="actions">
       <%- include('../partials/csrf') %>
@@ -130,21 +126,21 @@
       <button type="submit" name="mode" value="full" class="secondary">Full</button>
     </form>
     <% } else { %>
-    <p class="muted">Yêu cầu sync từ web đang tắt (Quản trị &gt; Tính năng).</p>
+    <p class="muted"><%= t('Yêu cầu sync từ web đang tắt (Quản trị > Tính năng).') %></p>
     <% } %>
-    <p class="muted small">Delta (15 phút) thấy máy mới, đổi tên, chuyển OU trong phạm vi và key mới. Máy bị xóa hoặc chuyển ra ngoài phạm vi chỉ được phát hiện ở <strong>full ban đêm</strong>; cần ngay thì bấm Full.</p>
-    <p class="muted">Lần sync thành công gần nhất: <%= lastSuccess ? h.dateTime(lastSuccess.finished_at) : 'chưa có' %></p>
+    <p class="muted small"><%- th('Delta (15 phút) thấy máy mới, đổi tên, chuyển OU trong phạm vi và key mới. Máy bị xóa hoặc chuyển ra ngoài phạm vi chỉ được phát hiện ở <strong>full ban đêm</strong>; cần ngay thì bấm Full.') %></p>
+    <p class="muted"><%= t('Lần sync thành công gần nhất: {c}', { c: lastSuccess ? h.dateTime(lastSuccess.finished_at) : t('chưa có') }) %></p>
   </div>
 </section>
 
 <section class="card">
-  <h2>Các lượt sync gần đây</h2>
+  <h2><%= t('Các lượt sync gần đây') %></h2>
   <table class="dense">
-    <thead><tr><th>#</th><th>Bắt đầu</th><th>Kiểu</th><th>DC</th><th>Trạng thái</th><th class="num" title="+ máy lần đầu được thêm vào hệ thống bởi lượt này; − máy bị gắn &quot;không còn trong phạm vi giám sát&quot; (lượt full)">Máy</th><th class="num" title="+ key mới thêm vào hệ thống (key không bao giờ bị xóa)">Key</th><th>Ghi chú</th></tr></thead>
+    <thead><tr><th>#</th><th><%= t('Bắt đầu') %></th><th><%= t('Kiểu') %></th><th>DC</th><th><%= t('Trạng thái') %></th><th class="num" title="<%= t('+ máy lần đầu được thêm vào hệ thống bởi lượt này; − máy bị gắn "không còn trong phạm vi giám sát" (lượt full)') %>"><%= t('Máy') %></th><th class="num" title="<%= t('+ key mới thêm vào hệ thống (key không bao giờ bị xóa)') %>">Key</th><th><%= t('Ghi chú') %></th></tr></thead>
     <tbody>
     <% runs.forEach((r) => { const st = h.runStatus(r.status); %>
       <tr>
-        <td><a href="/admin/sync/runs/<%= r.id %>" title="Số thứ tự #<%= r.id %>"><%= h.runRef(r) %></a></td>
+        <td><a href="/admin/sync/runs/<%= r.id %>" title="<%= t('Số thứ tự #{id}', { id: r.id }) %>"><%= h.runRef(r) %></a></td>
         <td><%= h.dateTime(r.started_at) %></td>
         <td><%= r.mode %></td>
         <td><%= r.dc_name %></td>
@@ -154,20 +150,20 @@
         <td class="num"><% if (r.keys_added) { %><span class="delta-up">+<%= h.number(r.keys_added) %></span><% } else { %>0<% } %></td>
         <td>
           <% if (r.error_code) { %><code><%= r.error_code %></code><% } %>
-          <% if (r.keys_empty_pwd) { %><span class="badge badge-warn"><%= r.keys_empty_pwd %> key rỗng</span><% } %>
+          <% if (r.keys_empty_pwd) { %><span class="badge badge-warn"><%= t('{keysEmptyPwd} key rỗng', { keysEmptyPwd: r.keys_empty_pwd }) %></span><% } %>
           <% if (r.anomalies) { %><ul class="anomalies"><% r.anomalies.forEach((a) => { %><li><%= h.anomalyText(a) %></li><% }) %></ul><% } %>
           <%# Tom tat o day (ke ca sau khi da quyet dinh); chi tiet va nut quyet dinh o trang mo bang ma luot %>
           <% if (r.status === 'quarantined' && !r.ack_decision) { %>
-            <div class="run-summary"><strong>Đang chờ quyết định</strong> · bấm mã lượt <a href="/admin/sync/runs/<%= r.id %>"><%= h.runRef(r) %></a> để xem chi tiết và quyết định.</div>
+            <div class="run-summary"><%- th('<strong>Đang chờ quyết định</strong> · bấm mã lượt <a href="/admin/sync/runs/{id}">{r}</a> để xem chi tiết và quyết định.', { id: r.id, r: h.runRef(r) }) %></div>
           <% } else if (r.ack_decision) { %>
-            <div class="run-summary muted"><%= r.ack_decision === 'accept' ? 'Đã chấp nhận' : 'Đã bác bỏ' %> bởi <%= r.ack_by %><% if (r.ack_at) { %> lúc <%= h.dateTime(r.ack_at) %><% } %></div>
+            <div class="run-summary muted"><%= t('{decision} bởi {by}', { decision: r.ack_decision === 'accept' ? t('Đã chấp nhận') : t('Đã bác bỏ'), by: r.ack_by }) %><% if (r.ack_at) { %> <%= t('lúc {at}', { at: h.dateTime(r.ack_at) }) %><% } %></div>
           <% } %>
         </td>
       </tr>
     <% }) %>
-    <% if (!runs.length) { %><tr><td colspan="9" class="muted">Chưa có lượt sync nào.</td></tr><% } %>
+    <% if (!runs.length) { %><tr><td colspan="9" class="muted"><%= t('Chưa có lượt sync nào.') %></td></tr><% } %>
     </tbody>
   </table>
-  <%- include('../partials/pager', { page: runsPage.page, pages: runsPage.pages, query, total: runsPage.total, pageSize: runsPage.pageSize, unit: 'lượt' }) %>
+  <%- include('../partials/pager', { page: runsPage.page, pages: runsPage.pages, query, total: runsPage.total, pageSize: runsPage.pageSize, unit: t('lượt') }) %>
 </section>
 <%- include('../partials/foot') %>

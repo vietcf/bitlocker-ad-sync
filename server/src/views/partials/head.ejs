@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="vi">
+<html lang="<%= lang %>">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -11,28 +11,30 @@
 <% if (me && !me.mustChangePassword) { %>
 <header class="topbar">
   <a class="brand" href="/">BitLocker Keys</a>
-  <nav class="nav" aria-label="Chính">
+  <nav class="nav" aria-label="<%= t('Chính') %>">
     <%# Static labels only, so building the tag as a string is safe. %>
     <% const active = (href) => (href === '/' ? path === '/' || path.startsWith('/computers') : path.startsWith(href)); %>
     <% const link = (href, label) => `<a href="${href}"${active(href) ? ' aria-current="page"' : ''}>${label}</a>`; %>
-    <% if (can('keys') || can('reports')) { %><%- link('/dashboard', 'Tổng quan') %><% } %>
-    <% if (can('keys')) { %><%- link('/', 'Tìm máy') %><% } %>
-    <% if (can('logs')) { %><%- link('/audit', 'Nhật ký') %><% } %>
-    <% if (can('reports')) { %><%- link('/reports', 'Báo cáo') %><% } %>
+    <% if (can('keys') || can('reports')) { %><%- link('/dashboard', t('Tổng quan')) %><% } %>
+    <% if (can('keys')) { %><%- link('/', t('Tìm máy')) %><% } %>
+    <% if (can('logs')) { %><%- link('/audit', t('Nhật ký')) %><% } %>
+    <% if (can('reports')) { %><%- link('/reports', t('Báo cáo')) %><% } %>
     <% if (can('admin')) { %>
-      <%- link('/admin', 'Quản trị') %>
+      <%- link('/admin', t('Quản trị')) %>
     <% } %>
   </nav>
   <div class="account">
+    <%- include('lang-switch') %>
     <span class="who" title="<%= me.upn %>"><%= me.displayName || me.upn %></span>
-    <% if (me.authSource === 'local') { %><a href="/change-password">Đổi mật khẩu</a><% } %>
+    <% if (me.authSource === 'local') { %><a href="/change-password"><%= t('Đổi mật khẩu') %></a><% } %>
     <form method="post" action="/logout" class="inline">
       <%- include('csrf') %>
-      <button type="submit" class="link">Đăng xuất</button>
+      <button type="submit" class="link"><%= t('Đăng xuất') %></button>
     </form>
   </div>
 </header>
 <% } %>
+<% if (!(me && !me.mustChangePassword)) { %><div class="lang-corner"><%- include('lang-switch') %></div><% } %>
 <main class="page">
 <% if (flash) { %>
   <div class="notice notice-<%= flash.type %>" role="status"><%= flash.text %></div>

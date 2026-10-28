@@ -2,76 +2,72 @@
 <%- include('_tabs') %>
 <section class="card">
   <h2>Mail server (SMTP)</h2>
-  <p class="muted">Mọi email của hệ thống (cảnh báo, thông báo máy/key mới) được đưa vào hàng đợi rồi gửi qua server này.
-    Nếu tắt ở đây, hệ thống dùng <code>SMTP_URL</code> trong file <code>.env</code> (nếu có).</p>
+  <p class="muted"><%- th('Mọi email của hệ thống (cảnh báo, thông báo máy/key mới) được đưa vào hàng đợi rồi gửi qua server này. Nếu tắt ở đây, hệ thống dùng <code>SMTP_URL</code> trong file <code>.env</code> (nếu có).') %></p>
   <%- include('../partials/error-box', { error }) %>
   <form method="post" action="/admin/settings/mail-server" class="form">
     <%- include('../partials/csrf') %>
     <label class="check"><input type="checkbox" name="enabled" <%= form.enabled ? 'checked' : '' %>>
-      <span><strong>Gửi mail qua server này</strong></span></label>
+      <span><%- th('<strong>Gửi mail qua server này</strong>') %></span></label>
 
     <fieldset>
-      <legend>Kết nối</legend>
+      <legend><%= t('Kết nối') %></legend>
       <div class="settings-grid">
-        <label>Địa chỉ server <input name="host" value="<%= form.host %>" maxlength="255" placeholder="smtp.corp.local" spellcheck="false"></label>
-        <label>Cổng <input type="number" name="port" value="<%= form.port %>" min="1" max="65535" required></label>
-        <label>Bảo mật
-          <select name="security">
-            <option value="starttls" <%= form.security === 'starttls' ? 'selected' : '' %>>STARTTLS (thường cổng 587)</option>
-            <option value="tls" <%= form.security === 'tls' ? 'selected' : '' %>>SSL/TLS (thường cổng 465)</option>
-            <option value="none" <%= form.security === 'none' ? 'selected' : '' %>>Không mã hóa (cổng 25, relay nội bộ)</option>
+        <label><%= t('Địa chỉ server') %> <input name="host" value="<%= form.host %>" maxlength="255" placeholder="smtp.corp.local" spellcheck="false"></label>
+        <label><%= t('Cổng') %> <input type="number" name="port" value="<%= form.port %>" min="1" max="65535" required></label>
+        <label><%= t('Bảo mật') %> <select name="security">
+            <option value="starttls" <%= form.security === 'starttls' ? 'selected' : '' %>><%= t('STARTTLS (thường cổng 587)') %></option>
+            <option value="tls" <%= form.security === 'tls' ? 'selected' : '' %>><%= t('SSL/TLS (thường cổng 465)') %></option>
+            <option value="none" <%= form.security === 'none' ? 'selected' : '' %>><%= t('Không mã hóa (cổng 25, relay nội bộ)') %></option>
           </select>
         </label>
       </div>
       <label class="check"><input type="checkbox" name="rejectUnauthorized" <%= form.rejectUnauthorized ? 'checked' : '' %>>
-        <span>Kiểm tra chứng chỉ của mail server <span class="muted">(chỉ bỏ chọn ở môi trường lab dùng chứng chỉ tự ký)</span></span></label>
+        <span><%- th('Kiểm tra chứng chỉ của mail server <span class="muted">(chỉ bỏ chọn ở môi trường lab dùng chứng chỉ tự ký)</span>') %></span></label>
     </fieldset>
 
     <fieldset>
-      <legend>Xác thực</legend>
-      <p class="muted small">Để trống tên đăng nhập nếu relay không cần xác thực.</p>
+      <legend><%= t('Xác thực') %></legend>
+      <p class="muted small"><%= t('Để trống tên đăng nhập nếu relay không cần xác thực.') %></p>
       <div class="settings-grid">
-        <label>Tên đăng nhập <input name="username" value="<%= form.username %>" maxlength="255" autocomplete="off" spellcheck="false"></label>
-        <label>Mật khẩu
-          <input type="password" name="password" maxlength="512" autocomplete="new-password"
-                 placeholder="<%= passwordSet ? 'Đã lưu, để trống nếu không đổi' : 'Chưa có' %>">
+        <label><%= t('Tên đăng nhập') %> <input name="username" value="<%= form.username %>" maxlength="255" autocomplete="off" spellcheck="false"></label>
+        <label><%= t('Mật khẩu') %> <input type="password" name="password" maxlength="512" autocomplete="new-password"
+                 placeholder="<%= passwordSet ? t('Đã lưu, để trống nếu không đổi') : t('Chưa có') %>">
         </label>
       </div>
       <% if (passwordSet) { %>
-        <label class="check"><input type="checkbox" name="clearPassword"> <span>Xóa mật khẩu đã lưu</span></label>
+        <label class="check"><input type="checkbox" name="clearPassword"> <span><%= t('Xóa mật khẩu đã lưu') %></span></label>
       <% } %>
-      <p class="muted small">Mật khẩu được mã hóa (AES-256-GCM) trước khi lưu và không bao giờ hiển thị lại.</p>
+      <p class="muted small"><%= t('Mật khẩu được mã hóa (AES-256-GCM) trước khi lưu và không bao giờ hiển thị lại.') %></p>
     </fieldset>
 
     <fieldset>
-      <legend>Gửi mail</legend>
-      <label>Gửi những mail đang chờ mỗi
-        <span class="nowrap"><input type="number" name="sendIntervalMinutes" value="<%= form.sendIntervalMinutes %>" min="1" max="60" required class="thr-input"> phút</span>
-        <span class="muted hint">Từ 1 đến 60; mặc định 1. Mail xếp hàng ngay khi có sự kiện và được gửi ở lần chạy kế tiếp của job này. Áp dụng trong vòng một phút.</span>
+      <legend><%= t('Gửi mail') %></legend>
+      <label><%= t('Gửi những mail đang chờ mỗi') %>
+        <span class="nowrap"><input type="number" name="sendIntervalMinutes" value="<%= form.sendIntervalMinutes %>" min="1" max="60" required class="thr-input"> <%= t('phút') %></span>
+        <span class="muted hint"><%= t('Từ 1 đến 60; mặc định 1. Mail xếp hàng ngay khi có sự kiện và được gửi ở lần chạy kế tiếp của job này. Áp dụng trong vòng một phút.') %></span>
       </label>
     </fieldset>
 
     <fieldset>
-      <legend>Nội dung</legend>
+      <legend><%= t('Nội dung') %></legend>
       <div class="settings-grid">
-        <label>Địa chỉ gửi (From) <input type="email" name="from" value="<%= form.from %>" required maxlength="254"></label>
-        <label>Địa chỉ web của app
-          <input type="url" name="appUrl" value="<%= form.appUrl %>" maxlength="255" placeholder="https://blk.corp.local">
-          <span class="muted hint">Dùng để tạo link tới máy trong email. Để trống thì email không có link.</span>
+        <label><%= t('Địa chỉ gửi (From)') %> <input type="email" name="from" value="<%= form.from %>" required maxlength="254"></label>
+        <label><%= t('Địa chỉ web của app') %> <input type="url" name="appUrl" value="<%= form.appUrl %>" maxlength="255" placeholder="https://blk.corp.local">
+          <span class="muted hint"><%= t('Dùng để tạo link tới máy trong email. Để trống thì email không có link.') %></span>
         </label>
       </div>
     </fieldset>
-    <div class="actions"><button type="submit">Lưu</button></div>
+    <div class="actions"><button type="submit"><%= t('Lưu') %></button></div>
   </form>
 </section>
 
 <section class="card">
-  <h2>Gửi thử</h2>
-  <p class="muted">Gửi ngay một email thử bằng cấu hình <strong>đã lưu</strong> (không qua hàng đợi) và báo lỗi nếu có.</p>
+  <h2><%= t('Gửi thử') %></h2>
+  <p class="muted"><%- th('Gửi ngay một email thử bằng cấu hình <strong>đã lưu</strong> (không qua hàng đợi) và báo lỗi nếu có.') %></p>
   <form method="post" action="/admin/settings/mail-server/test" class="filters">
     <%- include('../partials/csrf') %>
-    <label>Gửi tới <input type="email" name="to" value="<%= me.email ?? '' %>" required maxlength="254"></label>
-    <button type="submit" class="secondary">Gửi thử</button>
+    <label><%= t('Gửi tới') %> <input type="email" name="to" value="<%= me.email ?? '' %>" required maxlength="254"></label>
+    <button type="submit" class="secondary"><%= t('Gửi thử') %></button>
   </form>
 </section>
 <%- include('../partials/foot') %>

@@ -1,36 +1,32 @@
 <%- include('../partials/head') %>
 <%- include('_tabs') %>
-<p class="crumbs"><a href="/admin/sync">← Tình trạng sync</a></p>
+<p class="crumbs"><%- th('<a href="/admin/sync">← Tình trạng sync</a>') %></p>
 <% const ov = metrics.find((m) => m.branch_id === null); const st = h.runStatus(run.status); %>
 <section class="card">
   <div class="title-row">
-    <h2>Lượt sync <%= h.runRef(run) %> <span class="badge badge-<%= st.tone %>"><%= st.label %></span></h2>
+    <h2><%- th('Lượt sync {run} <span class="badge badge-{tone}">{label}</span>', { run: h.runRef(run), tone: st.tone, label: st.label }) %></h2>
     <span class="muted"><%= run.mode %> · DC <%= run.dc_name %> · <%= h.dateTime(run.started_at) %></span>
   </div>
   <% if (waiting) { %>
-    <div class="notice notice-warn" role="status">
-      Lượt này bị <strong>giữ lại</strong>: các thay đổi bên dưới <strong>chưa được áp dụng</strong>. Xem kỹ rồi chọn
-      <strong>Chấp nhận</strong> (thay đổi là thật, ví dụ đã thu hồi một lô máy) hoặc <strong>Bác bỏ</strong> (nguyên nhân đã được sửa, ví dụ
-      worker đọc thiếu OU; không áp dụng gì).
-    </div>
+    <div class="notice notice-warn" role="status"> <%- th('Lượt này bị <strong>giữ lại</strong>: các thay đổi bên dưới <strong>chưa được áp dụng</strong>. Xem kỹ rồi chọn <strong>Chấp nhận</strong> (thay đổi là thật, ví dụ đã thu hồi một lô máy) hoặc <strong>Bác bỏ</strong> (nguyên nhân đã được sửa, ví dụ worker đọc thiếu OU; không áp dụng gì).') %> </div>
   <% } else if (run.ack_decision) { %>
-    <p class="muted"><%= run.ack_decision === 'accept' ? 'Đã chấp nhận' : 'Đã bác bỏ' %> bởi <%= run.ack_by %> lúc <%= h.dateTime(run.ack_at) %>.</p>
+    <p class="muted"><%= t('{b} bởi {ackBy} lúc {ackAt}.', { b: run.ack_decision === 'accept' ? t('Đã chấp nhận') : t('Đã bác bỏ'), ackBy: run.ack_by, ackAt: h.dateTime(run.ack_at) }) %></p>
   <% } %>
 
   <% if (run.anomalies?.length) { %>
-    <h3>Lý do bị giữ lại</h3>
+    <h3><%= t('Lý do bị giữ lại') %></h3>
     <ul class="anomalies"><% run.anomalies.forEach((a) => { %><li><%= h.anomalyText(a) %></li><% }) %></ul>
   <% } %>
 
   <% if (run.mode === 'full') { %>
-  <h3>Số liệu của lượt so với hệ thống</h3>
+  <h3><%= t('Số liệu của lượt so với hệ thống') %></h3>
   <table class="dense">
-    <thead><tr><th>Phạm vi</th><th class="num">Máy lượt này thấy</th><th class="num">Máy đang có</th><th class="num">Chênh lệch</th>
-      <th class="num">Key lượt này thấy</th><th class="num">Key đang có</th><th class="num">Key không đọc được mật khẩu</th></tr></thead>
+    <thead><tr><th><%= t('Phạm vi') %></th><th class="num"><%= t('Máy lượt này thấy') %></th><th class="num"><%= t('Máy đang có') %></th><th class="num"><%= t('Chênh lệch') %></th>
+      <th class="num"><%= t('Key lượt này thấy') %></th><th class="num"><%= t('Key đang có') %></th><th class="num"><%= t('Key không đọc được mật khẩu') %></th></tr></thead>
     <tbody>
     <% metrics.forEach((m) => { const d = m.computers_seen - m.computers_in_db; %>
       <tr class="<%= m.branch_id === null ? 'row-total' : '' %>">
-        <td><%= m.branch_id === null ? 'Toàn hệ thống' : h.branchCode(m.branch_code) %></td>
+        <td><%= m.branch_id === null ? t('Toàn hệ thống') : h.branchCode(m.branch_code) %></td>
         <td class="num"><%= h.number(m.computers_seen) %></td><td class="num"><%= h.number(m.computers_in_db) %></td>
         <td class="num <%= d < 0 ? 'bad-text' : '' %>"><%= d > 0 ? '+' : '' %><%= h.number(d) %></td>
         <td class="num"><%= m.branch_id === null ? h.number(m.keys_seen) : '—' %></td>
@@ -38,18 +34,18 @@
         <td class="num"><%= m.branch_id === null ? h.number(m.keys_empty_pwd) : '—' %></td>
       </tr>
     <% }) %>
-    <% if (!metrics.length) { %><tr><td colspan="7" class="muted">Không có số liệu.</td></tr><% } %>
+    <% if (!metrics.length) { %><tr><td colspan="7" class="muted"><%= t('Không có số liệu.') %></td></tr><% } %>
     </tbody>
   </table>
   <% } else { %>
-  <h3>Số liệu của lượt này</h3>
-  <p class="muted small">Lượt delta chỉ đọc máy và key <strong>có thay đổi</strong> từ mốc USN lần trước, nên chỉ hiện những gì lượt này thấy, không so với toàn hệ thống (chỉ lượt full mới so sánh với dữ liệu đang có).</p>
+  <h3><%= t('Số liệu của lượt này') %></h3>
+  <p class="muted small"><%- th('Lượt delta chỉ đọc máy và key <strong>có thay đổi</strong> từ mốc USN lần trước, nên chỉ hiện những gì lượt này thấy, không so với toàn hệ thống (chỉ lượt full mới so sánh với dữ liệu đang có).') %></p>
   <table class="dense">
-    <thead><tr><th>Phạm vi</th><th class="num">Máy lượt này thấy</th><th class="num" title="Số máy đang giám sát tại thời điểm lượt này kết thúc">Máy hiện tại</th><th class="num" title="Số máy lần đầu được thêm vào hệ thống bởi lượt này">Máy mới</th><th class="num">Key lượt này thấy</th><th class="num" title="Số key của các máy đang giám sát">Key hiện tại</th><th class="num">Key mới thêm</th><th class="num">Key không đọc được mật khẩu</th></tr></thead>
+    <thead><tr><th><%= t('Phạm vi') %></th><th class="num"><%= t('Máy lượt này thấy') %></th><th class="num" title="<%= t('Số máy đang giám sát tại thời điểm lượt này kết thúc') %>"><%= t('Máy hiện tại') %></th><th class="num" title="<%= t('Số máy lần đầu được thêm vào hệ thống bởi lượt này') %>"><%= t('Máy mới') %></th><th class="num"><%= t('Key lượt này thấy') %></th><th class="num" title="<%= t('Số key của các máy đang giám sát') %>"><%= t('Key hiện tại') %></th><th class="num"><%= t('Key mới thêm') %></th><th class="num"><%= t('Key không đọc được mật khẩu') %></th></tr></thead>
     <tbody>
     <% metrics.forEach((m) => { %>
       <tr class="<%= m.branch_id === null ? 'row-total' : '' %>">
-        <td><%= m.branch_id === null ? 'Toàn hệ thống' : h.branchCode(m.branch_code) %></td>
+        <td><%= m.branch_id === null ? t('Toàn hệ thống') : h.branchCode(m.branch_code) %></td>
         <td class="num"><%= h.number(m.computers_seen) %></td>
         <td class="num"><%= h.number(m.computers_in_db) %></td>
         <td class="num"><%= h.number(m.computers_added) %></td>
@@ -59,7 +55,7 @@
         <td class="num"><%= m.branch_id === null ? h.number(m.keys_empty_pwd) : '—' %></td>
       </tr>
     <% }) %>
-    <% if (!metrics.length) { %><tr><td colspan="8" class="muted">Không có số liệu.</td></tr><% } %>
+    <% if (!metrics.length) { %><tr><td colspan="8" class="muted"><%= t('Không có số liệu.') %></td></tr><% } %>
     </tbody>
   </table>
   <% } %>
@@ -67,28 +63,27 @@
 
 <% if (waiting) { %>
 <section class="card">
-  <h2>Nếu chấp nhận</h2>
+  <h2><%= t('Nếu chấp nhận') %></h2>
   <ul>
-    <li><strong><%= h.number(planned.total) %> máy</strong> được gắn nhãn <strong>"Không còn trong phạm vi giám sát"</strong> (lượt này và các lượt sau không thấy).
-      Máy và key của chúng <strong>vẫn được giữ</strong>, vẫn hiện key được; máy xuất hiện lại trong phạm vi giám sát sẽ tự trở lại bình thường.</li>
-    <li>Mốc USN <code><%= run.pending?.highestUsn ?? '—' %></code> được lưu: lượt delta kế tiếp chỉ đọc thay đổi sau mốc này.</li>
-    <li>Lượt được tính vào số liệu nền cho các lần kiểm tra bất thường sau.</li>
+    <li><%- th('<strong>{total} máy</strong> được gắn nhãn <strong>"Không còn trong phạm vi giám sát"</strong> (lượt này và các lượt sau không thấy). Máy và key của chúng <strong>vẫn được giữ</strong>, vẫn hiện key được; máy xuất hiện lại trong phạm vi giám sát sẽ tự trở lại bình thường.', { total: h.number(planned.total) }) %></li>
+    <li><%- th('Mốc USN <code>{highestUsn}</code> được lưu: lượt delta kế tiếp chỉ đọc thay đổi sau mốc này.', { highestUsn: run.pending?.highestUsn ?? '—' }) %></li>
+    <li><%= t('Lượt được tính vào số liệu nền cho các lần kiểm tra bất thường sau.') %></li>
   </ul>
-  <p class="muted small">Nếu bác bỏ: không máy nào bị gắn nhãn, USN không đổi (lượt sau đọc lại từ mốc cũ), lượt không vào số liệu nền.</p>
+  <p class="muted small"><%= t('Nếu bác bỏ: không máy nào bị gắn nhãn, USN không đổi (lượt sau đọc lại từ mốc cũ), lượt không vào số liệu nền.') %></p>
 
   <% if (planned.total) { %>
-    <h3>Máy sẽ bị gắn nhãn "Không còn trong phạm vi giám sát", theo chi nhánh</h3>
+    <h3><%= t('Máy sẽ bị gắn nhãn "Không còn trong phạm vi giám sát", theo chi nhánh') %></h3>
     <table class="dense">
-      <thead><tr><th>Chi nhánh</th><th class="num">Máy</th><th class="num">Key của các máy này</th></tr></thead>
+      <thead><tr><th><%= t('Chi nhánh') %></th><th class="num"><%= t('Máy') %></th><th class="num"><%= t('Key của các máy này') %></th></tr></thead>
       <tbody><% planned.byBranch.forEach((b) => { %>
         <tr><td><%= h.branchCode(b.branch_code) %></td><td class="num"><%= h.number(b.computers) %></td><td class="num"><%= h.number(b.keys) %></td></tr>
       <% }) %></tbody>
     </table>
     <details class="table-view" <%= planned.total <= 50 ? 'open' : '' %>>
-      <summary>Danh sách máy (<%= h.number(planned.total) %><%= planned.total > planned.rows.length ? `, hiện ${planned.rows.length} máy đầu` : '' %>)</summary>
+      <summary><%= t('Danh sách máy ({total}{u})', { total: h.number(planned.total), u: planned.total > planned.rows.length ? t(', hiện {n} máy đầu', { n: planned.rows.length }) : '' }) %></summary>
       <div class="table-scroll">
       <table class="dense">
-        <thead><tr><th>Máy</th><th>Chi nhánh</th><th>DN</th><th class="num">Key</th><th>Thấy lần cuối</th></tr></thead>
+        <thead><tr><th><%= t('Máy') %></th><th><%= t('Chi nhánh') %></th><th>DN</th><th class="num">Key</th><th><%= t('Thấy lần cuối') %></th></tr></thead>
         <tbody><% planned.rows.forEach((c) => { %>
           <tr><td><a href="/computers/<%= c.id %>"><%= c.name %></a><br><span class="guid"><%= c.object_guid %></span></td>
             <td><%= h.branchCode(c.branch_code) %></td><td class="small"><code class="wrap"><%= c.distinguished_name %></code></td>
@@ -102,29 +97,29 @@
   <form method="post" action="/admin/sync/runs/<%= run.id %>/ack" class="actions decision">
     <%- include('../partials/csrf') %>
     <button type="submit" name="decision" value="accept"
-      data-confirm="Chấp nhận lượt <%= h.runRef(run) %>: gắn nhãn &quot;Không còn trong phạm vi giám sát&quot; cho <%= planned.total %> máy (không xóa dữ liệu) và lưu mốc USN?">Chấp nhận</button>
+      data-confirm="<%= t('Chấp nhận lượt {run}: gắn nhãn "Không còn trong phạm vi giám sát" cho {total} máy (không xóa dữ liệu) và lưu mốc USN?', { run: h.runRef(run), total: planned.total }) %>"><%= t('Chấp nhận') %></button>
     <button type="submit" name="decision" value="reject" class="secondary"
-      data-confirm="Bác bỏ lượt <%= h.runRef(run) %>: không áp dụng thay đổi nào?">Bác bỏ</button>
+      data-confirm="<%= t('Bác bỏ lượt {run}: không áp dụng thay đổi nào?', { run: h.runRef(run) }) %>"><%= t('Bác bỏ') %></button>
   </form>
 </section>
 <% } %>
 
 <section class="card">
-  <h2>Lượt này đã lưu</h2>
-  <p class="muted small">Máy và key ghi nhận lần đầu được lưu ngay khi worker gửi lên, kể cả khi lượt bị giữ lại; quyết định không làm mất chúng.</p>
+  <h2><%= t('Lượt này đã lưu') %></h2>
+  <p class="muted small"><%= t('Máy và key ghi nhận lần đầu được lưu ngay khi worker gửi lên, kể cả khi lượt bị giữ lại; quyết định không làm mất chúng.') %></p>
   <div class="two-col">
     <div>
-      <h3>Máy mới (<%= h.number(stored.computers.total) %>)</h3>
-      <% if (!stored.computers.total) { %><p class="muted">Không có.</p><% } else { %>
+      <h3><%= t('Máy mới ({total})', { total: h.number(stored.computers.total) }) %></h3>
+      <% if (!stored.computers.total) { %><p class="muted"><%= t('Không có.') %></p><% } else { %>
         <ul class="plain-list"><% stored.computers.rows.forEach((c) => { %><li><a href="/computers/<%= c.id %>"><%= c.name %></a> <span class="muted">· <%= h.branchCode(c.branch_code) %></span></li><% }) %></ul>
-        <% if (stored.computers.total > stored.computers.rows.length) { %><p class="muted small">... và <%= stored.computers.total - stored.computers.rows.length %> máy khác.</p><% } %>
+        <% if (stored.computers.total > stored.computers.rows.length) { %><p class="muted small"><%= t('... và {length} máy khác.', { length: stored.computers.total - stored.computers.rows.length }) %></p><% } %>
       <% } %>
     </div>
     <div>
-      <h3>Key mới (<%= h.number(stored.keys.total) %>)</h3>
-      <% if (!stored.keys.total) { %><p class="muted">Không có.</p><% } else { %>
+      <h3><%= t('Key mới ({total})', { total: h.number(stored.keys.total) }) %></h3>
+      <% if (!stored.keys.total) { %><p class="muted"><%= t('Không có.') %></p><% } else { %>
         <ul class="plain-list"><% stored.keys.rows.forEach((k) => { %><li><code><%= k.key_id.toUpperCase() %></code> · <a href="/computers/<%= k.computer_id %>"><%= k.computer_name %></a> <span class="muted">· <%= h.branchCode(k.branch_code) %></span></li><% }) %></ul>
-        <% if (stored.keys.total > stored.keys.rows.length) { %><p class="muted small">... và <%= stored.keys.total - stored.keys.rows.length %> key khác.</p><% } %>
+        <% if (stored.keys.total > stored.keys.rows.length) { %><p class="muted small"><%= t('... và {length} key khác.', { length: stored.keys.total - stored.keys.rows.length }) %></p><% } %>
       <% } %>
     </div>
   </div>

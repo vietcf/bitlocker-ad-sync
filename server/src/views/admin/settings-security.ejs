@@ -1,62 +1,57 @@
 <%- include('../partials/head') %>
 <%- include('_tabs') %>
 <section class="card">
-  <h2>Bảo mật đăng nhập</h2>
-  <p class="muted">Thay đổi có hiệu lực trong vòng 30 giây và được ghi nhật ký.</p>
+  <h2><%= t('Bảo mật đăng nhập') %></h2>
+  <p class="muted"><%= t('Thay đổi có hiệu lực trong vòng 30 giây và được ghi nhật ký.') %></p>
   <%- include('../partials/error-box', { error }) %>
   <form method="post" action="/admin/settings/security" class="form">
     <%- include('../partials/csrf') %>
     <fieldset>
-      <legend>Mật khẩu tài khoản nội bộ</legend>
-      <p class="muted small">Áp dụng khi người dùng đặt / đổi mật khẩu (tài khoản AD theo chính sách mật khẩu của AD). Mật khẩu hiện có
-        không bị kiểm tra lại; muốn áp dụng ngay thì bật "Bắt đổi mật khẩu ở lần đăng nhập sau" cho người dùng.</p>
-      <label>Độ dài tối thiểu
-        <span class="nowrap"><input type="number" name="pwMinLength" value="<%= form.password.minLength %>" min="<%= form.limits.pwMinLength[0] %>" max="<%= form.limits.pwMinLength[1] %>" required class="thr-input"> ký tự</span>
-        <span class="muted hint">Từ <%= form.limits.pwMinLength[0] %> đến <%= form.limits.pwMinLength[1] %>; mặc định 12.</span>
+      <legend><%= t('Mật khẩu tài khoản nội bộ') %></legend>
+      <p class="muted small"><%= t('Áp dụng khi người dùng đặt / đổi mật khẩu (tài khoản AD theo chính sách mật khẩu của AD). Mật khẩu hiện có không bị kiểm tra lại; muốn áp dụng ngay thì bật "Bắt đổi mật khẩu ở lần đăng nhập sau" cho người dùng.') %></p>
+      <label><%= t('Độ dài tối thiểu') %>
+        <span class="nowrap"><input type="number" name="pwMinLength" value="<%= form.password.minLength %>" min="<%= form.limits.pwMinLength[0] %>" max="<%= form.limits.pwMinLength[1] %>" required class="thr-input"> <%= t('ký tự') %></span>
+        <span class="muted hint"><%= t('Từ {pwMinLength} đến {pwMinLength2}; mặc định 12.', { pwMinLength: form.limits.pwMinLength[0], pwMinLength2: form.limits.pwMinLength[1] }) %></span>
       </label>
-      <p><strong>Độ phức tạp</strong> <span class="muted small">(chọn các loại ký tự bắt buộc phải có)</span></p>
-      <label class="check"><input type="checkbox" name="pwUpper" <%= form.password.upper ? 'checked' : '' %>> <span>Ít nhất một <strong>chữ hoa</strong> (A–Z)</span></label>
-      <label class="check"><input type="checkbox" name="pwLower" <%= form.password.lower ? 'checked' : '' %>> <span>Ít nhất một <strong>chữ thường</strong> (a–z)</span></label>
-      <label class="check"><input type="checkbox" name="pwDigit" <%= form.password.digit ? 'checked' : '' %>> <span>Ít nhất một <strong>chữ số</strong> (0–9)</span></label>
-      <label class="check"><input type="checkbox" name="pwSpecial" <%= form.password.special ? 'checked' : '' %>> <span>Ít nhất một <strong>ký tự đặc biệt</strong> (không phải chữ hoặc số, ví dụ - _ ! @ # hoặc dấu cách)</span></label>
-      <p class="muted small">Luôn áp dụng: không chứa tên đăng nhập, khác mật khẩu hiện tại. Mật khẩu một lần do hệ thống tạo luôn đạt các yêu cầu này.
-        Đang áp dụng: <%= form.passwordText %></p>
+      <p><%- th('<strong>Độ phức tạp</strong> <span class="muted small">(chọn các loại ký tự bắt buộc phải có)</span>') %></p>
+      <label class="check"><input type="checkbox" name="pwUpper" <%= form.password.upper ? 'checked' : '' %>> <span><%- th('Ít nhất một <strong>chữ hoa</strong> (A–Z)') %></span></label>
+      <label class="check"><input type="checkbox" name="pwLower" <%= form.password.lower ? 'checked' : '' %>> <span><%- th('Ít nhất một <strong>chữ thường</strong> (a–z)') %></span></label>
+      <label class="check"><input type="checkbox" name="pwDigit" <%= form.password.digit ? 'checked' : '' %>> <span><%- th('Ít nhất một <strong>chữ số</strong> (0–9)') %></span></label>
+      <label class="check"><input type="checkbox" name="pwSpecial" <%= form.password.special ? 'checked' : '' %>> <span><%- th('Ít nhất một <strong>ký tự đặc biệt</strong> (không phải chữ hoặc số, ví dụ - _ ! @ # hoặc dấu cách)') %></span></label>
+      <p class="muted small"><%= t('Luôn áp dụng: không chứa tên đăng nhập, khác mật khẩu hiện tại. Mật khẩu một lần do hệ thống tạo luôn đạt các yêu cầu này. Đang áp dụng: {passwordText}', { passwordText: h.passwordPolicy(form.password) }) %></p>
     </fieldset>
     <fieldset>
-      <legend>Khóa tài khoản khi đăng nhập sai</legend>
+      <legend><%= t('Khóa tài khoản khi đăng nhập sai') %></legend>
       <label class="check"><input type="checkbox" name="lockEnabled" <%= form.lockout.enabled ? 'checked' : '' %>>
-        <span><strong>Khóa tài khoản</strong> sau nhiều lần nhập sai mật khẩu (hoặc mã xác thực 2 bước)</span></label>
+        <span><%- th('<strong>Khóa tài khoản</strong> sau nhiều lần nhập sai mật khẩu (hoặc mã xác thực 2 bước)') %></span></label>
       <div class="inline-fields">
-        <label>Số lần sai liên tiếp
-          <span class="nowrap"><input type="number" name="lockAttempts" value="<%= form.lockout.maxAttempts %>" min="<%= form.lockoutLimits.maxAttempts[0] %>" max="<%= form.lockoutLimits.maxAttempts[1] %>" required class="thr-input"> lần</span>
-          <span class="muted hint">Từ <%= form.lockoutLimits.maxAttempts[0] %> đến <%= form.lockoutLimits.maxAttempts[1] %>; mặc định 5.</span>
+        <label><%= t('Số lần sai liên tiếp') %>
+          <span class="nowrap"><input type="number" name="lockAttempts" value="<%= form.lockout.maxAttempts %>" min="<%= form.lockoutLimits.maxAttempts[0] %>" max="<%= form.lockoutLimits.maxAttempts[1] %>" required class="thr-input"> <%= t('lần') %></span>
+          <span class="muted hint"><%= t('Từ {maxAttempts} đến {maxAttempts2}; mặc định 5.', { maxAttempts: form.lockoutLimits.maxAttempts[0], maxAttempts2: form.lockoutLimits.maxAttempts[1] }) %></span>
         </label>
-        <label>Khóa trong
-          <span class="nowrap"><input type="number" name="lockMinutes" value="<%= form.lockout.lockMinutes %>" min="<%= form.lockoutLimits.lockMinutes[0] %>" max="<%= form.lockoutLimits.lockMinutes[1] %>" required class="thr-input"> phút</span>
-          <span class="muted hint">Mặc định 15. Nhập <strong>0</strong> = khóa tới khi Admin HQ mở.</span>
+        <label><%= t('Khóa trong') %>
+          <span class="nowrap"><input type="number" name="lockMinutes" value="<%= form.lockout.lockMinutes %>" min="<%= form.lockoutLimits.lockMinutes[0] %>" max="<%= form.lockoutLimits.lockMinutes[1] %>" required class="thr-input"> <%= t('phút') %></span>
+          <span class="muted hint"><%- th('Mặc định 15. Nhập <strong>0</strong> = khóa tới khi Admin HQ mở.') %></span>
         </label>
       </div>
       <label class="check"><input type="checkbox" name="lockAdmin" <%= form.lockout.applyToAdmin ? 'checked' : '' %>>
-        <span><strong>Áp dụng cho tài khoản Admin HQ</strong> <span class="muted">(bỏ chọn nếu không muốn Admin bị khóa; nếu Admin bị khóa: <code>node src/cli/users.js unlock &lt;tên&gt;</code>, xem README)</span></span></label>
+        <span><%- th('<strong>Áp dụng cho tài khoản Admin HQ</strong> <span class="muted">(bỏ chọn nếu không muốn Admin bị khóa; nếu Admin bị khóa: <code>node src/cli/users.js unlock &lt;tên&gt;</code>, xem README)</span>') %></span></label>
     </fieldset>
 
     <fieldset>
-      <legend>Phiên đăng nhập</legend>
-      <p class="muted small">Áp dụng cho mọi người dùng, cả trên web và API, kể cả với phiên đang mở.</p>
-    <label>Tự đăng xuất sau khi không hoạt động
-      <span class="nowrap"><input type="number" name="idleMinutes" value="<%= form.idleMinutes %>" min="<%= form.limits.idleMinutes[0] %>" max="<%= form.limits.idleMinutes[1] %>" required class="thr-input"> phút</span>
-      <span class="muted hint">Không có thao tác nào (mở trang, bấm nút) trong khoảng này thì phiên bị hủy và trang đang mở tự chuyển về
-        màn hình đăng nhập (ví dụ trang hiện key bị bỏ quên). Từ <%= form.limits.idleMinutes[0] %> đến <%= form.limits.idleMinutes[1] %> phút;
-        mặc định <%= form.defaults.idleMinutes %> (SESSION_IDLE_MINUTES trong .env).</span>
+      <legend><%= t('Phiên đăng nhập') %></legend>
+      <p class="muted small"><%= t('Áp dụng cho mọi người dùng, cả trên web và API, kể cả với phiên đang mở.') %></p>
+    <label><%= t('Tự đăng xuất sau khi không hoạt động') %>
+      <span class="nowrap"><input type="number" name="idleMinutes" value="<%= form.idleMinutes %>" min="<%= form.limits.idleMinutes[0] %>" max="<%= form.limits.idleMinutes[1] %>" required class="thr-input"> <%= t('phút') %></span>
+      <span class="muted hint"><%= t('Không có thao tác nào (mở trang, bấm nút) trong khoảng này thì phiên bị hủy và trang đang mở tự chuyển về màn hình đăng nhập (ví dụ trang hiện key bị bỏ quên). Từ {idleMinutes} đến {idleMinutes2} phút; mặc định {idleMinutes3} (SESSION_IDLE_MINUTES trong .env).', { idleMinutes: form.limits.idleMinutes[0], idleMinutes2: form.limits.idleMinutes[1], idleMinutes3: form.defaults.idleMinutes }) %></span>
     </label>
-    <label>Thời gian tối đa của một phiên
-      <span class="nowrap"><input type="number" name="maxHours" value="<%= form.maxHours %>" min="<%= form.limits.maxHours[0] %>" max="<%= form.limits.maxHours[1] %>" required class="thr-input"> giờ</span>
-      <span class="muted hint">Sau khoảng này kể từ lúc đăng nhập thì phải đăng nhập lại, dù vẫn đang dùng. Từ <%= form.limits.maxHours[0] %>
-        đến <%= form.limits.maxHours[1] %> giờ; mặc định <%= form.defaults.maxHours %> (SESSION_MAX_HOURS).</span>
+    <label><%= t('Thời gian tối đa của một phiên') %>
+      <span class="nowrap"><input type="number" name="maxHours" value="<%= form.maxHours %>" min="<%= form.limits.maxHours[0] %>" max="<%= form.limits.maxHours[1] %>" required class="thr-input"> <%= t('giờ') %></span>
+      <span class="muted hint"><%= t('Sau khoảng này kể từ lúc đăng nhập thì phải đăng nhập lại, dù vẫn đang dùng. Từ {maxHours} đến {maxHours2} giờ; mặc định {maxHours3} (SESSION_MAX_HOURS).', { maxHours: form.limits.maxHours[0], maxHours2: form.limits.maxHours[1], maxHours3: form.defaults.maxHours }) %></span>
     </label>
     </fieldset>
-    <div class="actions"><button type="submit">Lưu</button></div>
+    <div class="actions"><button type="submit"><%= t('Lưu') %></button></div>
   </form>
-  <p class="muted small">Xác thực 2 bước và bắt đổi mật khẩu được bật cho từng người ở Quản trị &gt; Người dùng &gt; Sửa.</p>
+  <p class="muted small"><%= t('Xác thực 2 bước và bắt đổi mật khẩu được bật cho từng người ở Quản trị > Người dùng > Sửa.') %></p>
 </section>
 <%- include('../partials/foot') %>

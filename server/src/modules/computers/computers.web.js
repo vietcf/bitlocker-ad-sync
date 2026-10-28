@@ -15,7 +15,7 @@ export function computersWeb({ computers, keys }) {
     const result = q.trim() ? await computers.search(req.scope, q, p, clientInfo(req)) : null;
     const list = result ? null : await computers.list(req.scope, filters, p);
     const canExportKeys = await keys.canExportKeys(req.scope);
-    res.render('home', { title: 'Tìm máy', q, result, list, filters, query: req.query, canExportKeys });
+    res.render('home', { title: req.t('Tìm máy'), q, result, list, filters, query: req.query, canExportKeys });
   });
 
   // Same filters as the list on the home page.
@@ -31,7 +31,7 @@ export function computersWeb({ computers, keys }) {
     const preview = await keys.exportPreview(req.scope, filters);
     const { branches } = await computers.list(req.scope, {}, 1);
     res.render('computers/export-keys', {
-      title: 'Xuất kèm recovery key',
+      title: req.t('Xuất kèm recovery key'),
       filters,
       preview,
       branchName: branches.find((b) => b.id === filters.branchId)?.code ?? null,
@@ -60,13 +60,13 @@ export function computersWeb({ computers, keys }) {
     const form = error
       ? req.body
       : { deviceSerial: computer.device_serial ?? '', ownerEmail: computer.owner_email ?? '' };
-    res.render('computers/edit-info', { title: `Thông tin máy · ${computer.name}`, computer, form, error });
+    res.render('computers/edit-info', { title: req.t('Thông tin máy · {name}', { name: computer.name }), computer, form, error });
   };
   r.get('/computers/:id/edit', (req, res) => renderComputerInfo(req, res, null));
   r.post('/computers/:id/edit', formAction(async (req, res) => {
     const computerId = parse(id, req.params.id);
     await computers.updateInfo(req.scope, computerId, req.body, clientInfo(req));
-    flash(req, 'success', 'Đã lưu thông tin máy.');
+    flash(req, 'success', req.t('Đã lưu thông tin máy.'));
     res.redirect(`/computers/${computerId}`);
   }, renderComputerInfo));
 
@@ -74,7 +74,7 @@ export function computersWeb({ computers, keys }) {
     const computerId = parse(id, req.params.id);
     const keyId = parse(uuid, req.params.keyId);
     res.render('computers/reveal-form', {
-      title: 'Hiện recovery key',
+      title: req.t('Hiện recovery key'),
       computerId,
       keyId,
       reasons: await keys.reasons(),

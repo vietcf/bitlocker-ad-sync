@@ -1,41 +1,39 @@
 <%- include('../partials/head') %>
 <section class="card">
   <div class="title-row">
-    <h1>Nhật ký truy cập</h1>
-    <% if (features['feature.audit_export']) { %><a class="button secondary small" href="/audit/export.csv<%= h.query(query, { page: undefined }) %>">Xuất CSV</a><% } %>
+    <h1><%= t('Nhật ký truy cập') %></h1>
+    <% if (features['feature.audit_export']) { %><a class="button secondary small" href="/audit/export.csv<%= h.query(query, { page: undefined }) %>"><%= t('Xuất CSV') %></a><% } %>
   </div>
   <form method="get" action="/audit" class="filter-bar" data-autosubmit>
     <div class="filter-fields">
-    <label>Chi nhánh
-      <select name="branchId">
-        <option value="">Tất cả</option>
+    <label><%= t('Chi nhánh') %> <select name="branchId">
+        <option value=""><%= t('Tất cả') %></option>
         <% branches.forEach((b) => { %><option value="<%= b.id %>" <%= filters.branchId === b.id ? 'selected' : '' %>><%= b.code %></option><% }) %>
       </select>
     </label>
-    <label>Hành động
-      <select name="action">
-        <option value="">Tất cả</option>
+    <label><%= t('Hành động') %> <select name="action">
+        <option value=""><%= t('Tất cả') %></option>
         <% actions.forEach((a) => { %><option value="<%= a %>" <%= filters.action === a ? 'selected' : '' %>><%= h.action(a) %></option><% }) %>
       </select>
     </label>
-    <label>Người dùng <input name="user" value="<%= filters.user ?? '' %>" placeholder="tên đăng nhập"></label>
-    <label>Máy <input name="computer" value="<%= filters.computer ?? '' %>" placeholder="tên máy"></label>
+    <label><%= t('Người dùng') %> <input name="user" value="<%= filters.user ?? '' %>" placeholder="<%= t('tên đăng nhập') %>"></label>
+    <label><%= t('Máy') %> <input name="computer" value="<%= filters.computer ?? '' %>" placeholder="<%= t('tên máy') %>"></label>
     <fieldset class="date-range">
-      <legend>Thời gian</legend>
-      <input type="date" name="from" value="<%= filters.from ? filters.from.toISOString().slice(0, 10) : '' %>" aria-label="Từ ngày" title="Từ ngày">
+      <legend><%= t('Thời gian') %></legend>
+      <input type="date" name="from" value="<%= filters.from ? filters.from.toISOString().slice(0, 10) : '' %>" aria-label="<%= t('Từ ngày') %>" title="<%= t('Từ ngày') %>">
       <span class="muted">–</span>
-      <input type="date" name="to" value="<%= filters.to ? filters.to.toISOString().slice(0, 10) : '' %>" aria-label="Đến ngày" title="Đến ngày">
+      <input type="date" name="to" value="<%= filters.to ? filters.to.toISOString().slice(0, 10) : '' %>" aria-label="<%= t('Đến ngày') %>" title="<%= t('Đến ngày') %>">
     </fieldset>
     </div>
   <div class="filter-actions">
     <span class="spacer"></span>
-    <a href="/audit" class="small">Xóa lọc</a>
-    <button type="submit" class="small">Lọc</button>
+    <a href="/audit" class="small"><%= t('Xóa lọc') %></a>
+    <button type="submit" class="small"><%= t('Lọc') %></button>
   </div>
   </form>
-  <p class="muted"><%= h.number(result.total) %> dòng. Xuất CSV không bao giờ chứa key, và việc xuất cũng được ghi log.</p>
+  <p class="muted"><%= t('{total} dòng. Xuất CSV không bao giờ chứa key, và việc xuất cũng được ghi log.', { total: h.number(result.total) }) %></p>
   <table class="dense">
-    <thead><tr><th>Thời gian</th><th>Người dùng</th><th>Hành động</th><th>Chi nhánh</th><th>Máy</th><th>Lý do / chi tiết</th><th>IP</th></tr></thead>
+    <thead><tr><th><%= t('Thời gian') %></th><th><%= t('Người dùng') %></th><th><%= t('Hành động') %></th><th><%= t('Chi nhánh') %></th><th><%= t('Máy') %></th><th><%= t('Lý do / chi tiết') %></th><th>IP</th></tr></thead>
     <tbody>
     <% result.rows.forEach((l) => { %>
       <tr class="<%= l.action === 'login_failed' ? 'warn-row' : '' %>">
@@ -54,6 +52,6 @@
     <% }) %>
     </tbody>
   </table>
-  <%- include('../partials/pager', { page: result.page, pages: result.pages, query, total: result.total, pageSize: result.pageSize, unit: 'dòng' }) %>
+  <%- include('../partials/pager', { page: result.page, pages: result.pages, query, total: result.total, pageSize: result.pageSize, unit: t('dòng') }) %>
 </section>
 <%- include('../partials/foot') %>

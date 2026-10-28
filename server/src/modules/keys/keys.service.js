@@ -14,6 +14,7 @@ import {
   markRevealed,
   readRecoveryPassword,
 } from './keys.repo.js';
+import { tk } from '../../i18n/index.js';
 
 export const REVEAL_SECONDS = 60;
 const KEY_EXPORT_MAX = 50_000;
@@ -22,11 +23,11 @@ const KEY_EXPORT_MAX = 50_000;
 export const KEY_EXPORT_MODES = ['off', 'admin', 'all'];
 
 export const REASON_LABELS = {
-  user_locked_out: 'Người dùng bị khóa máy (màn hình recovery)',
-  hardware_change: 'Thay đổi phần cứng / mainboard',
-  bios_update: 'Cập nhật BIOS / firmware',
-  disk_recovery: 'Khôi phục dữ liệu ổ cứng',
-  other: 'Lý do khác (ghi rõ trong ghi chú)',
+  user_locked_out: tk('Người dùng bị khóa máy (màn hình recovery)'),
+  hardware_change: tk('Thay đổi phần cứng / mainboard'),
+  bios_update: tk('Cập nhật BIOS / firmware'),
+  disk_recovery: tk('Khôi phục dữ liệu ổ cứng'),
+  other: tk('Lý do khác (ghi rõ trong ghi chú)'),
 };
 
 const revealInput = z.object({

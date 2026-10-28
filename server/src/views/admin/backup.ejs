@@ -2,24 +2,22 @@
 <%- include('_tabs') %>
 <% const size = (n) => n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`; %>
 <section class="card">
-  <h2>Sao lưu</h2>
-  <p class="muted">File sao lưu là file <strong>.zip</strong>, mặc định <strong>mã hóa AES-256</strong>: mở bằng <strong>7-Zip</strong> hoặc WinRAR với mật khẩu sao lưu
-    (File Explorer của Windows không mở được loại mã hóa này). File chứa <strong>mọi recovery key</strong>: giữ kín, chép ra nơi lưu trữ an toàn.</p>
+  <h2><%= t('Sao lưu') %></h2>
+  <p class="muted"><%- th('File sao lưu là file <strong>.zip</strong>, mặc định <strong>mã hóa AES-256</strong>: mở bằng <strong>7-Zip</strong> hoặc WinRAR với mật khẩu sao lưu (File Explorer của Windows không mở được loại mã hóa này). File chứa <strong>mọi recovery key</strong>: giữ kín, chép ra nơi lưu trữ an toàn.') %></p>
   <% if (!s.options.encrypt) { %>
-    <div class="notice notice-error" role="alert"><strong>Mã hóa đang tắt.</strong> File sao lưu là zip thường: ai có file là đọc được mọi recovery key.
-      Chỉ tắt khi thư mục sao lưu và nơi chép file đến đã được mã hóa và giới hạn quyền đọc.</div>
+    <div class="notice notice-error" role="alert"><%- th('<strong>Mã hóa đang tắt.</strong> File sao lưu là zip thường: ai có file là đọc được mọi recovery key. Chỉ tắt khi thư mục sao lưu và nơi chép file đến đã được mã hóa và giới hạn quyền đọc.') %></div>
   <% } %>
   <%- include('../partials/error-box', { error }) %>
 
   <% if (s.running) { %>
-    <div class="notice notice-info" role="status">Đang sao lưu (bắt đầu lúc <strong><%= h.dateTime(s.running) %></strong>). Tải lại trang sau ít phút để xem kết quả.</div>
+    <div class="notice notice-info" role="status"><%- th('Đang sao lưu (bắt đầu lúc <strong>{running}</strong>). Tải lại trang sau ít phút để xem kết quả.', { running: h.dateTime(s.running) }) %></div>
   <% } %>
   <% const last = s.lastResult; %>
   <% if (last) { %>
     <div class="notice notice-<%= last.ok ? 'info' : 'error' %>" role="status">
-      Lần chạy gần nhất: <strong><%= h.dateTime(last.at) %></strong> (<%= last.trigger === 'schedule' ? 'theo lịch' : 'Sao lưu ngay' %>):
-      <% if (last.ok) { %>thành công, <%= last.files.map((f) => f.name).join(', ') %>.
-      <% } else { %><strong>lỗi</strong>: <%= last.errors.map((e) => `${e.kind}: ${e.error}`).join('; ') %><% } %>
+      <%- th('Lần chạy gần nhất: <strong>{at}</strong> ({how}):', { at: h.dateTime(last.at), how: last.trigger === 'schedule' ? t('theo lịch') : t('Sao lưu ngay') }) %>
+      <% if (last.ok) { %><%= t('thành công, {files}.', { files: last.files.map((f) => f.name).join(', ') }) %>
+      <% } else { %><strong><%= t('lỗi') %></strong>: <%= last.errors.map((e) => `${e.kind}: ${e.error}`).join('; ') %><% } %>
     </div>
   <% } %>
 
@@ -27,22 +25,21 @@
     <form method="post" action="/admin/backup/options" class="form">
       <%- include('../partials/csrf') %>
       <fieldset>
-        <legend>Lịch sao lưu</legend>
-        <label class="check"><input type="checkbox" name="enabled" <%= form.enabled ? 'checked' : '' %>> <span><strong>Sao lưu tự động mỗi ngày</strong></span></label>
-        <label>Giờ chạy <input type="time" name="time" value="<%= form.time %>" required class="input-time">
-          <span class="muted hint">Theo múi giờ của ứng dụng (APP_TZ). Nên chọn giờ ít người dùng.</span></label>
-        <p><strong>Sao lưu gì</strong></p>
+        <legend><%= t('Lịch sao lưu') %></legend>
+        <label class="check"><input type="checkbox" name="enabled" <%= form.enabled ? 'checked' : '' %>> <span><%- th('<strong>Sao lưu tự động mỗi ngày</strong>') %></span></label>
+        <label><%= t('Giờ chạy') %> <input type="time" name="time" value="<%= form.time %>" required class="input-time">
+          <span class="muted hint"><%= t('Theo múi giờ của ứng dụng (APP_TZ). Nên chọn giờ ít người dùng.') %></span></label>
+        <p><%- th('<strong>Sao lưu gì</strong>') %></p>
         <label class="check"><input type="checkbox" name="keys" <%= form.keys ? 'checked' : '' %>>
-          <span><strong>Máy và recovery key</strong> (CSV): DN, objectGUID, Key ID, mật khẩu khôi phục, DN của key, ngày giờ... Mở bằng 7-Zip + Excel, không cần hệ thống.</span></label>
+          <span><%- th('<strong>Máy và recovery key</strong> (CSV): DN, objectGUID, Key ID, mật khẩu khôi phục, DN của key, ngày giờ... Mở bằng 7-Zip + Excel, không cần hệ thống.') %></span></label>
         <label class="check"><input type="checkbox" name="database" <%= form.database ? 'checked' : '' %>>
-          <span><strong>Toàn bộ database</strong> (pg_dump) để khôi phục hệ thống.
-          <% if (!s.databaseConfigured) { %><span class="warn-text">Chưa cấu hình BACKUP_DATABASE_URL: phần này sẽ báo lỗi.</span><% } %></span></label>
-        <p><strong>Mã hóa</strong></p>
+          <span><%- th('<strong>Toàn bộ database</strong> (pg_dump) để khôi phục hệ thống.') %>
+          <% if (!s.databaseConfigured) { %><span class="warn-text"><%= t('Chưa cấu hình BACKUP_DATABASE_URL: phần này sẽ báo lỗi.') %></span><% } %></span></label>
+        <p><%- th('<strong>Mã hóa</strong>') %></p>
         <label class="check"><input type="checkbox" name="encrypt" <%= form.encrypt ? 'checked' : '' %>>
-          <span><strong>Mã hóa file sao lưu bằng mật khẩu (AES-256)</strong> <span class="badge badge-good">khuyến nghị</span><br>
-          <span class="muted small">Bỏ chọn thì file là zip thường, mở được bằng mọi công cụ (kể cả File Explorer) mà không cần mật khẩu.</span></span></label>
-        <label>Giữ lại <span class="nowrap"><input type="number" name="keep" value="<%= form.keep %>" min="1" max="365" required class="thr-input"> bản mới nhất mỗi loại</span></label>
-        <div class="actions"><button type="submit">Lưu cấu hình</button></div>
+          <span><%- th('<strong>Mã hóa file sao lưu bằng mật khẩu (AES-256)</strong> <span class="badge badge-good">khuyến nghị</span><br> <span class="muted small">Bỏ chọn thì file là zip thường, mở được bằng mọi công cụ (kể cả File Explorer) mà không cần mật khẩu.</span>') %></span></label>
+        <label><%= t('Giữ lại') %> <span class="nowrap"><input type="number" name="keep" value="<%= form.keep %>" min="1" max="365" required class="thr-input"> <%= t('bản mới nhất mỗi loại') %></span></label>
+        <div class="actions"><button type="submit"><%= t('Lưu cấu hình') %></button></div>
       </fieldset>
     </form>
 
@@ -50,39 +47,37 @@
       <form method="post" action="/admin/backup/password" class="form" autocomplete="off">
         <%- include('../partials/csrf') %>
         <fieldset>
-          <legend>Mật khẩu mã hóa</legend>
+          <legend><%= t('Mật khẩu mã hóa') %></legend>
           <p class="muted small">
-            <% if (s.passwordSet) { %><span class="badge badge-good">Đã đặt</span> Nhập mật khẩu mới để thay; các file cũ vẫn dùng mật khẩu cũ.
-            <% } else { %><span class="badge badge-bad">Chưa đặt</span> Cần đặt khi bật mã hóa.<% } %>
-            Chỉ nhập được khi tích "Mã hóa" ở khung bên cạnh. Tối thiểu 16 ký tự; nên là một cụm từ dài. Hệ thống không hiện lại mật khẩu và không ghi nó vào file:
-            <strong>lưu mật khẩu ở kho mật khẩu của công ty</strong>, mất là không mở được file.</p>
-          <label>Mật khẩu mới <input type="password" name="password" minlength="16" required autocomplete="new-password" data-needs-encrypt <%= form.encrypt ? "" : "disabled" %>></label>
-          <label>Nhập lại <input type="password" name="confirm" minlength="16" required autocomplete="new-password" data-needs-encrypt <%= form.encrypt ? "" : "disabled" %>></label>
-          <div class="actions"><button type="submit" class="secondary" data-needs-encrypt <%= form.encrypt ? "" : "disabled" %>>Lưu mật khẩu</button></div>
+            <% if (s.passwordSet) { %><span class="badge badge-good"><%= t('Đã đặt') %></span> <%= t('Nhập mật khẩu mới để thay; các file cũ vẫn dùng mật khẩu cũ.') %>
+            <% } else { %><span class="badge badge-bad"><%= t('Chưa đặt') %></span> <%= t('Cần đặt khi bật mã hóa.') %><% } %>
+            <%- th('Chỉ nhập được khi tích "Mã hóa" ở khung bên cạnh. Tối thiểu 16 ký tự; nên là một cụm từ dài. Hệ thống không hiện lại mật khẩu và không ghi nó vào file: <strong>lưu mật khẩu ở kho mật khẩu của công ty</strong>, mất là không mở được file.') %></p>
+          <label><%= t('Mật khẩu mới') %> <input type="password" name="password" minlength="16" required autocomplete="new-password" data-needs-encrypt <%= form.encrypt ? "" : "disabled" %>></label>
+          <label><%= t('Nhập lại') %> <input type="password" name="confirm" minlength="16" required autocomplete="new-password" data-needs-encrypt <%= form.encrypt ? "" : "disabled" %>></label>
+          <div class="actions"><button type="submit" class="secondary" data-needs-encrypt <%= form.encrypt ? "" : "disabled" %>><%= t('Lưu mật khẩu') %></button></div>
         </fieldset>
       </form>
       <form method="post" action="/admin/backup/run" class="inline-form">
         <%- include('../partials/csrf') %>
-        <button type="submit" <%= (s.passwordSet || !s.options.encrypt) && !s.running ? '' : 'disabled' %>>Sao lưu ngay</button>
-        <span class="muted small">Chạy ngay theo các lựa chọn đã lưu (ghi nhật ký).</span>
+        <button type="submit" <%= (s.passwordSet || !s.options.encrypt) && !s.running ? '' : 'disabled' %>><%= t('Sao lưu ngay') %></button>
+        <span class="muted small"><%= t('Chạy ngay theo các lựa chọn đã lưu (ghi nhật ký).') %></span>
       </form>
     </div>
   </div>
 </section>
 
 <section class="card">
-  <h2>File sao lưu (<%= s.files.length %>)</h2>
-  <p class="muted small">Thư mục trên máy chủ: <code><%= s.dir %></code>. Nên có job chép thư mục này sang nơi khác (máy chủ backup, băng từ...).
-    Mỗi lần tải được ghi nhật ký.</p>
-  <% if (!s.files.length) { %><p class="muted">Chưa có file nào.</p><% } else { %>
+  <h2><%= t('File sao lưu ({length})', { length: s.files.length }) %></h2>
+  <p class="muted small"><%- th('Thư mục trên máy chủ: <code>{dir}</code>. Nên có job chép thư mục này sang nơi khác (máy chủ backup, băng từ...). Mỗi lần tải được ghi nhật ký.', { dir: s.dir }) %></p>
+  <% if (!s.files.length) { %><p class="muted"><%= t('Chưa có file nào.') %></p><% } else { %>
   <table class="dense">
-    <thead><tr><th>File</th><th>Loại</th><th>Mã hóa</th><th class="num">Kích thước</th><th>Tạo lúc</th><th></th></tr></thead>
+    <thead><tr><th>File</th><th><%= t('Loại') %></th><th><%= t('Mã hóa') %></th><th class="num"><%= t('Kích thước') %></th><th><%= t('Tạo lúc') %></th><th></th></tr></thead>
     <tbody>
     <% s.files.forEach((f) => { %>
-      <tr><td><code><%= f.name %></code></td><td><%= f.kind === 'keys' ? 'Máy và key' : 'Database' %></td>
-        <td><% if (f.encrypted) { %><span class="badge badge-good">AES-256</span><% } else { %><span class="badge badge-bad">Không</span><% } %></td>
+      <tr><td><code><%= f.name %></code></td><td><%= f.kind === 'keys' ? t('Máy và key') : 'Database' %></td>
+        <td><% if (f.encrypted) { %><span class="badge badge-good">AES-256</span><% } else { %><span class="badge badge-bad"><%= t('Không') %></span><% } %></td>
         <td class="num"><%= size(f.size) %></td><td><%= h.dateTime(f.at) %></td>
-        <td><a href="/admin/backup/files/<%= f.name %>">Tải về</a></td></tr>
+        <td><%- th('<a href="/admin/backup/files/{name}">Tải về</a>', { name: f.name }) %></td></tr>
     <% }) %>
     </tbody>
   </table>

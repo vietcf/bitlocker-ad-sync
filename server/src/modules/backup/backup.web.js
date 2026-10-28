@@ -11,20 +11,20 @@ export function backupWeb({ backup }) {
     const form = error && req.body?.time
       ? { ...s.options, ...req.body, enabled: req.body.enabled === 'on', keys: req.body.keys === 'on', database: req.body.database === 'on', encrypt: req.body.encrypt === 'on' }
       : s.options;
-    res.render('admin/backup', { title: 'Sao lưu', s, form, error });
+    res.render('admin/backup', { title: req.t('Sao lưu'), s, form, error });
   };
 
   r.get('/', noStore, (req, res) => render(req, res, null));
 
   r.post('/options', formAction(async (req, res) => {
     await backup.saveOptions(req.scope, req.body, clientInfo(req));
-    flash(req, 'success', 'Đã lưu cấu hình sao lưu.');
+    flash(req, 'success', req.t('Đã lưu cấu hình sao lưu.'));
     res.redirect('/admin/backup');
   }, render));
 
   r.post('/password', noStore, formAction(async (req, res) => {
     await backup.setPassword(req.scope, req.body, clientInfo(req));
-    flash(req, 'success', 'Đã lưu mật khẩu sao lưu. Lưu mật khẩu này ở kho mật khẩu: mất mật khẩu thì không mở được file sao lưu.');
+    flash(req, 'success', req.t('Đã lưu mật khẩu sao lưu. Lưu mật khẩu này ở kho mật khẩu: mất mật khẩu thì không mở được file sao lưu.'));
     res.redirect('/admin/backup');
   }, render));
 
@@ -32,10 +32,10 @@ export function backupWeb({ backup }) {
   r.post('/run', async (req, res) => {
     try {
       backup.runNow(req.scope, clientInfo(req));
-      flash(req, 'info', 'Đã bắt đầu sao lưu, chạy nền. Tải lại trang sau ít phút để xem kết quả ở mục "Lần chạy gần nhất".');
+      flash(req, 'info', req.t('Đã bắt đầu sao lưu, chạy nền. Tải lại trang sau ít phút để xem kết quả ở mục "Lần chạy gần nhất".'));
     } catch (err) {
       if (err.code !== 'backup_running') throw err;
-      flash(req, 'error', 'Đang có một lượt sao lưu chạy, chờ nó xong.');
+      flash(req, 'error', req.t('Đang có một lượt sao lưu chạy, chờ nó xong.'));
     }
     res.redirect('/admin/backup');
   });

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { badRequest } from '../../http/errors.js';
+import { langFromCookie, tk } from '../../i18n/index.js';
 import { parse } from '../../http/validate.js';
 import { clientInfo, noStore } from '../../http/security.js';
 import { flash, formAction } from '../../web/middleware.js';
@@ -8,8 +9,8 @@ import { describePasswordPolicy } from './password.js';
 import { endUserSession, pendingSecondFactor, refreshUserSession, startPendingSecondFactor, startUserSession } from './session.js';
 
 const loginForm = z.object({
-  username: z.string().trim().min(1, 'Nhập tên đăng nhập').max(256),
-  password: z.string().min(1, 'Nhập mật khẩu').max(256),
+  username: z.string().trim().min(1, tk('Nhập tên đăng nhập')).max(256),
+  password: z.string().min(1, tk('Nhập mật khẩu')).max(256),
   next: z.string().max(512).optional(),
 });
 const codeForm = z.object({ code: z.string().trim().max(16) });
@@ -22,13 +23,19 @@ const changeForm = z.object({
 /** Only same-site relative paths are followed after sign-in (no open redirect). */
 const safeNext = (n) => (typeof n === 'string' && /^\/(?!\/)[^\\]*$/.test(n) ? n : '/');
 
+/** After sign-in, a language picked on the login page (cookie) becomes the user's setting. */
+async function rememberLanguage(auth, req) {
+  const lang = langFromCookie(req.headers.cookie);
+  if (lang && req.session?.userId) await auth.setLanguage({ userId: req.session.userId }, lang);
+}
+
 /** /login, /logout, /change-password */
 export function authWeb({ auth }, { requireUser }) {
   const r = Router();
 
   const renderLogin = (req, res, error) =>
     res.render('auth/login', {
-      title: 'Đăng nhập',
+      title: req.t('Đăng nhập'),
       error,
       username: req.body?.username ?? '',
       next: req.body?.next ?? req.query.next ?? '',
@@ -49,6 +56,7 @@ export function authWeb({ auth }, { requireUser }) {
         return res.redirect('/login/2fa');
       }
       await startUserSession(req, user, 'password');
+      await rememberLanguage(auth, req);
       res.redirect(user.mustChangePassword ? '/change-password' : safeNext(form.next));
     }, renderLogin, [400, 401, 403, 423, 503]), // wrong password, locked, AD down: back to the form
   );
@@ -59,7 +67,7 @@ export function authWeb({ auth }, { requireUser }) {
     if (!p) return res.redirect('/login?expired=1');
     const setup = p.mode === 'setup' ? await auth.beginTotpSetup(p.userId) : null;
     res.render('auth/two-factor', {
-      title: setup ? 'Thiết lập xác thực 2 bước' : 'Xác thực 2 bước',
+      title: setup ? req.t('Thiết lập xác thực 2 bước') : req.t('Xác thực 2 bước'),
       error,
       username: p.username,
       setup: setup ? { qrSvg: setup.qrSvg, secret: setup.secret.match(/.{1,4}/g).join(' ') } : null,
@@ -76,7 +84,8 @@ export function authWeb({ auth }, { requireUser }) {
       try {
         const user = await auth.completeSecondFactor(p.userId, code, clientInfo(req), p.method);
         await startUserSession(req, user, 'password+totp');
-        if (p.mode === 'setup') flash(req, 'success', 'Đã thiết lập xác thực 2 bước. Từ nay mỗi lần đăng nhập cần mã trong app Authenticator.');
+        await rememberLanguage(auth, req);
+        if (p.mode === 'setup') flash(req, 'success', req.t('Đã thiết lập xác thực 2 bước. Từ nay mỗi lần đăng nhập cần mã trong app Authenticator.'));
         res.redirect(user.mustChangePassword ? '/change-password' : p.next);
       } catch (err) {
         // Locked after too many wrong codes: back to the password form.
@@ -96,12 +105,12 @@ export function authWeb({ auth }, { requireUser }) {
 
   const renderChange = async (req, res, error) => {
     const policy = await auth.passwordPolicy();
-    res.render('auth/change-password', { title: 'Đổi mật khẩu', error, policy, policyText: describePasswordPolicy(policy) });
+    res.render('auth/change-password', { title: req.t('Đổi mật khẩu'), error, policy, policyText: describePasswordPolicy(policy, req.t) });
   };
 
   r.get('/change-password', requireUser, noStore, async (req, res) => {
     if (req.scope.authSource !== 'local') {
-      flash(req, 'info', 'Tài khoản AD đổi mật khẩu trên Windows (Ctrl+Alt+Del → Change a password).');
+      flash(req, 'info', req.t('Tài khoản AD đổi mật khẩu trên Windows (Ctrl+Alt+Del → Change a password).'));
       return res.redirect('/');
     }
     await renderChange(req, res, null);
@@ -113,10 +122,10 @@ export function authWeb({ auth }, { requireUser }) {
     noStore,
     formAction(async (req, res) => {
       const form = parse(changeForm, req.body);
-      if (form.newPassword !== form.confirm) throw badRequest('mismatch', 'Hai lần nhập mật khẩu mới không khớp.');
+      if (form.newPassword !== form.confirm) throw badRequest('mismatch', 'The two new passwords do not match.');
       await auth.changePassword(req.scope, form.currentPassword, form.newPassword, clientInfo(req));
       await refreshUserSession(req);
-      flash(req, 'success', 'Đã đổi mật khẩu.');
+      flash(req, 'success', req.t('Đã đổi mật khẩu.'));
       res.redirect('/');
     }, renderChange),
   );

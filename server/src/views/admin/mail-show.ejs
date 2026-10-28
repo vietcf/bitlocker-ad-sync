@@ -1,6 +1,6 @@
 <%- include('../partials/head') %>
 <%- include('_tabs') %>
-<% const STATUS = { pending: ['Chờ gửi', 'badge-info'], sent: ['Đã gửi', 'badge-good'], failed: ['Thất bại', 'badge-bad'], no_recipient: ['Không gửi (thiếu email)', 'badge-warn'] }; %>
+<% const STATUS = { pending: [t('Chờ gửi'), 'badge-info'], sent: [t('Đã gửi'), 'badge-good'], failed: [t('Thất bại'), 'badge-bad'], no_recipient: [t('Không gửi (thiếu email)'), 'badge-warn'] }; %>
 <p class="crumbs"><a href="/admin/mail">← Log email</a></p>
 <section class="card">
   <div class="title-row">
@@ -8,23 +8,21 @@
     <% if (m.status === 'failed') { %>
       <form method="post" action="/admin/mail/<%= m.id %>/retry" class="inline">
         <%- include('../partials/csrf') %>
-        <button type="submit" class="small">Gửi lại</button>
+        <button type="submit" class="small"><%= t('Gửi lại') %></button>
       </form>
     <% } %>
   </div>
   <dl class="facts">
-    <dt>Trạng thái</dt><dd><span class="badge <%= STATUS[m.status][1] %>"><%= STATUS[m.status][0] %></span>
-      (<%= m.attempts %> lần thử<% if (m.status === 'pending') { %>, lần tới <%= h.dateTime(m.next_attempt_at) %><% } %>)</dd>
-    <% if (m.last_error) { %><dt><%= m.status === "no_recipient" ? "Lý do không gửi" : "Lỗi gần nhất" %></dt><dd><code class="wrap"><%= m.last_error %></code></dd><% } %>
-    <dt>Tạo lúc</dt><dd><%= h.dateTime(m.created_at) %></dd>
-    <dt>Gửi lúc</dt><dd><%= h.dateTime(m.sent_at) %></dd>
-    <dt>Gửi cho</dt><dd><%= m.recipients.length ? m.recipients.join(", ") : "— (không có ai)" %></dd>
-    <% if (m.missing_recipients.length) { %><dt>Không có email</dt><dd><span class="warn-text"><%= m.missing_recipients.join(", ") %></span>
-      <span class="muted small">(lẽ ra nhận email này; thêm email ở <a href="/admin/users">Người dùng</a>)</span></dd><% } %>
-    <dt>Tiêu đề</dt><dd><%= m.subject %></dd>
+    <dt><%= t('Trạng thái') %></dt><dd><span class="badge <%= STATUS[m.status][1] %>"><%= STATUS[m.status][0] %></span>
+      (<%= t('{n} lần thử', { n: m.attempts }) %><% if (m.status === 'pending') { %><%= t(', lần tới {at}', { at: h.dateTime(m.next_attempt_at) }) %><% } %>)</dd>
+    <% if (m.last_error) { %><dt><%= m.status === "no_recipient" ? t('Lý do không gửi') : t('Lỗi gần nhất') %></dt><dd><code class="wrap"><%= m.last_error %></code></dd><% } %>
+    <dt><%= t('Tạo lúc') %></dt><dd><%= h.dateTime(m.created_at) %></dd>
+    <dt><%= t('Gửi lúc') %></dt><dd><%= h.dateTime(m.sent_at) %></dd>
+    <dt><%= t('Gửi cho') %></dt><dd><%= m.recipients.length ? m.recipients.join(", ") : t('— (không có ai)') %></dd>
+    <% if (m.missing_recipients.length) { %><dt><%= t('Không có email') %></dt><dd><%- th('<span class="warn-text">{join}</span> <span class="muted small">(lẽ ra nhận email này; thêm email ở <a href="/admin/users">Người dùng</a>)</span>', { join: m.missing_recipients.join(", ") }) %></dd><% } %>
+    <dt><%= t('Tiêu đề') %></dt><dd><%= m.subject %></dd>
   </dl>
-  <% if (m.html) { %><p><a class="button small secondary" href="/admin/mail/<%= m.id %>/html" target="_blank" rel="noopener">Xem bản HTML (như trong hộp thư) ↗</a>
-    <span class="muted small">Bên dưới là bản chữ gửi kèm.</span></p><% } %>
+  <% if (m.html) { %><p><%- th('<a class="button small secondary" href="/admin/mail/{id}/html" target="_blank" rel="noopener">Xem bản HTML (như trong hộp thư) ↗</a> <span class="muted small">Bên dưới là bản chữ gửi kèm.</span>', { id: m.id }) %></p><% } %>
   <div class="mail-body"><%= m.body %></div>
 </section>
 <%- include('../partials/foot') %>

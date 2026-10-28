@@ -1,24 +1,24 @@
 <%- include('../partials/head') %>
 <%- include('_tabs') %>
-<% const UNIT = { percent: '%', minutes: 'phút', hours: 'giờ', months: 'tháng', days: 'ngày', count: '', points: 'điểm %' }; %>
+<% const UNIT = { percent: '%', minutes: t('phút'), hours: t('giờ'), months: t('tháng'), days: t('ngày'), count: '', points: t('điểm %') }; %>
 <% const GROUPS = []; %>
 <section class="card">
-  <h2>Cảnh báo sync</h2>
-  <p class="muted">Ngưỡng và bật/tắt các cảnh báo của đồng bộ AD. Thay đổi có hiệu lực trong vòng 30 giây và được ghi vào nhật ký. Cột "Mặc định" là giá trị khi cài đặt.</p>
+  <h2><%= t('Cảnh báo sync') %></h2>
+  <p class="muted"><%= t('Ngưỡng và bật/tắt các cảnh báo của đồng bộ AD. Thay đổi có hiệu lực trong vòng 30 giây và được ghi vào nhật ký. Cột "Mặc định" là giá trị khi cài đặt.') %></p>
   <%- include('../partials/error-box', { error }) %>
   <form method="post" action="/admin/settings/thresholds" class="form thr-form">
     <%- include('../partials/csrf') %>
     <fieldset>
-      <legend>Kiểm tra khi lượt sync kết thúc (bật/tắt được)</legend>
-      <p class="muted small">Vượt ngưỡng thì lượt sync bị giữ lại (cách ly) và chờ Admin HQ chấp nhận hoặc bác bỏ ở tab Tình trạng sync. Các kiểm tra này chỉ xét lượt full (lượt delta chỉ đọc máy và key có thay đổi nên không so với toàn hệ thống). Tắt một kiểm tra thì lượt full không bị giữ lại vì lý do đó nữa.</p>
+      <legend><%= t('Kiểm tra khi lượt sync kết thúc (bật/tắt được)') %></legend>
+      <p class="muted small"><%= t('Vượt ngưỡng thì lượt sync bị giữ lại (cách ly) và chờ Admin HQ chấp nhận hoặc bác bỏ ở tab Tình trạng sync. Các kiểm tra này chỉ xét lượt full (lượt delta chỉ đọc máy và key có thay đổi nên không so với toàn hệ thống). Tắt một kiểm tra thì lượt full không bị giữ lại vì lý do đó nữa.') %></p>
       <% checks.forEach((c) => { %>
         <%- include('_switch-block', { sw: c, items: list.filter((t) => t.check === c.code), values, UNIT }) %>
       <% }) %>
     </fieldset>
 
     <fieldset>
-      <legend>Sự cố hệ thống (watchdog, bật/tắt được)</legend>
-      <p class="muted small">Đo trực tiếp, tự hết khi sửa xong. Không có heartbeat thì Worker Offline (một mail); worker vẫn chạy mà vượt ngưỡng khác (không đọc được AD, lâu không có lượt sync, canary, USN...) thì Đồng bộ AD có sự cố (một mail). Tắt một loại thì watchdog không theo dõi nó nữa: nếu sự cố đó xảy ra thật sẽ không có cảnh báo nào.</p>
+      <legend><%= t('Sự cố hệ thống (watchdog, bật/tắt được)') %></legend>
+      <p class="muted small"><%= t('Đo trực tiếp, tự hết khi sửa xong. Không có heartbeat thì Worker Offline (một mail); worker vẫn chạy mà vượt ngưỡng khác (không đọc được AD, lâu không có lượt sync, canary, USN...) thì Đồng bộ AD có sự cố (một mail). Tắt một loại thì watchdog không theo dõi nó nữa: nếu sự cố đó xảy ra thật sẽ không có cảnh báo nào.') %></p>
       <%- include('_threshold-rows', { items: list.filter((t) => t.group === 'watchdog' && !t.alert), values, UNIT }) %>
       <% alerts.filter((a) => a.group === 'system').forEach((a) => { %>
         <%- include('_switch-block', { sw: a, items: list.filter((t) => t.alert === a.type), values, UNIT }) %>
@@ -26,11 +26,11 @@
     </fieldset>
 
     <fieldset>
-      <legend>Cảnh báo dữ liệu (bật/tắt được)</legend>
-      <p class="muted small">Tính từ nội dung đã đồng bộ nên còn đúng nhiều ngày sau khi sửa nguyên nhân; không làm dừng sync. Mỗi loại có công tắc bật/tắt và ngưỡng riêng. Tắt thì không bao giờ mở cảnh báo đó (đang mở thì đóng). Ở tab Tình trạng sync: "Đã xử lý" đóng cảnh báo ngay và theo dõi lại sau thời gian đặt ở đây; "Bỏ qua" im lặng 1/7/30 ngày.</p>
+      <legend><%= t('Cảnh báo dữ liệu (bật/tắt được)') %></legend>
+      <p class="muted small"><%= t('Tính từ nội dung đã đồng bộ nên còn đúng nhiều ngày sau khi sửa nguyên nhân; không làm dừng sync. Mỗi loại có công tắc bật/tắt và ngưỡng riêng. Tắt thì không bao giờ mở cảnh báo đó (đang mở thì đóng). Ở tab Tình trạng sync: "Đã xử lý" đóng cảnh báo ngay và theo dõi lại sau thời gian đặt ở đây; "Bỏ qua" im lặng 1/7/30 ngày.') %></p>
       <div class="alert-config">
-        <div class="alert-config-head"><strong>Chung cho mọi cảnh báo dữ liệu</strong></div>
-        <p class="muted small">Áp dụng cho cả bốn loại bên dưới, không phải riêng loại nào.</p>
+        <div class="alert-config-head"><%- th('<strong>Chung cho mọi cảnh báo dữ liệu</strong>') %></div>
+        <p class="muted small"><%= t('Áp dụng cho cả bốn loại bên dưới, không phải riêng loại nào.') %></p>
         <%- include('_threshold-rows', { items: list.filter((t) => t.group === 'dataalerts' && !t.alert), values, UNIT }) %>
       </div>
       <% alerts.filter((a) => a.group === 'data').forEach((a) => { %>
@@ -39,11 +39,11 @@
     </fieldset>
 
     <fieldset>
-      <legend>Nhãn hoạt động của máy (không phải cảnh báo)</legend>
-      <p class="muted small">Nhãn "Hoạt động gần đây" / "Không hoạt động gần đây" ở trang máy, danh sách Tìm máy và Báo cáo, theo lần đăng nhập AD gần nhất của máy (lastLogonTimestamp, lệch tối đa ~14 ngày). Không tạo cảnh báo. Bộ lọc ở Tìm máy có các mốc riêng (1/3/6/9/12/24 tháng).</p>
+      <legend><%= t('Nhãn hoạt động của máy (không phải cảnh báo)') %></legend>
+      <p class="muted small"><%= t('Nhãn "Hoạt động gần đây" / "Không hoạt động gần đây" ở trang máy, danh sách Tìm máy và Báo cáo, theo lần đăng nhập AD gần nhất của máy (lastLogonTimestamp, lệch tối đa ~14 ngày). Không tạo cảnh báo. Bộ lọc ở Tìm máy có các mốc riêng (1/3/6/9/12/24 tháng).') %></p>
       <%- include('_threshold-rows', { items: list.filter((t) => t.group === 'activity'), values, UNIT }) %>
     </fieldset>
-    <div class="actions"><button type="submit">Lưu</button></div>
+    <div class="actions"><button type="submit"><%= t('Lưu') %></button></div>
   </form>
 </section>
 <%- include('../partials/foot') %>

@@ -1,14 +1,16 @@
 // How many rows a list shows on one page. Set under Quan tri > Tinh nang ("Hien thi"), read on every
 // request (settings cache, 30 s), so a change applies at once without a restart. Defaults apply until changed.
 
+import { tk } from '../../i18n/index.js';
+
 export const PAGE_SIZE_LIMITS = [5, 200];
 
 export const PAGE_SIZES = {
-  computers: { key: 'ui.page_size.computers', default: 25, label: 'Tìm máy và danh sách máy' },
-  audit: { key: 'ui.page_size.audit', default: 50, label: 'Nhật ký truy cập' },
+  computers: { key: 'ui.page_size.computers', default: 25, label: tk('Tìm máy và danh sách máy') },
+  audit: { key: 'ui.page_size.audit', default: 50, label: tk('Nhật ký truy cập') },
   mail: { key: 'ui.page_size.mail', default: 50, label: 'Log email' },
-  sync: { key: 'ui.page_size.sync', default: 50, label: 'Các lượt sync (Quản trị > Sync AD)' },
-  report: { key: 'ui.page_size.report', default: 20, label: 'Báo cáo: chi tiết theo chi nhánh' },
+  sync: { key: 'ui.page_size.sync', default: 50, label: tk('Các lượt sync (Quản trị > Sync AD)') },
+  report: { key: 'ui.page_size.report', default: 20, label: tk('Báo cáo: chi tiết theo chi nhánh') },
 };
 
 /** The page size of a list (a wrong stored value falls back to the default). settings may be null. */

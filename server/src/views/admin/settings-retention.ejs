@@ -1,59 +1,53 @@
 <%- include('../partials/head') %>
 <%- include('_tabs') %>
 <section class="card">
-  <h2>Thời gian lưu trữ</h2>
-  <p class="muted">Job dọn dẹp chạy mỗi ngày một lần vào giờ chọn bên dưới và xóa dữ liệu cũ hơn số ngày dưới đây.
-    Máy, recovery key và người dùng <strong>không bao giờ</strong> bị xóa.</p>
+  <h2><%= t('Thời gian lưu trữ') %></h2>
+  <p class="muted"><%- th('Job dọn dẹp chạy mỗi ngày một lần vào giờ chọn bên dưới và xóa dữ liệu cũ hơn số ngày dưới đây. Máy, recovery key và người dùng <strong>không bao giờ</strong> bị xóa.') %></p>
   <%- include('../partials/error-box', { error }) %>
   <form method="post" action="/admin/settings/retention" class="form">
     <%- include('../partials/csrf') %>
 
     <fieldset>
-      <legend>Giờ chạy</legend>
-      <label>Dọn dẹp lúc <input type="time" name="runAt" value="<%= form.runAt %>" required class="input-time">
-        <span class="muted hint">Giờ theo múi giờ của ứng dụng (APP_TZ); mặc định 03:00. Nên chọn giờ ít người dùng.</span></label>
+      <legend><%= t('Giờ chạy') %></legend>
+      <label><%= t('Dọn dẹp lúc') %> <input type="time" name="runAt" value="<%= form.runAt %>" required class="input-time">
+        <span class="muted hint"><%= t('Giờ theo múi giờ của ứng dụng (APP_TZ); mặc định 03:00. Nên chọn giờ ít người dùng.') %></span></label>
     </fieldset>
 
     <fieldset>
-      <legend>Nhật ký truy cập (ai xem key, đăng nhập, xuất dữ liệu, thay đổi quản trị)</legend>
+      <legend><%= t('Nhật ký truy cập (ai xem key, đăng nhập, xuất dữ liệu, thay đổi quản trị)') %></legend>
       <label class="check"><input type="checkbox" name="keepAccessLog" <%= form.keepAccessLog ? 'checked' : '' %>>
-        <span><strong>Giữ mãi</strong> <span class="muted">(khuyến nghị: nhật ký là bằng chứng kiểm toán)</span></span></label>
-      <label>Hoặc giữ (ngày)
-        <input type="number" name="accessLogDays" value="<%= form.accessLogDays ?? '' %>" min="1" max="36500" placeholder="ví dụ 90" class="mw-200">
-        <span class="muted hint">Tùy bạn chọn (từ 1 ngày). Chỉ xóa phần cũ nhất, liên tục từ đầu chuỗi; mỗi lần xóa lưu lại mốc hash
-          để phần còn lại vẫn kiểm chứng được, và việc xóa cũng được ghi vào nhật ký. Nên lưu bản sao nhật ký ở nơi khác trước khi bật.</span>
+        <span><%- th('<strong>Giữ mãi</strong> <span class="muted">(khuyến nghị: nhật ký là bằng chứng kiểm toán)</span>') %></span></label>
+      <label><%= t('Hoặc giữ (ngày)') %> <input type="number" name="accessLogDays" value="<%= form.accessLogDays ?? '' %>" min="1" max="36500" placeholder="<%= t('ví dụ 90') %>" class="mw-200">
+        <span class="muted hint"><%= t('Tùy bạn chọn (từ 1 ngày). Chỉ xóa phần cũ nhất, liên tục từ đầu chuỗi; mỗi lần xóa lưu lại mốc hash để phần còn lại vẫn kiểm chứng được, và việc xóa cũng được ghi vào nhật ký. Nên lưu bản sao nhật ký ở nơi khác trước khi bật.') %></span>
       </label>
       <% if (lastPurge) { %>
-        <p class="muted small">Lần xóa gần nhất: <%= h.dateTime(lastPurge.purged_at) %> (<%= lastPurge.purged_by %>),
-          <%= h.number(Number(lastPurge.rows)) %> dòng cũ hơn <%= h.dateTime(lastPurge.before_at) %>.</p>
+        <p class="muted small"><%= t('Lần xóa gần nhất: {purgedAt} ({purgedBy}), {rows} dòng cũ hơn {beforeAt}.', { purgedAt: h.dateTime(lastPurge.purged_at), purgedBy: lastPurge.purged_by, rows: h.number(Number(lastPurge.rows)), beforeAt: h.dateTime(lastPurge.before_at) }) %></p>
       <% } %>
     </fieldset>
 
     <fieldset>
-      <legend>Lịch sử sync</legend>
-      <label>Giữ lượt sync, số liệu sync và cảnh báo đã đóng (ngày)
-        <input type="number" name="syncDays" value="<%= form.syncDays %>" min="30" max="3650" required class="mw-200">
-        <span class="muted hint">Tối thiểu 30 ngày. Lượt sync thành công gần nhất và lượt full thành công gần nhất luôn được giữ.</span>
+      <legend><%= t('Lịch sử sync') %></legend>
+      <label><%= t('Giữ lượt sync, số liệu sync và cảnh báo đã đóng (ngày)') %> <input type="number" name="syncDays" value="<%= form.syncDays %>" min="30" max="3650" required class="mw-200">
+        <span class="muted hint"><%= t('Tối thiểu 30 ngày. Lượt sync thành công gần nhất và lượt full thành công gần nhất luôn được giữ.') %></span>
       </label>
     </fieldset>
 
     <fieldset>
       <legend>Email</legend>
-      <label>Giữ email đã gửi / thất bại (ngày)
-        <input type="number" name="mailDays" value="<%= form.mailDays %>" min="1" max="3650" required class="mw-200">
-        <span class="muted hint">Email đang chờ gửi không bị xóa. Xem email ở tab <a href="/admin/mail">Log email</a>.</span>
+      <label><%= t('Giữ email đã gửi / thất bại (ngày)') %> <input type="number" name="mailDays" value="<%= form.mailDays %>" min="1" max="3650" required class="mw-200">
+        <span class="muted hint"><%- th('Email đang chờ gửi không bị xóa. Xem email ở tab <a href="/admin/mail">Log email</a>.') %></span>
       </label>
     </fieldset>
-    <div class="actions"><button type="submit">Lưu</button></div>
+    <div class="actions"><button type="submit"><%= t('Lưu') %></button></div>
   </form>
 </section>
 
 <section class="card">
-  <h2>Dọn dẹp ngay</h2>
-  <p class="muted">Chạy job dọn dẹp ngay với cấu hình <strong>đã lưu</strong>, không chờ đến 03:00.</p>
+  <h2><%= t('Dọn dẹp ngay') %></h2>
+  <p class="muted"><%- th('Chạy job dọn dẹp ngay với cấu hình <strong>đã lưu</strong>, không chờ đến 03:00.') %></p>
   <form method="post" action="/admin/settings/retention/run" class="actions">
     <%- include('../partials/csrf') %>
-    <button type="submit" class="secondary" data-confirm="Xóa dữ liệu cũ hơn thời gian lưu trữ đã cấu hình? Không hoàn tác được.">Dọn dẹp ngay</button>
+    <button type="submit" class="secondary" data-confirm="<%= t('Xóa dữ liệu cũ hơn thời gian lưu trữ đã cấu hình? Không hoàn tác được.') %>"><%= t('Dọn dẹp ngay') %></button>
   </form>
 </section>
 <%- include('../partials/foot') %>

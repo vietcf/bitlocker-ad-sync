@@ -1,3 +1,5 @@
+
+import { tk } from '../../i18n/index.js';
 export const ALERT_MAIL_DEFAULTS = {
   enabled: true, // mail this group of alerts at all
   admins: true, // to every Admin HQ user with an e-mail
@@ -14,23 +16,23 @@ export const ALERT_MAIL_DEFAULTS = {
  */
 export const ALERT_GROUPS = {
   agent: {
-    label: 'Agent (worker) ngừng hoạt động',
-    help: 'Worker không gửi heartbeat nữa (service bị dừng, máy chủ worker tắt hoặc treo).',
+    label: tk('Agent (worker) ngừng hoạt động'),
+    help: tk('Worker không gửi heartbeat nữa (service bị dừng, máy chủ worker tắt hoặc treo).'),
     types: ['worker_offline'],
   },
   ad: {
-    label: 'Kết nối AD và đồng bộ có vấn đề',
-    help: 'Không đọc được AD (DC offline, sai quyền, chứng chỉ LDAPS), sync lỗi hoặc bất thường bị giữ lại, lâu không có lượt sync, Key ID trùng.',
+    label: tk('Kết nối AD và đồng bộ có vấn đề'),
+    help: tk('Không đọc được AD (DC offline, sai quyền, chứng chỉ LDAPS), sync lỗi hoặc bất thường bị giữ lại, lâu không có lượt sync, Key ID trùng.'),
     types: ['sync_problem', 'sync_failed', 'sync_anomaly', 'key_duplicate'],
   },
   key: {
-    label: 'Xem key ngoài giờ và bảo mật dữ liệu',
-    help: 'Hiện key ngoài giờ làm việc, xuất key hàng loạt.',
+    label: tk('Xem key ngoài giờ và bảo mật dữ liệu'),
+    help: tk('Hiện key ngoài giờ làm việc, xuất key hàng loạt.'),
     types: ['reveal_out_of_hours', 'key_export'],
   },
   backup: {
-    label: 'Sao lưu',
-    help: 'Một lượt sao lưu (theo lịch hoặc "Sao lưu ngay") bị lỗi.',
+    label: tk('Sao lưu'),
+    help: tk('Một lượt sao lưu (theo lịch hoặc "Sao lưu ngay") bị lỗi.'),
     types: ['backup_failed'],
   },
 };

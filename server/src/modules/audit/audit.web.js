@@ -11,7 +11,7 @@ export function auditWeb({ audit }) {
   r.get('/', noStore, async (req, res) => {
     const { page, ...filters } = parse(auditFilters, req.query);
     const [result, branches] = await Promise.all([audit.search(req.scope, filters, page), audit.branchOptions(req.scope)]);
-    res.render('audit/index', { title: 'Nhật ký truy cập', result, filters, branches, actions: AUDIT_ACTIONS, query: req.query });
+    res.render('audit/index', { title: req.t('Nhật ký truy cập'), result, filters, branches, actions: AUDIT_ACTIONS, query: req.query });
   });
 
   r.get('/export.csv', noStore, async (req, res) => {

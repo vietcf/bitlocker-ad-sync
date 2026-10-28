@@ -6,23 +6,21 @@
 %>
 <% const isBare = typeof bare !== 'undefined' && bare; %>
 <% if (!isBare && (typeof newRow === 'undefined' || newRow)) { %><div class="filter-break"></div><% } %>
-<% if (!isBare) { %><div class="logon-range<%= typeof newRow !== 'undefined' && !newRow ? ' logon-inline' : '' %>" role="group" aria-label="Đăng nhập AD gần nhất"><% } %>
-  <label class="logon-activity" title="Theo lần đăng nhập domain gần nhất của máy trên AD (lastLogonTimestamp, lệch tối đa ~14 ngày)">Đăng nhập AD gần nhất
-    <select name="activity">
-      <option value="">Tất cả</option>
-      <optgroup label="Hoạt động gần đây">
-        <% months.forEach((n) => { %><option value="a<%= n %>" <%= act === 'a' + n ? 'selected' : '' %>>Trong <%= n %> tháng gần nhất</option><% }) %>
+<% if (!isBare) { %><div class="logon-range<%= typeof newRow !== 'undefined' && !newRow ? ' logon-inline' : '' %>" role="group" aria-label="<%= t('Đăng nhập AD gần nhất') %>"><% } %>
+  <label class="logon-activity" title="<%= t('Theo lần đăng nhập domain gần nhất của máy trên AD (lastLogonTimestamp, lệch tối đa ~14 ngày)') %>"><%= t('Đăng nhập AD gần nhất') %> <select name="activity">
+      <option value=""><%= t('Tất cả') %></option>
+      <optgroup label="<%= t('Hoạt động gần đây') %>">
+        <% months.forEach((n) => { %><option value="a<%= n %>" <%= act === 'a' + n ? 'selected' : '' %>><%= t('Trong {n} tháng gần nhất', { n: n }) %></option><% }) %>
       </optgroup>
-      <optgroup label="Không hoạt động gần đây">
-        <% months.forEach((n) => { %><option value="i<%= n %>" <%= act === 'i' + n ? 'selected' : '' %>>Quá <%= n %> tháng chưa thấy</option><% }) %>
+      <optgroup label="<%= t('Không hoạt động gần đây') %>">
+        <% months.forEach((n) => { %><option value="i<%= n %>" <%= act === 'i' + n ? 'selected' : '' %>><%= t('Quá {n} tháng chưa thấy', { n: n }) %></option><% }) %>
       </optgroup>
     </select>
   </label>
-  <label class="logon-nodata" title="Máy mà AD chưa ghi lần đăng nhập nào: chưa từng đăng nhập domain, hoặc worker chưa báo dữ liệu này.">Máy chưa có dữ liệu
-    <select name="noLogon">
-      <option value="exclude" <%= noLogon === 'exclude' ? 'selected' : '' %>>Không gồm</option>
-      <option value="include" <%= noLogon === 'include' ? 'selected' : '' %>>Gồm cả</option>
-      <option value="only" <%= noLogon === 'only' ? 'selected' : '' %>>Chỉ máy này</option>
+  <label class="logon-nodata" title="<%= t('Máy mà AD chưa ghi lần đăng nhập nào: chưa từng đăng nhập domain, hoặc worker chưa báo dữ liệu này.') %>"><%= t('Máy chưa có dữ liệu') %> <select name="noLogon">
+      <option value="exclude" <%= noLogon === 'exclude' ? 'selected' : '' %>><%= t('Không gồm') %></option>
+      <option value="include" <%= noLogon === 'include' ? 'selected' : '' %>><%= t('Gồm cả') %></option>
+      <option value="only" <%= noLogon === 'only' ? 'selected' : '' %>><%= t('Chỉ máy này') %></option>
     </select>
   </label>
 <% if (!isBare) { %></div>

@@ -14,6 +14,7 @@ import {
   getPasswordHash,
   getTotp,
   loadPrincipal,
+  setUserLanguage,
   recordFailure,
   recordSuccess,
   setPassword,
@@ -255,7 +256,13 @@ export class AuthService {
       // Only local accounts have a password here, so only they can be forced to change it.
       mustChangePassword: p.auth_source === 'local' && p.must_change_password,
       authMethod,
+      language: p.language,
     };
+  }
+
+  /** Saves the signed-in user's language (also the language of the e-mails sent to them). */
+  async setLanguage(scope, language) {
+    await setUserLanguage(this.pool, scope.userId, language);
   }
 
   async changePassword(scope, currentPassword, newPassword, client) {

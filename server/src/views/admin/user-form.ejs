@@ -1,69 +1,66 @@
 <%- include('../partials/head') %>
 <%- include('_tabs') %>
-<p class="crumbs"><a href="/admin/users">← Người dùng</a></p>
+<p class="crumbs"><%- th('<a href="/admin/users">← Người dùng</a>') %></p>
 <section class="card narrow wide-ish">
-  <h2><%= title %><% if (form.isRoot) { %> <span class="badge badge-info" title="Admin gốc: chỉ chính tài khoản này sửa được (hoặc CLI trên máy chủ)">Superadmin</span><% } %></h2>
+  <h2><%= title %><% if (form.isRoot) { %> <span class="badge badge-info" title="<%= t('Admin gốc: chỉ chính tài khoản này sửa được (hoặc CLI trên máy chủ)') %>">Superadmin</span><% } %></h2>
   <%- include('../partials/error-box', { error }) %>
   <form method="post" action="/admin/users<%= userId ? `/${userId}` : '' %>" class="form">
     <%- include('../partials/csrf') %>
     <fieldset>
-      <legend>Cách đăng nhập</legend>
+      <legend><%= t('Cách đăng nhập') %></legend>
       <label class="check"><input type="radio" name="authSource" value="ldap" <%= form.authSource === 'ldap' ? 'checked' : '' %>>
-        <span><strong>Tài khoản AD</strong>: tên và mật khẩu Windows của người dùng, kiểm tra qua LDAPS</span></label>
+        <span><%- th('<strong>Tài khoản AD</strong>: tên và mật khẩu Windows của người dùng, kiểm tra qua LDAPS') %></span></label>
       <label class="check"><input type="radio" name="authSource" value="local" <%= form.authSource === 'local' ? 'checked' : '' %>>
-        <span><strong>Tài khoản nội bộ</strong>: mật khẩu lưu trong hệ thống (dùng cho admin dự phòng khi AD lỗi)</span></label>
+        <span><%- th('<strong>Tài khoản nội bộ</strong>: mật khẩu lưu trong hệ thống (dùng cho admin dự phòng khi AD lỗi)') %></span></label>
       <% if (userId && form.authSource === 'ldap') { %>
-        <p class="muted">Liên kết AD:
-          <% if (form.adObjectGuid) { %>objectGUID <code><%= form.adObjectGuid %></code>, từ <%= h.dateTime(form.adLinkedAt) %>
-          <% } else { %>chưa đăng nhập lần nào (sẽ liên kết ở lần đăng nhập đầu)<% } %></p>
+        <p class="muted"><%= t('Liên kết AD:') %> <% if (form.adObjectGuid) { %>objectGUID <code><%= form.adObjectGuid %></code><%= t(', từ {at}', { at: h.dateTime(form.adLinkedAt) }) %>
+          <% } else { %><%= t('chưa đăng nhập lần nào (sẽ liên kết ở lần đăng nhập đầu)') %><% } %></p>
       <% } %>
     </fieldset>
     <% if (userId) { %>
-      <p>Tên đăng nhập: <strong><%= form.username %></strong></p>
+      <p><%- th('Tên đăng nhập: <strong>{username}</strong>', { username: form.username }) %></p>
     <% } else { %>
-      <label>Tên đăng nhập
-        <input name="username" value="<%= form.username ?? '' %>" required maxlength="64" placeholder="nguyenvana" autocomplete="off" spellcheck="false">
-        <span class="muted hint">Tài khoản AD: sAMAccountName (tên đăng nhập Windows). Tài khoản nội bộ: tên tùy chọn.</span>
+      <label><%= t('Tên đăng nhập') %> <input name="username" value="<%= form.username ?? '' %>" required maxlength="64" placeholder="nguyenvana" autocomplete="off" spellcheck="false">
+        <span class="muted hint"><%= t('Tài khoản AD: sAMAccountName (tên đăng nhập Windows). Tài khoản nội bộ: tên tùy chọn.') %></span>
       </label>
     <% } %>
-    <label>Họ tên <input name="displayName" value="<%= form.displayName ?? '' %>" maxlength="256">
-      <span class="muted hint">Tài khoản AD: để trống thì tự lấy từ AD ở lần đăng nhập đầu (đã có thì không bị ghi đè). Tài khoản nội bộ: bắt buộc.</span>
+    <label><%= t('Họ tên') %> <input name="displayName" value="<%= form.displayName ?? '' %>" maxlength="256">
+      <span class="muted hint"><%= t('Tài khoản AD: để trống thì tự lấy từ AD ở lần đăng nhập đầu (đã có thì không bị ghi đè). Tài khoản nội bộ: bắt buộc.') %></span>
     </label>
     <label>Email
       <input type="email" name="email" value="<%= form.email ?? '' %>" maxlength="254" placeholder="nguyenvana@corp.local" autocomplete="off" spellcheck="false">
-      <span class="muted hint">Tài khoản AD: để trống thì tự lấy từ AD ở lần đăng nhập đầu. Chưa có email thì không nhận được thư cảnh báo. Tài khoản nội bộ: bắt buộc.</span>
+      <span class="muted hint"><%= t('Tài khoản AD: để trống thì tự lấy từ AD ở lần đăng nhập đầu. Chưa có email thì không nhận được thư cảnh báo. Tài khoản nội bộ: bắt buộc.') %></span>
     </label>
     <% if (userId) { %>
-      <label class="check"><input type="checkbox" name="isActive" <%= form.isActive ? 'checked' : '' %>> Đang hoạt động (bỏ chọn để khóa tài khoản)</label>
+      <label class="check"><input type="checkbox" name="isActive" <%= form.isActive ? 'checked' : '' %>> <%= t('Đang hoạt động (bỏ chọn để khóa tài khoản)') %></label>
     <% } else { %>
       <input type="hidden" name="isActive" value="on">
     <% } %>
 
     <fieldset>
-      <legend>Bảo mật đăng nhập</legend>
+      <legend><%= t('Bảo mật đăng nhập') %></legend>
       <label class="check"><input type="checkbox" name="totpRequired" <%= form.totpRequired ? 'checked' : '' %>>
-        <span><strong>Bắt buộc xác thực 2 bước</strong>: sau mật khẩu phải nhập mã 6 số trong app Microsoft / Google Authenticator</span></label>
+        <span><%- th('<strong>Bắt buộc xác thực 2 bước</strong>: sau mật khẩu phải nhập mã 6 số trong app Microsoft / Google Authenticator') %></span></label>
       <% if (userId && form.totpRequired) { %>
         <p class="muted small">
-          <% if (form.totpEnrolledAt) { %>Đã thiết lập app xác thực lúc <%= h.dateTime(form.totpEnrolledAt) %>.
-          <% } else { %>Chưa thiết lập: lần đăng nhập tới người dùng sẽ quét mã QR.<% } %>
-          Bỏ chọn rồi lưu thì tắt và xóa thiết lập cũ.</p>
+          <% if (form.totpEnrolledAt) { %><%= t('Đã thiết lập app xác thực lúc {at}.', { at: h.dateTime(form.totpEnrolledAt) }) %>
+          <% } else { %><%= t('Chưa thiết lập: lần đăng nhập tới người dùng sẽ quét mã QR.') %><% } %> <%= t('Bỏ chọn rồi lưu thì tắt và xóa thiết lập cũ.') %></p>
       <% } else if (!userId) { %>
-        <p class="muted small">Lần đăng nhập đầu, người dùng quét mã QR để thiết lập app xác thực.</p>
+        <p class="muted small"><%= t('Lần đăng nhập đầu, người dùng quét mã QR để thiết lập app xác thực.') %></p>
       <% } %>
       <label class="check" data-local-only><input type="checkbox" name="mustChangePassword" <%= form.mustChangePassword ? 'checked' : '' %>
              <%= form.authSource === 'ldap' ? 'disabled' : '' %>>
-        <span><strong>Bắt đổi mật khẩu ở lần đăng nhập sau</strong> <span class="muted">(chỉ tài khoản nội bộ; tài khoản AD đổi mật khẩu trên Windows)</span></span></label>
+        <span><%- th('<strong>Bắt đổi mật khẩu ở lần đăng nhập sau</strong> <span class="muted">(chỉ tài khoản nội bộ; tài khoản AD đổi mật khẩu trên Windows)</span>') %></span></label>
     </fieldset>
 
     <fieldset>
-      <legend>Quyền</legend>
+      <legend><%= t('Quyền') %></legend>
       <label class="check admin-check"><input type="checkbox" name="grants" value="admin:all" <%= form.grants.includes('admin:all') ? 'checked' : '' %>>
-        <span><strong>Admin HQ</strong>: toàn quyền, xem key mọi chi nhánh, quản trị hệ thống. Chọn mục này thì không cần chọn vai trò theo chi nhánh.</span></label>
+        <span><%- th('<strong>Admin HQ</strong>: toàn quyền, xem key mọi chi nhánh, quản trị hệ thống. Chọn mục này thì không cần chọn vai trò theo chi nhánh.') %></span></label>
       <div class="grants-wrap">
-      <p class="muted small">Không chọn Admin HQ thì chọn vai trò theo từng chi nhánh (mỗi chi nhánh một vai trò).</p>
+      <p class="muted small"><%= t('Không chọn Admin HQ thì chọn vai trò theo từng chi nhánh (mỗi chi nhánh một vai trò).') %></p>
       <table class="grants">
-        <thead><tr><th>Chi nhánh</th><% ['it', 'lead', 'auditor'].forEach((r) => { %><th><%= h.role(r) %></th><% }) %></tr></thead>
+        <thead><tr><th><%= t('Chi nhánh') %></th><% ['it', 'lead', 'auditor'].forEach((r) => { %><th><%= h.role(r) %></th><% }) %></tr></thead>
         <tbody>
           <% branches.forEach((b) => { %>
           <tr>
@@ -79,43 +76,42 @@
     </fieldset>
 
     <div class="actions">
-      <button type="submit">Lưu</button>
-      <a class="button secondary" href="/admin/users">Hủy</a>
+      <button type="submit"><%= t('Lưu') %></button>
+      <a class="button secondary" href="/admin/users"><%= t('Hủy') %></a>
     </div>
-    <p class="muted">Tài khoản nội bộ: mật khẩu một lần được tạo tự động và hiện ở bước sau; người dùng phải đổi ở lần đăng nhập đầu.
-      Tài khoản AD: không có mật khẩu trong hệ thống.</p>
+    <p class="muted"><%= t('Tài khoản nội bộ: mật khẩu một lần được tạo tự động và hiện ở bước sau; người dùng phải đổi ở lần đăng nhập đầu. Tài khoản AD: không có mật khẩu trong hệ thống.') %></p>
   </form>
 
   <% if (userId) { %>
   <hr>
   <div class="actions">
     <% if (form.authSource === 'local') { %>
-    <form method="post" action="/admin/users/<%= userId %>/reset-password" class="inline" data-confirm="Tạo mật khẩu mới cho <%= form.username %>? Mật khẩu cũ sẽ không dùng được nữa.">
+    <form method="post" action="/admin/users/<%= userId %>/reset-password" class="inline" data-confirm="<%= t('Tạo mật khẩu mới cho {username}? Mật khẩu cũ sẽ không dùng được nữa.', { username: form.username }) %>">
       <%- include('../partials/csrf') %>
-      <button type="submit" class="secondary">Đặt lại mật khẩu</button>
+      <button type="submit" class="secondary"><%= t('Đặt lại mật khẩu') %></button>
     </form>
     <% } else if (form.adObjectGuid) { %>
-    <form method="post" action="/admin/users/<%= userId %>/unlink-ad" class="inline" data-confirm="Gỡ liên kết tài khoản AD? Dùng khi tài khoản AD của người này bị xóa và tạo lại.">
+    <form method="post" action="/admin/users/<%= userId %>/unlink-ad" class="inline" data-confirm="<%= t('Gỡ liên kết tài khoản AD? Dùng khi tài khoản AD của người này bị xóa và tạo lại.') %>">
       <%- include('../partials/csrf') %>
-      <button type="submit" class="secondary" title="Xóa liên kết giữa user này và tài khoản AD đã ghi nhận (objectGUID). Dùng khi tài khoản AD bị xóa rồi tạo lại cho cùng người hoặc người khác trùng tên: lúc đó đăng nhập báo không khớp tài khoản AD. Sau khi gỡ, lần đăng nhập AD kế tiếp sẽ gắn với tài khoản AD hiện tại. Quyền và chi nhánh của user giữ nguyên.">Gỡ liên kết AD</button>
+      <button type="submit" class="secondary" title="<%= t('Xóa liên kết giữa user này và tài khoản AD đã ghi nhận (objectGUID). Dùng khi tài khoản AD bị xóa rồi tạo lại cho cùng người hoặc người khác trùng tên: lúc đó đăng nhập báo không khớp tài khoản AD. Sau khi gỡ, lần đăng nhập AD kế tiếp sẽ gắn với tài khoản AD hiện tại. Quyền và chi nhánh của user giữ nguyên.') %>"><%= t('Gỡ liên kết AD') %></button>
     </form>
     <% } %>
     <% if (form.totpEnrolledAt) { %>
-    <form method="post" action="/admin/users/<%= userId %>/reset-2fa" class="inline" data-confirm="Đặt lại xác thực 2 bước của <%= form.username %>? App xác thực cũ không dùng được nữa; lần đăng nhập tới người dùng quét mã QR mới.">
+    <form method="post" action="/admin/users/<%= userId %>/reset-2fa" class="inline" data-confirm="<%= t('Đặt lại xác thực 2 bước của {username}? App xác thực cũ không dùng được nữa; lần đăng nhập tới người dùng quét mã QR mới.', { username: form.username }) %>">
       <%- include('../partials/csrf') %>
-      <button type="submit" class="secondary">Đặt lại xác thực 2 bước</button>
+      <button type="submit" class="secondary"><%= t('Đặt lại xác thực 2 bước') %></button>
     </form>
     <% } %>
     <% if (form.isLocked) { %>
     <form method="post" action="/admin/users/<%= userId %>/unlock" class="inline">
       <%- include('../partials/csrf') %>
-      <button type="submit" class="secondary">Mở khóa (sai mật khẩu)</button>
+      <button type="submit" class="secondary"><%= t('Mở khóa (sai mật khẩu)') %></button>
     </form>
     <% } %>
     <% if (!form.isRoot && form.username !== me.upn) { %>
-    <form method="post" action="/admin/users/<%= userId %>/delete" class="inline" data-confirm="Xóa hẳn người dùng <%= form.username %>? Không thể hoàn tác.">
+    <form method="post" action="/admin/users/<%= userId %>/delete" class="inline" data-confirm="<%= t('Xóa hẳn người dùng {username}? Không thể hoàn tác.', { username: form.username }) %>">
       <%- include('../partials/csrf') %>
-      <button type="submit" class="danger" title="Chỉ xóa được khi nhật ký chưa có dòng nào liên quan đến người này. Nếu đã có thì không xóa được, chỉ vô hiệu hóa (bỏ chọn Đang hoạt động).">Xóa người dùng</button>
+      <button type="submit" class="danger" title="<%= t('Chỉ xóa được khi nhật ký chưa có dòng nào liên quan đến người này. Nếu đã có thì không xóa được, chỉ vô hiệu hóa (bỏ chọn Đang hoạt động).') %>"><%= t('Xóa người dùng') %></button>
     </form>
     <% } %>
   </div>

@@ -12,7 +12,7 @@ import { syncWeb } from '../modules/sync/sync.web.js';
 import { dashboardWeb } from '../modules/dashboard/dashboard.web.js';
 import { settingsWeb } from '../modules/settings/settings.web.js';
 import { templateLocals, webErrorHandler } from './middleware.js';
-import { helpers } from './helpers.js';
+import { languageContext, languageRoute } from './language.js';
 import { ALERT_SWITCHES } from '../modules/settings/settings.service.js';
 
 /** Server-rendered pages (EJS). Same services as the API; forms carry a CSRF token. */
@@ -20,6 +20,7 @@ export function createWebRouter({ services, config, sessions }) {
   const web = Router();
   web.use(sessions, express.urlencoded({ extended: false, limit: '100kb' }), rejectNul);
   web.use(loadUser({ auth: services.auth, config, settings: services.settings }));
+  web.use(languageContext());
   web.use(templateLocals);
   // Feature switches (Quan tri > Tinh nang) for templates: show or hide buttons.
   web.use(async (req, res, next) => {
@@ -27,10 +28,12 @@ export function createWebRouter({ services, config, sessions }) {
     res.locals.alertsOff = [];
     for (const a of ALERT_SWITCHES) if (!(await services.settings.alertEnabled(a.type))) res.locals.alertsOff.push(a.type);
     res.locals.activityMonths = Number(await services.settings.get('computer.recent_months', 3));
-    res.locals.activityTip = helpers.activityTip(res.locals.activityMonths);
+    res.locals.activityTip = res.locals.h.activityTip(res.locals.activityMonths);
     next();
   });
   web.use(verifyCsrf);
+
+  web.post('/language', languageRoute({ auth: services.auth, config }));
 
   const signedIn = requireUser({ allowWhilePasswordChange: ['/change-password', '/logout'] });
 
@@ -52,7 +55,7 @@ export function createWebRouter({ services, config, sessions }) {
   web.use('/computers', requireCapability('keys'));
   web.use('/', computersWeb(services));
 
-  web.use((req, res) => res.status(404).render('error', { title: 'Không tìm thấy', status: 404, message: 'Không tìm thấy trang.', requestId: null }));
+  web.use((req, res) => res.status(404).render('error', { title: req.t('Không tìm thấy'), status: 404, message: req.t('Không tìm thấy trang.'), requestId: null }));
   web.use(webErrorHandler);
   return web;
 }
